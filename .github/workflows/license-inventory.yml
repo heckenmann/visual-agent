@@ -8,6 +8,8 @@ on:
       - "gradle/wrapper/gradle-wrapper.properties"
       - "scripts/license-settings.init.gradle.kts"
       - "scripts/generate-package-inventory.sh"
+      - "scripts/collect-third-party-notices.py"
+      - "scripts/test_release_notices.py"
       - ".github/workflows/license-inventory.yml"
       - "docs/dependency-license-audit.md"
       - "docs/dependency-licenses-*.csv"
@@ -82,6 +84,10 @@ jobs:
           bash scripts/generate-package-inventory.sh \
             modules/desktop/build/compose/binaries/main/app \
             build/reports/dependency-license
+          python3 scripts/collect-third-party-notices.py \
+            --package-root modules/desktop/build/compose/binaries/main/app \
+            --inventory modules/desktop/build/reports/dependency-license/packaged-artifacts.csv \
+            --output build/reports/dependency-license/third-party-notices
 
       - name: Upload inventories
         uses: actions/upload-artifact@v7
@@ -98,3 +104,4 @@ jobs:
             build/reports/dependency-license/embedded-notices.txt
             modules/desktop/build/reports/dependency-license/packaged-artifacts.csv
             modules/desktop/build/reports/dependency-license/runtime-provenance.properties
+            build/reports/dependency-license/third-party-notices/
