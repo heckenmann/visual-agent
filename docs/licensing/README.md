@@ -60,6 +60,12 @@ the legal-material directory. File links outside the source JDK and directory li
 are rejected. This fixes provenance retention, not corresponding-source delivery
 or application/native dependency notice completeness.
 
+The `Release workflow contracts` CI job runs the complete `test_release_*.py`
+suite independently of `Gradle tests`. The runtime legal-material fixtures execute
+real Gradle builds; serializing them after the application suite exhausted the
+existing 15-minute job budget despite successful assertions. Both suites retain
+their tests and limits, and the contract job uses the Gradle cache read-only.
+
 ## Zulu Runtime
 
 CI currently uses Zulu Community Availability JDK 27, not Subscriber Availability.
