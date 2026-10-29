@@ -1,4 +1,6 @@
 import de.heckenmann.visualagent.gradle.GenerateBranding
+import de.heckenmann.visualagent.gradle.PrepareRuntimeLegalMaterials
+import de.heckenmann.visualagent.gradle.verifyPackagedRuntimeLegalMaterials
 import org.gradle.api.artifacts.component.ModuleComponentIdentifier
 import org.gradle.api.tasks.SourceSetContainer
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
@@ -180,8 +182,18 @@ val desktopJavaHome =
         .get()
         .metadata.installationPath.asFile
 
+val prepareRuntimeLegalMaterials =
+    tasks.register<PrepareRuntimeLegalMaterials>("prepareRuntimeLegalMaterials") {
+        group = "distribution"
+        description = "Retains source-JDK legal files and exact public build provenance in native packages."
+        jdkHome.set(desktopJavaHome)
+        projectLicense.set(rootProject.layout.projectDirectory.file("LICENSE"))
+        outputDirectory.set(layout.buildDirectory.dir("generated/runtime-legal-resources"))
+    }
+
 compose.desktop {
     application {
+        dependsOn("prepareRuntimeLegalMaterials")
         javaHome = desktopJavaHome.absolutePath
         mainClass = "de.heckenmann.visualagent.desktop.DesktopMain"
         jvmArgs +=
@@ -195,6 +207,7 @@ compose.desktop {
                 },
             )
         nativeDistributions {
+            appResourcesRootDir.set(prepareRuntimeLegalMaterials.flatMap { it.outputDirectory })
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb, TargetFormat.Rpm)
             modules(
                 "java.compiler",
@@ -417,7 +430,7 @@ val desktopBootJar =
 tasks.register("generateDistributionArtifactInventory") {
     group = "reporting"
     description = "Maps packaged JAR names to resolved desktop runtime artifacts."
-    dependsOn("createDistributable")
+    dependsOn("verifyNativeDistributionLauncher")
     val report = layout.buildDirectory.file("reports/dependency-license/packaged-artifacts.csv")
     doLast {
         val artifactsByPackagingHash =
@@ -741,8 +754,23 @@ val verifyNativeDistributionLauncher =
             check(JavaVersion.toVersion(runtimeVersion).majorVersion == desktopJavaVersion.toString()) {
                 "Native distribution runtime $runtimeVersion does not match project toolchain $desktopJavaVersion."
             }
+            val resources =
+                when {
+                    osName.equals("Mac OS X", ignoreCase = true) -> distributionDirectory.resolve("$appName.app/Contents/app/resources")
+                    osName.startsWith("Windows", ignoreCase = true) -> distributionDirectory.resolve("$appName/app/resources")
+                    else -> distributionDirectory.resolve("$appName/lib/app/resources")
+                }
+            val provenance = verifyPackagedRuntimeLegalMaterials(resources, runtimeHome, desktopJavaHome, rootProject.file("LICENSE"))
+            layout.buildDirectory.file("reports/dependency-license/runtime-provenance.properties").get().asFile.apply {
+                parentFile.mkdirs()
+                writeText(provenance.entries.joinToString("\n", postfix = "\n") { (key, value) -> "$key=$value" })
+            }
         }
     }
+
+tasks.matching { it.name in setOf("packageDmg", "packageMsi", "packageLinuxDeb", "packageLinuxRpm", "packageAppImage") }.configureEach {
+    dependsOn(verifyNativeDistributionLauncher)
+}
 
 val verifyLinuxDesktopEntry =
     tasks.register("verifyLinuxDesktopEntry") {
