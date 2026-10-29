@@ -22,6 +22,12 @@ jobs:
     timeout-minutes: 10
 
     steps:
+      - name: Check out trusted publication policy
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+
       - name: Read package workflow metadata
         env:
           GH_TOKEN: ${{ github.token }}
@@ -60,9 +66,22 @@ jobs:
             visual-agent-windows-x64-jar \
             visual-agent-macos-arm64 \
             visual-agent-macos-x64 \
-            visual-agent-windows; do
+            visual-agent-windows \
+            visual-agent-legal \
+            visual-agent-corresponding-sources; do
             gh run download "$RUN_ID" --repo "$GH_REPO" --name "$artifact" --dir release-assets
           done
+
+      - name: Verify exact release license clearance
+        if: env.PUBLISH_RELEASE == 'true'
+        env:
+          SOURCE_COMMIT: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          python3 scripts/verify-release-licenses.py \
+            --policy docs/licensing/release-approvals.json \
+            --assets release-assets \
+            --tag "$RELEASE_TAG" \
+            --source-commit "$SOURCE_COMMIT"
 
       - name: Attach artifacts to existing GitHub release
         if: env.PUBLISH_RELEASE == 'true'
@@ -72,6 +91,6 @@ jobs:
         run: |
           set -euo pipefail
           mapfile -t assets < <(find release-assets -maxdepth 1 -type f -print | sort)
-          test "${#assets[@]}" -eq 10
+          test "${#assets[@]}" -eq 12
           gh release view "$RELEASE_TAG" --repo "$GH_REPO" >/dev/null
           gh release upload "$RELEASE_TAG" "${assets[@]}" --repo "$GH_REPO" --clobber

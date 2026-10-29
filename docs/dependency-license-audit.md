@@ -2,6 +2,16 @@
 
 Audit date: 2026-09-28. Scope: Issue [#47](https://github.com/heckenmann/visual-agent/issues/47), repository `master` at the start of the audit, macOS arm64 dependency resolution. This is an engineering compliance inventory, not a legal opinion.
 
+## October 29 Release Safety Work
+
+Issue #410 is now in progress. The [publication clearance gate](licensing/README.md)
+requires a reviewed source commit, exact release-file hashes, a legal bundle, and
+corresponding-source archive before upload. No release is currently approved.
+This safety gate does not mean the historical package obligations below are solved.
+CI now uses Zulu CA JDK 27; the older Temurin observations remain historical only.
+The owner confirmed project-generated asset provenance on October 29; the exact
+current inputs and conversion process are recorded in [project assets](licensing/project-assets.md).
+
 ## October 21 Framework Upgrade Supplement
 
 Issue #484 upgrades Spring AI to 2.1.0-M1 and Spring Boot to 4.2.0-M2 and adds the
