@@ -44,14 +44,34 @@ tasks.register<JavaExec>("benchmarkDirectProvider") {
     dependsOn(tasks.testClasses)
     classpath = sourceSets.test.get().runtimeClasspath
     mainClass.set("de.heckenmann.visualagent.agent.codexdirect.DirectProviderBenchmarkKt")
-    javaLauncher.set(javaToolchains.launcherFor { languageVersion.set(JavaLanguageVersion.of(24)) })
+    javaLauncher.set(
+        javaToolchains.launcherFor {
+            languageVersion.set(
+                JavaLanguageVersion.of(
+                    libs.versions.java.toolchain
+                        .get()
+                        .toInt(),
+                ),
+            )
+        },
+    )
 }
 
 kotlin {
-    jvmToolchain(24)
+    jvmToolchain(
+        libs.versions.java.toolchain
+            .get()
+            .toInt(),
+    )
     compilerOptions {
-        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_24)
-        freeCompilerArgs.addAll("-Xjsr305=strict", "-Werror")
+        jvmTarget.set(
+            org.jetbrains.kotlin.gradle.dsl.JvmTarget
+                .fromTarget(
+                    libs.versions.java.bytecode
+                        .get(),
+                ),
+        )
+        freeCompilerArgs.addAll("-Xjsr305=strict", "-Werror", "-Xjdk-release=${libs.versions.java.bytecode.get()}")
     }
 }
 

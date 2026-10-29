@@ -54,6 +54,9 @@ class ReleaseVersionTest(unittest.TestCase):
     def test_prefixed_tag_overrides_the_catalog_for_all_projects(self):
         self.assert_version("v2.3.4", "2.3.4")
 
+    def test_zero_major_release_keeps_its_original_application_version(self):
+        self.assert_version("v0.1.0", "0.1.0")
+
     def test_unprefixed_prerelease_preserves_build_metadata(self):
         self.assert_version("2.3.4-beta.1+build.7", "2.3.4-beta.1+build.7")
 
@@ -72,6 +75,37 @@ class ReleaseVersionTest(unittest.TestCase):
         self.assertNotEqual(0, result.returncode)
         self.assertIn("Release version exceeds native installer limits", result.stderr)
 
+    def toolchain_guard(self, release):
+        build = (ROOT / "build.gradle.kts").read_text()
+        start = build.index("val verifyJavaToolchains =")
+        guard = build[start:build.index("\nlicenseReport {", start)]
+        with tempfile.TemporaryDirectory() as temporary:
+            project = pathlib.Path(temporary)
+            (project / "gradle").mkdir()
+            (project / "settings.gradle.kts").write_text('rootProject.name = "toolchain-guard-fixture"\n')
+            (project / "gradle/libs.versions.toml").write_text('[versions]\njava-toolchain = "27"\n')
+            (project / "build.gradle.kts").write_text(
+                'import org.gradle.api.tasks.testing.Test\n'
+                'plugins { java }\n'
+                'val javaBytecodeVersion = 24\n'
+                'java { toolchain { languageVersion.set(JavaLanguageVersion.of(27)) } }\n'
+                f'tasks.withType<JavaCompile>().configureEach {{ options.release.set({release}) }}\n'
+                + guard
+            )
+            return subprocess.run(
+                [str(ROOT / "gradlew"), "-p", str(project), "--offline", "--quiet", "verifyJavaToolchains", "--no-daemon"],
+                capture_output=True,
+                text=True,
+            )
+
+    def test_actual_toolchain_guard_accepts_jdk_27_with_release_24(self):
+        result = self.toolchain_guard(24)
+        self.assertEqual(0, result.returncode, result.stderr)
+
+    def test_actual_toolchain_guard_rejects_a_divergent_java_release(self):
+        result = self.toolchain_guard(25)
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn("has a different bytecode release", result.stderr)
 
 if __name__ == "__main__":
     unittest.main()

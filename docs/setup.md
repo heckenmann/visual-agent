@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- Java 21+ (the project auto-resolves the JDK 24 toolchain locally; CI installs JDK 24 explicitly).
+- JDK 27 for development, compilation, tests, and native packaging/runtime. Point `JAVA_HOME` at JDK 27 when running Gradle; CI installs JDK 27 explicitly. Gradle can also resolve the configured toolchain automatically. No second development JDK is required.
 - The Gradle wrapper version is defined centrally in `gradle/wrapper/gradle-wrapper.properties` and is independent of the Visual Agent application version. The Wrapper JAR is intentionally excluded from version control. In a fresh clone, run `gradle wrapper --gradle-version <version from gradle-wrapper.properties> --no-daemon` once before using `./gradlew`.
 - A configured model provider: Ollama (local or remote), OpenAI-compatible, Codex CLI, or Codex Direct. Ollama must be running (`ollama serve`) only when using that provider.
 - H2 is embedded and accessed through Spring Data R2DBC. Versioned schema migrations run automatically before the stores are created.
@@ -56,7 +56,7 @@ only after all smoke checks pass:
 Before publishing, the package-and-smoke workflow installs and launches the uploaded package artifacts on
 their target systems. DEB and AppImage are tested in Ubuntu containers; RPM is tested in a Fedora
 container; DMGs and MSI are tested on matching macOS and Windows runners. Platform JARs are launched
-with Java 24. Smoke runs use isolated temporary data and require an explicit desktop-ready signal,
+with Java 27. Smoke runs use isolated temporary data and require an explicit desktop-ready signal,
 database/workspace creation, and orderly shutdown. Native packages are tested without a system JDK.
 These platform checks run in parallel after packaging. Maintainers can manually dispatch the
 package-and-smoke workflow for `master` or another branch using GitHub's branch selector, without
@@ -75,8 +75,20 @@ the shared `visual-agent` catalog entry. No source file or Git commit is changed
 
 All application modules, executable JARs, and runtime version metadata receive the full version.
 Native installer metadata uses only `MAJOR.MINOR.PATCH`; Windows MSI limits major/minor to 255
-and patch to 65535. Same-core prereleases therefore share a native installer version, although
-their application metadata and GitHub release tags remain distinct.
+and patch to 65535. Native packaging uses JDK 27, which includes the official JDK-8380634 fix for
+zero-major macOS versions. A release such as `v0.1.0` therefore remains `0.1.0` in Gradle, runtime
+metadata, and native installer metadata; no artificial version offset or bundle rewrite is used.
+Same-core prereleases share a native installer version, although their full application versions
+and GitHub release tags remain distinct.
+
+The single JDK is configured centrally by `java-toolchain` in `gradle/libs.versions.toml`.
+Compilation, tests, CI, `jlink`, `jpackage`, the bundled runtime, and its matching `keytool` all use JDK 27.
+The separate `java-bytecode` entry remains 24: Kotlin's `jvmTarget` and `-Xjdk-release`, plus Java's
+`options.release`, keep both bytecode and platform API usage compatible with Java 24. This is not
+a second toolchain; the stable Kotlin compiler does not yet expose a JVM-27 bytecode target.
+`verifyJavaToolchains` checks every Java compiler/test launcher and the shared Java release level
+during `check`; `verifyPackages` checks that the native runtime matches the same JDK.
+Regular CI and executable-JAR smoke tests run on Java 27.
 
 Local builds and manually dispatched smoke runs keep the version in `gradle/libs.versions.toml`.
 To reproduce a release build locally without publishing anything:

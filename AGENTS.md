@@ -11,9 +11,9 @@
 - Run one test class/method: `./gradlew test --tests "de.heckenmann.visualagent.<path>.<TestClass>.<method>"`.
 - Run smoke tests against real Ollama: `./gradlew test -Dvisualagent.ollama.smoke=true` (default `false`).
 - Copy dependencies to `./lib/`: `./gradlew :application:copyAllDependencies`.
-- Java toolchain is **JDK 24** (`jvmToolchain(24)`); CI installs **JDK 24** explicitly.
+- Development, compilation, tests, CI, packaging, and the native runtime use **JDK 27** (`java-toolchain` in the catalog), including the official zero-major macOS jpackage fix JDK-8380634. Bytecode/API compatibility stays at **Java 24** (`java-bytecode`): Kotlin uses `jvmTarget` plus `-Xjdk-release`, Java uses `options.release`. `verifyJavaToolchains` enforces compiler and test launcher consistency during `check`.
 - The Gradle wrapper version is defined centrally in `gradle/wrapper/gradle-wrapper.properties`; CI reads that version when bootstrapping the wrapper. You only need a local Gradle installation to regenerate it.
-- The application version defaults to `gradle/libs.versions.toml`. GitHub release builds pass `ORG_GRADLE_PROJECT_releaseTag`; `gradle/release-version.settings.gradle.kts` validates SemVer and overrides the shared application version (optional `v` removed). Runtime/JAR metadata keeps the full version; native installers use its numeric core. Never rewrite the catalog to prepare a release.
+- The application version defaults to `gradle/libs.versions.toml`. GitHub release builds pass `ORG_GRADLE_PROJECT_releaseTag`; `gradle/release-version.settings.gradle.kts` validates SemVer and overrides the shared application version (optional `v` removed). Runtime/JAR metadata keeps the full version; native installers use its numeric core. Never rewrite the catalog or patch a signed bundle to prepare a release.
 - `gradle.properties` sets `org.gradle.daemon=false` (matches CI).
 
 ## Pre-Commit Quality Gates
@@ -87,7 +87,7 @@ The same tool-call history persistence applies to unredacted server and client p
 
 ## Prerequisites
 
-- Java 21+ (toolchain auto-resolves JDK 24).
+- JDK 27 for development/builds; toolchains can auto-resolve it. Application JARs retain the Java-24 bytecode/API target.
 - A local Gradle installation is only needed to regenerate `gradlew`; the wrapper version is defined in `gradle/wrapper/gradle-wrapper.properties`.
 - Ollama running (`ollama serve`) when using local Ollama, or a reachable remote Ollama endpoint.
 - Optional: Ollama API key (bearer) when the endpoint requires authentication; non-blank keys are sent as `Authorization: Bearer <key>` on every request and apply live without restart (Base URL changes still require restart).

@@ -1,5 +1,7 @@
 [versions]
 visual-agent = "1.0.0"
+java-toolchain = "27"
+java-bytecode = "24"
 kotlin = "2.4.21"
 ktlint = "14.2.0"
 ktlint-core = "1.5.0"

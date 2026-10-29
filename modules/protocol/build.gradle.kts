@@ -49,10 +49,20 @@ protobuf {
 }
 
 kotlin {
-    jvmToolchain(24)
+    jvmToolchain(
+        libs.versions.java.toolchain
+            .get()
+            .toInt(),
+    )
     compilerOptions {
-        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_24)
-        freeCompilerArgs.addAll("-Xjsr305=strict", "-Werror")
+        jvmTarget.set(
+            org.jetbrains.kotlin.gradle.dsl.JvmTarget
+                .fromTarget(
+                    libs.versions.java.bytecode
+                        .get(),
+                ),
+        )
+        freeCompilerArgs.addAll("-Xjsr305=strict", "-Werror", "-Xjdk-release=${libs.versions.java.bytecode.get()}")
     }
 }
 

@@ -84,6 +84,14 @@ Native installer metadata uses the numeric core because not all package formats 
 suffixes. The source catalog and dependency/plugin versions remain unchanged. Manual smoke runs
 without a release tag retain the checked-in default. See [release version instructions](setup.md#release-versions).
 
+The `java-toolchain` catalog entry selects the same JDK 27 for compilation, tests, CI, native
+tooling and the bundled runtime. This includes the upstream JDK-8380634 fix accepting zero-major
+macOS versions without rewriting the application version. The distinct `java-bytecode` entry is
+24: all Kotlin compilers use its JVM target and `-Xjdk-release` platform-API restriction, and every
+Java compiler uses the same `options.release`. This preserves the supported bytecode target
+without installing a second development JDK. `verifyJavaToolchains` guards compiler/test-launcher
+JDK selection and Java release levels; native runtime verification checks the same toolchain JDK.
+
 The Foojay toolchain resolver is the sole settings-only plugin and remains declared once in `settings.gradle.kts`, where Gradle evaluates it before the catalog is available. It is not applied by, or shared between, main-build modules.
 
 Codex support is implemented in `:provider-openai-codex` as a clean-room Spring AI adapter over the public Codex app-server JSON-RPC protocol. No Codex connector source tree, copied implementation, or community connector dependency is part of this repository.
