@@ -31,7 +31,7 @@ jobs:
       - name: Set up Java
         uses: actions/setup-java@v6
         with:
-          distribution: temurin
+          distribution: zulu
           java-version: "27"
 
       - name: Read Gradle wrapper version
@@ -155,7 +155,7 @@ jobs:
       - name: Set up Java
         uses: actions/setup-java@v6
         with:
-          distribution: temurin
+          distribution: zulu
           java-version: "27"
 
       - name: Set up Gradle
@@ -272,7 +272,7 @@ jobs:
       - name: Set up Java
         uses: actions/setup-java@v6
         with:
-          distribution: temurin
+          distribution: zulu
           java-version: "27"
 
       - name: Download Linux JAR
@@ -319,7 +319,7 @@ jobs:
         if: matrix.kind == 'jar'
         uses: actions/setup-java@v6
         with:
-          distribution: temurin
+          distribution: zulu
           java-version: "27"
 
       - name: Download release artifact
@@ -351,7 +351,7 @@ jobs:
         if: matrix.kind == 'jar'
         uses: actions/setup-java@v6
         with:
-          distribution: temurin
+          distribution: zulu
           java-version: "27"
 
       - name: Download release artifact

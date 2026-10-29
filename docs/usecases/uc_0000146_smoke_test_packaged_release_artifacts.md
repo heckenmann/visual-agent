@@ -92,3 +92,7 @@ levels at 24 because the stable Kotlin compiler does not yet expose JVM-27 bytec
 verification checks the same JDK. No artificial version offset, custom packager, or signed-bundle patch is used.
 Regression tests preserve `v0.1.0` as application version `0.1.0`; an actual macOS DMG build
 exercises the jpackage path that failed in the release, including the unchanged installer version.
+
+CI installs Azul Zulu JDK 27 on every platform. [Temurin no longer publishes JDK 27 for Intel macOS](https://adoptium.net/news/2026/09/jdk27-macos-x64-removal),
+whereas [Zulu provides JDK 27 for macOS x64 and ARM64, Linux x64, and Windows x64](https://www.azul.com/downloads/).
+This preserves JDK 27 throughout the matrix rather than downgrading one architecture or dropping its package.

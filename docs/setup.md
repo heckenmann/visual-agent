@@ -3,6 +3,7 @@
 ## Prerequisites
 
 - JDK 27 for development, compilation, tests, and native packaging/runtime. Point `JAVA_HOME` at JDK 27 when running Gradle; CI installs JDK 27 explicitly. Gradle can also resolve the configured toolchain automatically. No second development JDK is required.
+- CI uses Azul Zulu JDK 27 across all platforms, including Intel macOS. Temurin stopped publishing macOS x64 builds starting with JDK 27; using the same supported distribution throughout avoids an architecture-specific Java-version fallback.
 - The Gradle wrapper version is defined centrally in `gradle/wrapper/gradle-wrapper.properties` and is independent of the Visual Agent application version. The Wrapper JAR is intentionally excluded from version control. In a fresh clone, run `gradle wrapper --gradle-version <version from gradle-wrapper.properties> --no-daemon` once before using `./gradlew`.
 - A configured model provider: Ollama (local or remote), OpenAI-compatible, Codex CLI, or Codex Direct. Ollama must be running (`ollama serve`) only when using that provider.
 - H2 is embedded and accessed through Spring Data R2DBC. Versioned schema migrations run automatically before the stores are created.

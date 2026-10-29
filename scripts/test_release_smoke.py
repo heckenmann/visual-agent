@@ -194,6 +194,8 @@ class ReleaseWorkflowTest(unittest.TestCase):
         for workflow in (root / ".github/workflows").glob("*.yml"):
             versions = re.findall(r'java-version:\s*"(\d+)"', workflow.read_text())
             self.assertTrue(all(version == "27" for version in versions), workflow.name)
+            distributions = re.findall(r'distribution:\s*(\S+)', workflow.read_text())
+            self.assertTrue(all(distribution == "zulu" for distribution in distributions), workflow.name)
         build = (root / "build.gradle.kts").read_text()
         self.assertIn("options.release.set(javaBytecodeVersion)", build)
         self.assertIn("dependsOn(verifyJavaToolchains)", build)

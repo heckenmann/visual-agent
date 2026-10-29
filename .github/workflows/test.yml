@@ -30,7 +30,7 @@ jobs:
       - name: Set up Java
         uses: actions/setup-java@v6
         with:
-          distribution: temurin
+          distribution: zulu
           java-version: "27"
 
       - name: Read Gradle wrapper version
@@ -76,7 +76,7 @@ jobs:
       - name: Set up Java
         uses: actions/setup-java@v6
         with:
-          distribution: temurin
+          distribution: zulu
           java-version: "27"
 
       - name: Read Gradle wrapper version
