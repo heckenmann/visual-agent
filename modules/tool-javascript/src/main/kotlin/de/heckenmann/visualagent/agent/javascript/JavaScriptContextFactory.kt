@@ -66,7 +66,9 @@ internal class JavaScriptContextFactory(
             .`out`(ByteArrayOutputStream())
             .err(ByteArrayOutputStream())
             .allowHostAccess(HostAccess.CONSTRAINED)
-            .allowHostClassLookup { false }
+            // A rejecting predicate still exposes Java builtins; null disables lookup entirely.
+            // See Context.Builder.allowHostClassLookup in the GraalVM SDK API contract.
+            .allowHostClassLookup(null)
             .allowHostClassLoading(false)
             .allowCreateThread(false)
             .allowNativeAccess(false)
