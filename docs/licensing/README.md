@@ -74,3 +74,28 @@ does not waive runtime notices or corresponding-source obligations. See the
 [exact Zulu 27 terms](https://docs.azul.com/core/tpls/october-2026/zulu27_jdk_tpl.html)
 and [CA/SA distinction](https://support.azul.com/hc/en-us/articles/360051512551-What-s-the-difference-between-CA-and-SA-bundles-of-Azul-Zulu-Builds-of-OpenJDK).
 Changing to Temurin would not remove those obligations.
+
+## Original Third-Party Notices
+
+After `:desktop:generateDistributionArtifactInventory`, collect the original texts:
+
+```bash
+python3 scripts/collect-third-party-notices.py \
+  --package-root modules/desktop/build/compose/binaries/main/app \
+  --inventory modules/desktop/build/reports/dependency-license/packaged-artifacts.csv \
+  --output build/reports/dependency-license/third-party-notices
+```
+
+Use a new or empty output directory. The collector verifies actual packaged JAR
+hashes, retains original bytes, and records a hash-addressed manifest. The platform
+inventory workflow uploads this directory for review. Components without detected
+notices remain listed; every component remains `unreviewed`, even if texts exist.
+This is evidence collection, not a replacement license scanner or clearance gate.
+
+The maintained Gradle License Report plugin remains the metadata inventory tool;
+its documented renderers report declarations and links, not complete reviewed
+redistribution bundles. The ZIP collector uses the standard library to retain
+actual artifact contents. Upstream/version-specific supplemental notices, manual
+dual-license decisions, native/font review, installer/JAR bundle inclusion, and
+source delivery remain separate work in #410. Never fill those gaps by assuming
+that one generic license text covers all resolved dependencies.
