@@ -120,3 +120,24 @@ These are proposed application-library choices, not clearance of embedded native
 code. The registry keeps explicit pending work and cannot approve redistribution.
 H2/MPL and Logback/EPL source availability and binary-distribution statements remain
 to be included; JNA's embedded libffi/native payload needs its own notice review.
+
+## Packaging Curated Materials
+
+Native images include the retained upstream directory at
+`app-resources/legal/third-party/` (the app-resources location is platform-specific).
+Gradle's built-in `Sync` merges these inputs with runtime legal materials before
+Compose/jpackage signs the application. No new scanner or packaging dependency is
+added, and no signed output is patched. The separate project MIT license remains
+under `legal/visual-agent/LICENSE`.
+
+Both standalone-server and desktop executable JARs include the curated directory
+at `META-INF/visual-agent/legal/third-party/` and the project license at
+`META-INF/visual-agent/legal/visual-agent/LICENSE`. These JARs do not contain a JDK,
+so runtime legal material is confined to native packages that actually ship one.
+
+`verifyPackages` verifies byte equality for every curated input and the project
+license in the real native image and both executable JARs. Missing, changed,
+duplicate JAR entries, or linked/oversized files fail verification. This checks
+retention of the current input set, not its legal completeness or validity.
+The generated evidence report and full remaining dependency/native/source review
+are not replaced by these initial curated files. Publication remains blocked.

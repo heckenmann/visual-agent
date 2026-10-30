@@ -25,6 +25,12 @@ scope includes build/test artifacts and does not imply that every entry is shipp
    JARs. Retain these under a separate
    `supplements/` directory without hiding absent embedded notices or granting
    clearance. Record the proposed license and remaining review work.
+7. Native packaging combines the existing runtime materials with the curated
+   third-party directory through Gradle `Sync` and Compose's app-resources input
+   before signing. Both executable JARs include the project license and curated
+   directory under `META-INF/visual-agent/legal/`.
+8. Package verification compares every included curated file with its original
+   bytes. Verification is read-only and never patches signed bundles.
 
 ## Failure Flow
 
@@ -41,7 +47,9 @@ the standard ZIP reader, not a replacement for the existing Gradle License Repor
 plugin. POM metadata, absent notices, dual-license selections, native code, fonts,
 and source obligations require separate review and supplemental materials. Even
 components with retained notices remain unreviewed. It does not alter release
-approval, embed the bundle in installers, or complete issue #410.
+approval or complete issue #410. Packaging the initial curated materials does not
+mean every dependency/native/source obligation is covered: the full notice bundle,
+legal review, corresponding sources, and user-facing notice access remain open.
 
 ## Tool Calls
 
@@ -52,3 +60,6 @@ approval, embed the bundle in installers, or complete issue #410.
 - `scripts/collect-third-party-notices.py`
 - `scripts/test_release_notices.py`
 - `modules/desktop/build.gradle.kts`: `generateDistributionArtifactInventory`
+- `modules/desktop/build.gradle.kts`: `prepareDistributionLegalResources`
+- `application/build.gradle.kts`: `bootJar` and `verifyExecutableJar`
+- `buildSrc/src/main/kotlin/de/heckenmann/visualagent/gradle/BundledLegalMaterialsVerification.kt`

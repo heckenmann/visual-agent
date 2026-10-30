@@ -1,5 +1,7 @@
 import de.heckenmann.visualagent.gradle.GenerateBranding
 import de.heckenmann.visualagent.gradle.PrepareRuntimeLegalMaterials
+import de.heckenmann.visualagent.gradle.verifyJarProjectLegalMaterials
+import de.heckenmann.visualagent.gradle.verifyNativeProjectLegalMaterials
 import de.heckenmann.visualagent.gradle.verifyPackagedRuntimeLegalMaterials
 import org.gradle.api.artifacts.component.ModuleComponentIdentifier
 import org.gradle.api.tasks.SourceSetContainer
@@ -191,9 +193,20 @@ val prepareRuntimeLegalMaterials =
         outputDirectory.set(layout.buildDirectory.dir("generated/runtime-legal-resources"))
     }
 
+val prepareDistributionLegalResources =
+    tasks.register<Sync>("prepareDistributionLegalResources") {
+        group = "distribution"
+        description = "Combines runtime and curated third-party legal texts before native signing."
+        into(layout.buildDirectory.dir("generated/distribution-legal-resources"))
+        from(prepareRuntimeLegalMaterials)
+        from(rootProject.layout.projectDirectory.dir("docs/licensing/third-party")) {
+            into("common/legal/third-party")
+        }
+    }
+
 compose.desktop {
     application {
-        dependsOn("prepareRuntimeLegalMaterials")
+        dependsOn("prepareDistributionLegalResources")
         javaHome = desktopJavaHome.absolutePath
         mainClass = "de.heckenmann.visualagent.desktop.DesktopMain"
         jvmArgs +=
@@ -207,7 +220,7 @@ compose.desktop {
                 },
             )
         nativeDistributions {
-            appResourcesRootDir.set(prepareRuntimeLegalMaterials.flatMap { it.outputDirectory })
+            appResourcesRootDir.set(layout.dir(prepareDistributionLegalResources.map { it.destinationDir }))
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb, TargetFormat.Rpm)
             modules(
                 "java.compiler",
@@ -425,6 +438,8 @@ val desktopBootJar =
     tasks.named<BootJar>("bootJar") {
         manifest.attributes["Enable-Native-Access"] = "ALL-UNNAMED"
         setClasspath(files(desktopMainOutput, desktopRuntimeClasspath))
+        from(rootProject.file("LICENSE")) { into("META-INF/visual-agent/legal/visual-agent") }
+        from(rootProject.file("docs/licensing/third-party")) { into("META-INF/visual-agent/legal/third-party") }
     }
 
 tasks.register("generateDistributionArtifactInventory") {
@@ -761,6 +776,7 @@ val verifyNativeDistributionLauncher =
                     else -> distributionDirectory.resolve("$appName/lib/app/resources")
                 }
             val provenance = verifyPackagedRuntimeLegalMaterials(resources, runtimeHome, desktopJavaHome, rootProject.file("LICENSE"))
+            verifyNativeProjectLegalMaterials(resources, rootProject.projectDir)
             layout.buildDirectory.file("reports/dependency-license/runtime-provenance.properties").get().asFile.apply {
                 parentFile.mkdirs()
                 writeText(provenance.entries.joinToString("\n", postfix = "\n") { (key, value) -> "$key=$value" })
@@ -809,6 +825,7 @@ val verifyExecutableJar =
                     .asFile
             check(executableJar.isFile) { "Executable desktop JAR was not created: $executableJar" }
             JarFile(executableJar).use { archive ->
+                verifyJarProjectLegalMaterials(archive, rootProject.projectDir)
                 val attributes = archive.manifest.mainAttributes
                 check(attributes.getValue("Main-Class") == "org.springframework.boot.loader.launch.JarLauncher") {
                     "Desktop boot JAR must use Spring Boot's JarLauncher as Main-Class"
