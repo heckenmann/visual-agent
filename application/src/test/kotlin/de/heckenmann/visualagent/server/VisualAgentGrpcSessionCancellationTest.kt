@@ -98,26 +98,28 @@ class VisualAgentGrpcSessionCancellationTest {
     @Test
     fun `explicit cancellation sends one terminal cancellation frame`() =
         runBlocking {
+            val streamStarted = CompletableDeferred<Unit>()
             val tokenCancelled = CompletableDeferred<Unit>()
+            val streamStopped = CompletableDeferred<Unit>()
             val conversationPort = mockk<ConversationPort>(relaxed = true)
             coEvery { conversationPort.stream(any(), any(), any()) } coAnswers {
                 secondArg<CancellationToken>().onCancelled { tokenCancelled.complete(Unit) }
-                awaitCancellation()
+                streamStarted.complete(Unit)
+                try {
+                    awaitCancellation()
+                } finally {
+                    streamStopped.complete(Unit)
+                }
             }
             val observer = RecordingObserver<ServerFrame>()
             val requestObserver = VisualAgentGrpcSessionService(conversationPort).openSession(observer)
             requestObserver.onNext(helloFrame())
             requestObserver.onNext(chatFrame(REQUEST_ONE, USER_ONE, "hello"))
-            requestObserver.onNext(
-                ClientFrame
-                    .newBuilder()
-                    .setSessionId("test-session")
-                    .setRequestId(REQUEST_ONE)
-                    .setCancelRequest(CancelRequest.newBuilder().setReason("user requested").build())
-                    .build(),
-            )
+            streamStarted.await()
+            requestObserver.onNext(cancelFrame(REQUEST_ONE))
 
             tokenCancelled.await()
+            streamStopped.await()
             assertEquals(1, observer.values.count { it.hasError() && it.requestId == REQUEST_ONE })
             assertEquals(
                 "CANCELLED",
@@ -126,6 +128,34 @@ class VisualAgentGrpcSessionCancellationTest {
                     .error.code,
             )
         }
+
+    @Test
+    fun `immediate cancellation does not depend on streaming callback startup`() =
+        runBlocking {
+            val conversationPort = mockk<ConversationPort>(relaxed = true)
+            coEvery { conversationPort.stream(any(), any(), any()) } coAnswers { awaitCancellation() }
+            val observer = RecordingObserver<ServerFrame>()
+            val requestObserver = VisualAgentGrpcSessionService(conversationPort).openSession(observer)
+            try {
+                requestObserver.onNext(helloFrame())
+                requestObserver.onNext(chatFrame(REQUEST_ONE, USER_ONE, "hello"))
+                requestObserver.onNext(cancelFrame(REQUEST_ONE))
+
+                val terminal = observer.awaitFrame { it.requestId == REQUEST_ONE && it.hasError() }
+                assertEquals("CANCELLED", terminal.error.code)
+                assertEquals(1, observer.values.count { it.hasError() && it.requestId == REQUEST_ONE })
+            } finally {
+                requestObserver.onCompleted()
+            }
+        }
+
+    private fun cancelFrame(requestId: String): ClientFrame =
+        ClientFrame
+            .newBuilder()
+            .setSessionId("test-session")
+            .setRequestId(requestId)
+            .setCancelRequest(CancelRequest.newBuilder().setReason("user requested").build())
+            .build()
 
     private fun helloFrame(): ClientFrame =
         ClientFrame
