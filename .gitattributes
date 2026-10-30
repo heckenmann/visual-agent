@@ -13,3 +13,5 @@
 *.wal filter=lfs diff=lfs merge=lfs -text
 *.shm filter=lfs diff=lfs merge=lfs -text
 *.bin filter=lfs diff=lfs merge=lfs -text
+# Preserve upstream license bytes across platform checkouts.
+docs/licensing/third-party/** -text
