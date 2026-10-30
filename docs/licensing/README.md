@@ -83,7 +83,8 @@ After `:desktop:generateDistributionArtifactInventory`, collect the original tex
 python3 scripts/collect-third-party-notices.py \
   --package-root modules/desktop/build/compose/binaries/main/app \
   --inventory modules/desktop/build/reports/dependency-license/packaged-artifacts.csv \
-  --output build/reports/dependency-license/third-party-notices
+  --output build/reports/dependency-license/third-party-notices \
+  --supplements docs/licensing/third-party/sources.json
 ```
 
 Use a new or empty output directory. The collector verifies actual packaged JAR
@@ -93,9 +94,29 @@ notices remain listed; every component remains `unreviewed`, even if texts exist
 This is evidence collection, not a replacement license scanner or clearance gate.
 
 The maintained Gradle License Report plugin remains the metadata inventory tool;
-its documented renderers report declarations and links, not complete reviewed
-redistribution bundles. The ZIP collector uses the standard library to retain
+its built-in `ExtendedJsonReportRenderer("licenses-all.json", false)` exports all
+declared alternatives and available embedded texts. This avoids inventing another
+metadata parser or silently selecting the first declared license. The report covers
+the existing broad build/test/runtime inventory, not just the packaged runtime.
+The plugin decodes/re-encodes extracted text, so this JSON is not byte-exact archive
+evidence. Original package files and supplemental texts are retained separately.
+The report is not a complete reviewed redistribution bundle. The ZIP collector
+uses the standard library to retain
 actual artifact contents. Upstream/version-specific supplemental notices, manual
 dual-license decisions, native/font review, installer/JAR bundle inclusion, and
 source delivery remain separate work in #410. Never fill those gaps by assuming
 that one generic license text covers all resolved dependencies.
+
+The optional supplemental registry binds additional original texts to exact Maven
+coordinates and original resolved-artifact hashes. Packaged JARs are still checked
+independently against the generated inventory: macOS packaging can transform their
+bytes, so a locally packaged hash is not a portable upstream identity. Initial
+evidence covers H2 2.5.252 (proposed MPL-2.0), Logback 1.6.6 (proposed EPL-2.0),
+and JNA 5.19.1 (proposed Apache-2.0),
+following the documented audit choices. Texts come from pinned upstream commits;
+the full EPL text comes from the Eclipse Foundation and is hash-pinned. Git disables
+line-ending conversion for this directory to retain original bytes on Windows too.
+These are proposed application-library choices, not clearance of embedded native
+code. The registry keeps explicit pending work and cannot approve redistribution.
+H2/MPL and Logback/EPL source availability and binary-distribution statements remain
+to be included; JNA's embedded libffi/native payload needs its own notice review.

@@ -1,7 +1,8 @@
 import com.github.jk1.license.render.CsvReportRenderer
-import de.heckenmann.visualagent.gradle.GenerateBranding
+import com.github.jk1.license.render.ExtendedJsonReportRenderer
 import com.github.jk1.license.render.InventoryHtmlReportRenderer
 import com.github.jk1.license.render.ReportRenderer
+import de.heckenmann.visualagent.gradle.GenerateBranding
 import org.gradle.api.artifacts.component.ModuleComponentIdentifier
 import org.gradle.api.tasks.SourceSetContainer
 import org.gradle.api.tasks.testing.Test
@@ -59,7 +60,12 @@ licenseReport {
     projects = (listOf(project) + subprojects).toTypedArray()
     buildScriptProjects = (listOf(project) + subprojects).toTypedArray()
     configurations = arrayOf("compileClasspath", "runtimeClasspath", "testRuntimeClasspath")
-    renderers = arrayOf<ReportRenderer>(CsvReportRenderer(), InventoryHtmlReportRenderer())
+    renderers =
+        arrayOf<ReportRenderer>(
+            CsvReportRenderer(),
+            InventoryHtmlReportRenderer(),
+            ExtendedJsonReportRenderer("licenses-all.json", false),
+        )
 }
 
 val pluginClasspathReports =

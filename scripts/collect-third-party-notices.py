@@ -10,6 +10,8 @@ import re
 import stat
 import zipfile
 
+from third_party_supplements import load_supplements
+
 
 MAX_NOTICE_BYTES = 8 * 1024 * 1024
 MAX_TOTAL_BYTES = 64 * 1024 * 1024
@@ -34,9 +36,10 @@ def confined_file(root, relative):
     return candidate
 
 
-def collect(package_root, inventory, output):
+def collect(package_root, inventory, output, supplements=None):
     """Collect byte-exact evidence; absence and presence both remain unreviewed."""
     root = package_root.resolve(strict=True)
+    supplemental = load_supplements(supplements)
     if output.is_symlink() or (output.exists() and any(output.iterdir())):
         raise ValueError("Output must be a new or empty directory")
     output.mkdir(parents=True, exist_ok=True)
@@ -91,14 +94,40 @@ def collect(package_root, inventory, output):
                     "sha256": hashlib.sha256(content).hexdigest(),
                     "size": len(content),
                 })
-        components.append({
+        component = {
             "coordinate": coordinate,
             "packagePath": relative,
             "packageSha256": actual_hash,
             "reviewStatus": "unreviewed",
             "noticeStatus": "retained" if notices else "no-detected-notice",
             "notices": sorted(notices, key=lambda notice: notice["entry"]),
-        })
+        }
+        extra = supplemental.get(coordinate)
+        if extra:
+            if extra["expectedSourceSha256"] != row.get("sourceSha256"):
+                raise ValueError("Supplement does not match exact source artifact")
+            retained = []
+            for material in extra["materials"]:
+                content = material["content"]
+                total += len(content)
+                if total > MAX_TOTAL_BYTES:
+                    raise ValueError("Notice extraction limit exceeded")
+                target = output / "supplements" / actual_hash / material["path"]
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes(content)
+                retained.append({
+                    "path": target.relative_to(output).as_posix(),
+                    "sha256": material["sha256"],
+                    "sourceUrl": material["url"],
+                })
+            component["supplement"] = {
+                "sourceSha256": row["sourceSha256"],
+                "proposedLicense": extra["proposedLicense"],
+                "upstreamCommit": extra["upstreamCommit"],
+                "remaining": extra["remaining"],
+                "materials": retained,
+            }
+        components.append(component)
     report = {
         "schemaVersion": 1,
         "redistributionApproved": False,
@@ -114,8 +143,9 @@ def main():
     parser.add_argument("--package-root", type=pathlib.Path, required=True)
     parser.add_argument("--inventory", type=pathlib.Path, required=True)
     parser.add_argument("--output", type=pathlib.Path, required=True)
+    parser.add_argument("--supplements", type=pathlib.Path)
     arguments = parser.parse_args()
-    collect(arguments.package_root, arguments.inventory, arguments.output)
+    collect(arguments.package_root, arguments.inventory, arguments.output, arguments.supplements)
 
 
 if __name__ == "__main__":

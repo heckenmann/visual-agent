@@ -10,6 +10,9 @@ on:
       - "scripts/generate-package-inventory.sh"
       - "scripts/collect-third-party-notices.py"
       - "scripts/test_release_notices.py"
+      - "scripts/third_party_supplements.py"
+      - "scripts/test_release_supplements.py"
+      - "docs/licensing/third-party/**"
       - ".github/workflows/license-inventory.yml"
       - "docs/dependency-license-audit.md"
       - "docs/dependency-licenses-*.csv"
@@ -87,7 +90,8 @@ jobs:
           python3 scripts/collect-third-party-notices.py \
             --package-root modules/desktop/build/compose/binaries/main/app \
             --inventory modules/desktop/build/reports/dependency-license/packaged-artifacts.csv \
-            --output build/reports/dependency-license/third-party-notices
+            --output build/reports/dependency-license/third-party-notices \
+            --supplements docs/licensing/third-party/sources.json
 
       - name: Upload inventories
         uses: actions/upload-artifact@v7
@@ -96,6 +100,7 @@ jobs:
           if-no-files-found: error
           path: |
             build/reports/dependency-license/licenses.csv
+            build/reports/dependency-license/licenses-all.json
             build/reports/dependency-license/build-plugins.csv
             build/reports/dependency-license/dependency-scopes.csv
             build/reports/dependency-license/settings-plugins.csv
