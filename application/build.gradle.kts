@@ -1,3 +1,4 @@
+import de.heckenmann.visualagent.gradle.verifyJarProjectLegalMaterials
 import org.springframework.boot.gradle.tasks.bundling.BootJar
 import java.nio.file.Files
 import java.util.jar.JarFile
@@ -198,6 +199,7 @@ val verifyExecutableJar =
                     .asFile
             check(executableJar.isFile) { "Executable application JAR was not created: $executableJar" }
             JarFile(executableJar).use { archive ->
+                verifyJarProjectLegalMaterials(archive, rootProject.projectDir)
                 val attributes = archive.manifest.mainAttributes
                 check(attributes.getValue("Main-Class") == "org.springframework.boot.loader.launch.JarLauncher") {
                     "Application boot JAR must use Spring Boot's JarLauncher as Main-Class"
@@ -214,6 +216,8 @@ val verifyExecutableJar =
 
 tasks.named<BootJar>("bootJar") {
     manifest.attributes["Enable-Native-Access"] = "ALL-UNNAMED"
+    from(rootProject.file("LICENSE")) { into("META-INF/visual-agent/legal/visual-agent") }
+    from(rootProject.file("docs/licensing/third-party")) { into("META-INF/visual-agent/legal/third-party") }
 }
 
 tasks.register("runServer") {
