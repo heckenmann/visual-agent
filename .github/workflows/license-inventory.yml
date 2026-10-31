@@ -12,6 +12,8 @@ on:
       - "scripts/test_release_notices.py"
       - "scripts/third_party_supplements.py"
       - "scripts/test_release_supplements.py"
+      - "scripts/test_release_library_sources.py"
+      - "docs/licensing/source-delivery.md"
       - "docs/licensing/third-party/**"
       - ".github/workflows/license-inventory.yml"
       - "docs/dependency-license-audit.md"
@@ -82,7 +84,7 @@ jobs:
           set -euo pipefail
           ./gradlew -I scripts/license-settings.init.gradle.kts \
             generateLicenseReport generateBuildPluginInventory generateDependencyScopeInventory \
-            :desktop:generateDistributionArtifactInventory \
+            :desktop:generateDistributionArtifactInventory :desktop:prepareLibrarySourceMaterials \
             --no-daemon --no-parallel --no-configuration-cache
           bash scripts/generate-package-inventory.sh \
             modules/desktop/build/compose/binaries/main/app \
@@ -109,4 +111,5 @@ jobs:
             build/reports/dependency-license/embedded-notices.txt
             modules/desktop/build/reports/dependency-license/packaged-artifacts.csv
             modules/desktop/build/reports/dependency-license/runtime-provenance.properties
+            modules/desktop/build/reports/dependency-license/library-source-materials/
             build/reports/dependency-license/third-party-notices/
