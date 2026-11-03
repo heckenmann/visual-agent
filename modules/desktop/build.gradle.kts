@@ -95,6 +95,42 @@ dependencies {
 }
 
 val desktopDispatcherProbeClasspath = files(sourceSets.main.get().runtimeClasspath, sourceSets.test.get().output)
+
+// Resolve sources from the selected runtime graph, not independently selected versions.
+// This is a partial evidence set; JDK/native source obligations remain open in #410.
+val requiredSourceModules = setOf("com.h2database:h2", "ch.qos.logback:logback-core", "ch.qos.logback:logback-classic")
+val runtimeSourceMaterials =
+    configurations.runtimeClasspath.map { configuration ->
+        configuration.incoming
+            .artifactView {
+                withVariantReselection()
+                componentFilter { component ->
+                    component is ModuleComponentIdentifier && "${component.group}:${component.module}" in requiredSourceModules
+                }
+                attributes {
+                    attribute(Usage.USAGE_ATTRIBUTE, objects.named(Usage.JAVA_RUNTIME))
+                    attribute(Category.CATEGORY_ATTRIBUTE, objects.named(Category.DOCUMENTATION))
+                    attribute(Bundling.BUNDLING_ATTRIBUTE, objects.named(Bundling.EXTERNAL))
+                    attribute(DocsType.DOCS_TYPE_ATTRIBUTE, objects.named(DocsType.SOURCES))
+                }
+            }.files
+    }
+
+tasks.register<Sync>("prepareLibrarySourceMaterials") {
+    group = "distribution"
+    description = "Collects partial H2/Logback source evidence; does not approve redistribution."
+    from(runtimeSourceMaterials) { into("archives") }
+    from(rootProject.layout.projectDirectory.dir("docs/licensing/third-party")) { into("legal") }
+    from(rootProject.layout.projectDirectory.file("docs/licensing/source-delivery.md"))
+    into(layout.buildDirectory.dir("reports/dependency-license/library-source-materials"))
+    duplicatesStrategy = DuplicatesStrategy.FAIL
+    doFirst {
+        check(runtimeSourceMaterials.get().files.size == requiredSourceModules.size) {
+            "Missing required H2/Logback source artifacts; source evidence is incomplete."
+        }
+    }
+}
+
 val generateDesktopDispatcherProbeClasspath =
     tasks.register<WriteProperties>("generateDesktopDispatcherProbeClasspath") {
         destinationFile.set(layout.buildDirectory.file("generated/dispatcher-probe/classpath.properties"))
