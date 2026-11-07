@@ -17,10 +17,19 @@ plugins {
 }
 
 // Use one JDK for build/test/runtime while keeping Java and Kotlin API/bytecode targets aligned.
-val javaBytecodeVersion = libs.versions.java.bytecode.get().toInt()
+val javaBytecodeVersion =
+    libs.versions.java.bytecode
+        .get()
+        .toInt()
 java {
     toolchain {
-        languageVersion.set(JavaLanguageVersion.of(libs.versions.java.toolchain.get().toInt()))
+        languageVersion.set(
+            JavaLanguageVersion.of(
+                libs.versions.java.toolchain
+                    .get()
+                    .toInt(),
+            ),
+        )
     }
 }
 allprojects {
@@ -34,21 +43,38 @@ val verifyJavaToolchains =
         group = "verification"
         description = "Verifies one configured JDK for compilation/tests and the shared Java bytecode release."
         doLast {
-            val expectedJdk = libs.versions.java.toolchain.get().toInt()
+            val expectedJdk =
+                libs.versions.java.toolchain
+                    .get()
+                    .toInt()
             allprojects.forEach { target ->
                 target.extensions.findByType<JavaPluginExtension>()?.let { java ->
-                    check(java.toolchain.languageVersion.get().asInt() == expectedJdk) {
+                    check(
+                        java.toolchain.languageVersion
+                            .get()
+                            .asInt() == expectedJdk,
+                    ) {
                         "${target.path} must use the shared JDK $expectedJdk toolchain"
                     }
                 }
                 target.tasks.withType<JavaCompile>().forEach { compile ->
                     check(compile.options.release.get() == javaBytecodeVersion) { "${compile.path} has a different bytecode release" }
-                    check(compile.javaCompiler.get().metadata.languageVersion.asInt() == expectedJdk) {
+                    check(
+                        compile.javaCompiler
+                            .get()
+                            .metadata.languageVersion
+                            .asInt() == expectedJdk,
+                    ) {
                         "${compile.path} must compile with JDK $expectedJdk"
                     }
                 }
                 target.tasks.withType<Test>().forEach { test ->
-                    check(test.javaLauncher.get().metadata.languageVersion.asInt() == expectedJdk) {
+                    check(
+                        test.javaLauncher
+                            .get()
+                            .metadata.languageVersion
+                            .asInt() == expectedJdk,
+                    ) {
                         "${test.path} must run with JDK $expectedJdk"
                     }
                 }
@@ -74,7 +100,9 @@ val pluginClasspathReports =
             val report = target.layout.buildDirectory.file("reports/dependency-license/build-plugins.txt")
             doLast {
                 val coordinates =
-                    target.buildscript.configurations.getByName("classpath").incoming.resolutionResult.allComponents
+                    target.buildscript.configurations
+                        .getByName("classpath")
+                        .incoming.resolutionResult.allComponents
                         .mapNotNull { component ->
                             (component.id as? ModuleComponentIdentifier)?.let { id ->
                                 "${id.group}:${id.module}:${id.version}"
@@ -96,12 +124,16 @@ tasks.register("generateBuildPluginInventory") {
     val report = layout.buildDirectory.file("reports/dependency-license/build-plugins.csv")
     doLast {
         val projectsByCoordinate =
-            allprojects.flatMap { target ->
-                target.layout.buildDirectory.file("reports/dependency-license/build-plugins.txt").get().asFile
-                    .readLines()
-                    .filter(String::isNotBlank)
-                    .map { coordinate -> coordinate to target.path }
-            }.groupBy({ it.first }, { it.second })
+            allprojects
+                .flatMap { target ->
+                    target.layout.buildDirectory
+                        .file("reports/dependency-license/build-plugins.txt")
+                        .get()
+                        .asFile
+                        .readLines()
+                        .filter(String::isNotBlank)
+                        .map { coordinate -> coordinate to target.path }
+                }.groupBy({ it.first }, { it.second })
         val rows =
             projectsByCoordinate.toSortedMap().map { (coordinate, projects) ->
                 "$coordinate,\"${projects.distinct().sorted().joinToString(" ")}\""
@@ -122,7 +154,11 @@ val dependencyScopeReports =
                     listOf("compileClasspath", "runtimeClasspath", "testRuntimeClasspath")
                         .flatMap { configurationName ->
                             val configuration = target.configurations.findByName(configurationName)
-                            configuration?.incoming?.resolutionResult?.allComponents.orEmpty()
+                            configuration
+                                ?.incoming
+                                ?.resolutionResult
+                                ?.allComponents
+                                .orEmpty()
                                 .mapNotNull { component ->
                                     (component.id as? ModuleComponentIdentifier)?.let { id ->
                                         "${id.group}:${id.module}:${id.version},${target.path},$configurationName"
@@ -145,11 +181,15 @@ tasks.register("generateDependencyScopeInventory") {
     val report = layout.buildDirectory.file("reports/dependency-license/dependency-scopes.csv")
     doLast {
         val rows =
-            allprojects.flatMap { target ->
-                target.layout.buildDirectory.file("reports/dependency-license/dependency-scopes.txt").get().asFile
-                    .readLines()
-                    .filter(String::isNotBlank)
-            }.distinct()
+            allprojects
+                .flatMap { target ->
+                    target.layout.buildDirectory
+                        .file("reports/dependency-license/dependency-scopes.txt")
+                        .get()
+                        .asFile
+                        .readLines()
+                        .filter(String::isNotBlank)
+                }.distinct()
                 .sorted()
         report.get().asFile.apply {
             parentFile.mkdirs()
@@ -159,7 +199,9 @@ tasks.register("generateDependencyScopeInventory") {
 }
 
 group = "de.heckenmann.visualagent"
-version = libs.versions.visual.agent.get()
+version =
+    libs.versions.visual.agent
+        .get()
 
 tasks.register("printProjectVersion") {
     group = "help"
@@ -194,9 +236,21 @@ val verifyGeneratedBranding =
             val composePng = directory.resolve("compose/drawable/visual_agent.png").readBytes()
             check(uiPng.contentEquals(composePng)) { "Generated UI and Compose PNG icons differ." }
             val pngHeader = ByteBuffer.wrap(uiPng)
-            check(uiPng.size >= 24 && uiPng.copyOfRange(0, 8).contentEquals(byteArrayOf(
-                137.toByte(), 80, 78, 71, 13, 10, 26, 10,
-            ))) { "Generated application icon has an invalid PNG signature." }
+            check(
+                uiPng.size >= 24 &&
+                    uiPng.copyOfRange(0, 8).contentEquals(
+                        byteArrayOf(
+                            137.toByte(),
+                            80,
+                            78,
+                            71,
+                            13,
+                            10,
+                            26,
+                            10,
+                        ),
+                    ),
+            ) { "Generated application icon has an invalid PNG signature." }
             check(pngHeader.getInt(16) == 1024 && pngHeader.getInt(20) == 1024) {
                 "Application PNG is not 1024 x 1024."
             }
@@ -296,7 +350,9 @@ tasks.register("verifyKtlintCompilerCompatibility") {
                                 module.group == "org.jetbrains.kotlin" &&
                                     module.name == "kotlin-compiler-embeddable"
                             }?.version
-                    val expectedVersion = rootProject.libs.versions.ktlint.kotlin.get()
+                    val expectedVersion =
+                        rootProject.libs.versions.ktlint.kotlin
+                            .get()
                     check(compilerVersion == expectedVersion) {
                         "$modulePath resolved ${compilerVersion ?: "no compiler"}, expected $expectedVersion"
                     }
@@ -457,7 +513,23 @@ tasks.register("verifyModuleDependencies") {
     description = "Verifies the directed dependency graph between Visual Agent modules."
     doLast {
         val moduleDependencies =
-            setOf(":application", ":ui", ":protocol", ":desktop", ":agent-core", ":model-core", ":provider-core", ":provider-standard", ":provider-openai-codex", ":provider-codex-direct", ":providers", ":tool-standard", ":tool-javascript", ":tools", ":task-core").associateWith { modulePath ->
+            setOf(
+                ":application",
+                ":ui",
+                ":protocol",
+                ":desktop",
+                ":agent-core",
+                ":model-core",
+                ":provider-core",
+                ":provider-standard",
+                ":provider-openai-codex",
+                ":provider-codex-direct",
+                ":providers",
+                ":tool-standard",
+                ":tool-javascript",
+                ":tools",
+                ":task-core",
+            ).associateWith { modulePath ->
                 project(modulePath)
                     .configurations
                     .filter { configuration -> !configuration.name.contains("test", ignoreCase = true) }
@@ -501,7 +573,7 @@ tasks.register("verifyModuleDependencies") {
                 .files
                 .flatMap { source ->
                     source.readLines().mapIndexedNotNull { index, line ->
-                        if (forbiddenUiImports.containsMatchIn(line)) "${source}:${index + 1}: $line" else null
+                        if (forbiddenUiImports.containsMatchIn(line)) "$source:${index + 1}: $line" else null
                     }
                 }
         check(violations.isEmpty() && uiSourceViolations.isEmpty()) {
@@ -524,15 +596,17 @@ tasks.register("verifyAutonomousReactorContracts") {
     description = "Keeps autonomous server execution Reactor-native."
     doLast {
         val base = file("application/src/main/kotlin/de/heckenmann/visualagent")
-        val sources = fileTree(base.resolve("orchestration")).matching { include("**/*.kt") }.files +
-            listOf("SubAgent.kt", "TodoToolCompletion.kt", "SubAgentJobScheduler.kt", "SubAgentExecutionControl.kt")
-                .map { base.resolve("agent/$it") }
+        val sources =
+            fileTree(base.resolve("orchestration")).matching { include("**/*.kt") }.files +
+                listOf("SubAgent.kt", "TodoToolCompletion.kt", "SubAgentJobScheduler.kt", "SubAgentExecutionControl.kt")
+                    .map { base.resolve("agent/$it") }
         val forbidden = Regex("kotlinx\\.coroutines|\\bsuspend\\s+fun\\b|\\.block(?:Required)?\\s*\\(|\\brunBlocking\\b")
-        val violations = sources.flatMap { source ->
-            source.readLines().mapIndexedNotNull { index, line ->
-                if (forbidden.containsMatchIn(line)) "$source:${index + 1}: $line" else null
+        val violations =
+            sources.flatMap { source ->
+                source.readLines().mapIndexedNotNull { index, line ->
+                    if (forbidden.containsMatchIn(line)) "$source:${index + 1}: $line" else null
+                }
             }
-        }
         check(violations.isEmpty()) {
             "Autonomous server execution must retain Reactor contracts:\n" + violations.joinToString("\n")
         }
@@ -551,13 +625,19 @@ tasks.register("verifyReactorBoundaries") {
                 description = "Prevents Project Reactor from leaking into this UI-facing module."
                 doLast {
                     val dependencyViolations =
-                        listOf("compileClasspath", "runtimeClasspath").flatMap { configurationName ->
-                            moduleProject.configurations.findByName(configurationName)?.incoming?.resolutionResult?.allComponents
-                                ?.mapNotNull { component -> component.moduleVersion }
-                                ?.filter { module -> module.group == "io.projectreactor" }
-                                ?.map { module -> "$modulePath:$configurationName resolves ${module.group}:${module.name}:${module.version}" }
-                                .orEmpty()
-                        }.distinct()
+                        listOf("compileClasspath", "runtimeClasspath")
+                            .flatMap { configurationName ->
+                                moduleProject.configurations
+                                    .findByName(configurationName)
+                                    ?.incoming
+                                    ?.resolutionResult
+                                    ?.allComponents
+                                    ?.mapNotNull { component -> component.moduleVersion }
+                                    ?.filter { module -> module.group == "io.projectreactor" }
+                                    ?.map { module ->
+                                        "$modulePath:$configurationName resolves ${module.group}:${module.name}:${module.version}"
+                                    }.orEmpty()
+                            }.distinct()
                     check(dependencyViolations.isEmpty()) {
                         buildString {
                             appendLine("UI-facing modules must not resolve Project Reactor:")
@@ -576,7 +656,7 @@ tasks.register("verifyReactorBoundaries") {
                     .files
                     .flatMap { source ->
                         source.readLines().mapIndexedNotNull { index, line ->
-                            if (Regex("\\breactor\\.").containsMatchIn(line)) "${source}:${index + 1}: $line" else null
+                            if (Regex("\\breactor\\.").containsMatchIn(line)) "$source:${index + 1}: $line" else null
                         }
                     }
             }

@@ -68,6 +68,10 @@ their tests and limits, and the contract job uses the Gradle cache read-only.
 
 ## Zulu Runtime
 
+See [the source-delivery worklist](source-delivery.md) for verified exact-version
+Maven source inputs and the remaining bundle/recipient-notice implementation.
+Available upstream sources are not evidence that our release already delivers them.
+
 CI currently uses Zulu Community Availability JDK 27, not Subscriber Availability.
 The MIT project remains independent of the runtime. GPLv2 plus Classpath Exception
 does not waive runtime notices or corresponding-source obligations. See the

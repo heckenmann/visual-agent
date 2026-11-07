@@ -31,6 +31,11 @@ scope includes build/test artifacts and does not imply that every entry is shipp
    directory under `META-INF/visual-agent/legal/`.
 8. Package verification compares every included curated file with its original
    bytes. Verification is read-only and never patches signed bundles.
+9. `:desktop:prepareLibrarySourceMaterials` collects exact selected runtime source
+   variants for H2 and Logback using Gradle's built-in artifact view, together with
+   curated legal inputs and an explicit scope statement. Source resolution errors
+   and missing required archives fail collection. This partial evidence directory
+   is not published as a completed corresponding-source bundle.
 
 ## Failure Flow
 
@@ -61,5 +66,7 @@ legal review, corresponding sources, and user-facing notice access remain open.
 - `scripts/test_release_notices.py`
 - `modules/desktop/build.gradle.kts`: `generateDistributionArtifactInventory`
 - `modules/desktop/build.gradle.kts`: `prepareDistributionLegalResources`
+- `modules/desktop/build.gradle.kts`: `prepareLibrarySourceMaterials`
+- `scripts/test_release_library_sources.py`
 - `application/build.gradle.kts`: `bootJar` and `verifyExecutableJar`
 - `buildSrc/src/main/kotlin/de/heckenmann/visualagent/gradle/BundledLegalMaterialsVerification.kt`
