@@ -44,7 +44,7 @@ jobs:
           printf 'version=%s\n' "$version" >> "$GITHUB_OUTPUT"
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v6.4.0
+        uses: gradle/actions/setup-gradle@v6.4.1
         with:
           gradle-version: ${{ steps.gradle_wrapper.outputs.version }}
 
@@ -52,7 +52,7 @@ jobs:
         run: gradle wrapper --gradle-version "${{ steps.gradle_wrapper.outputs.version }}" --no-daemon
 
       - name: Validate generated Gradle wrapper
-        uses: gradle/actions/wrapper-validation@v6.4.0
+        uses: gradle/actions/wrapper-validation@v6.4.1
 
       - name: Resolve Gradle version from release tag
         if: github.event_name == 'release'
@@ -159,7 +159,7 @@ jobs:
           java-version: "27"
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v6.4.0
+        uses: gradle/actions/setup-gradle@v6.4.1
         with:
           gradle-version: ${{ needs.verify.outputs.gradle_version }}
 
