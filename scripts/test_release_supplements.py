@@ -95,10 +95,161 @@ class SupplementalNoticesTest(unittest.TestCase):
     def test_repository_snapshots_match_the_recorded_hashes(self):
         registry = pathlib.Path(__file__).parents[1] / "docs/licensing/third-party/sources.json"
         components = load_supplements(registry)
-        self.assertEqual(5, len(components))
+        self.assertEqual(34, len(components))
         self.assertEqual("MPL-2.0", components["com.h2database:h2:2.5.252"]["proposedLicense"])
         self.assertEqual("EPL-2.0", components["ch.qos.logback:logback-core:1.6.6"]["proposedLicense"])
         self.assertEqual("Apache-2.0", components["net.java.dev.jna:jna:5.19.1"]["proposedLicense"])
+        icu = components["org.graalvm.shadowed:icu4j:25.4.4.1.1"]
+        self.assertEqual("Unicode/ICU License", icu["proposedLicense"])
+        self.assertEqual("f1b3db8ecd39d5b3a6eff4d5641b176c7f914dfb", icu["upstreamCommit"])
+        self.assertEqual(
+            "02f9e8a76ed2f8fa80d53054ca4632c7058354010df27c8f4e7e7443543f7e1e",
+            icu["expectedSourceSha256"],
+        )
+        self.assertIn(b"UNICODE LICENSE V3", icu["materials"][0]["content"])
+        upl = components["org.graalvm.polyglot:polyglot:25.4.4.1.1"]
+        self.assertEqual("UPL-1.0", upl["proposedLicense"])
+        self.assertEqual("95ce1499c8c96ab7d5a6697c5b4bf42160f3b68b", upl["upstreamCommit"])
+        self.assertIn(b"The Universal Permissive License (UPL), Version 1.0", upl["materials"][0]["content"])
+        self.assertTrue(upl["remaining"])
+        registry_data = json.loads(registry.read_text())
+        upl_record = next(
+            item for item in registry_data["components"]
+            if "org.graalvm.polyglot:polyglot:25.4.4.1.1" in item["sourceArtifacts"]
+        )
+        self.assertEqual(12, len(upl_record["sourceArtifacts"]))
+        self.assertEqual("unreviewed", upl_record["reviewStatus"])
+        icu_record = next(
+            item for item in registry_data["components"]
+            if "org.graalvm.shadowed:icu4j:25.4.4.1.1" in item["sourceArtifacts"]
+        )
+        self.assertEqual("unreviewed", icu_record["reviewStatus"])
+        self.assertTrue(icu["remaining"])
+        mimalloc = components["mimalloc2:2.1.7-r0"]
+        self.assertEqual("MIT", mimalloc["proposedLicense"])
+        self.assertEqual("0eed39319f139afde8515010ff59baf24de9e47ea316a315398e8027d198202d",
+                         mimalloc["expectedSourceSha256"])
+        self.assertTrue(mimalloc["materials"][0]["content"].startswith(b"MIT License\n"))
+        self.assertIn("runtime string identifies only upstream 2.1.7", " ".join(mimalloc["remaining"]))
+        self.assertIn("mimalloc2 2.1.7-r0 and its package patch", " ".join(mimalloc["remaining"]))
+        zstd = components["zstd:1.5.6"]
+        self.assertEqual("BSD-3-Clause", zstd["proposedLicense"])
+        self.assertTrue(zstd["materials"][0]["content"].startswith(b"BSD License\n"))
+        self.assertIn("zstd-static 1.5.6-r2", " ".join(zstd["remaining"]))
+        self.assertIn("which declared license option applies", " ".join(zstd["remaining"]))
+        zlib = components["zlib:1.3.1"]
+        self.assertEqual("Zlib", zlib["proposedLicense"])
+        self.assertIn(b"Jean-loup Gailly", zlib["materials"][0]["content"])
+        self.assertIn("zlib-static 1.3.1-r2", " ".join(zlib["remaining"]))
+        self.assertIn("exact build inputs", " ".join(zlib["remaining"]))
+        runtime = components["AppImage:type2-runtime:20251108"]
+        self.assertEqual("MIT", runtime["proposedLicense"])
+        self.assertEqual("f5fec23be76e50e2445ed2d018bac49b367490fc483c62c4637e99ec705d27ba",
+                         runtime["expectedSourceSha256"])
+        self.assertIn(b"statically linked code", runtime["materials"][0]["content"])
+        self.assertIn("embeds the pinned upstream source commit", " ".join(runtime["remaining"]))
+        fuse = components["AppImage:libfuse:3.15.0"]
+        self.assertEqual("LGPL-2.1-only", fuse["proposedLicense"])
+        self.assertIn(b"GNU LESSER GENERAL PUBLIC LICENSE", fuse["materials"][1]["content"])
+        self.assertIn("static-link relinking", " ".join(fuse["remaining"]))
+        squashfuse = components["AppImage:squashfuse:0.5.2"]
+        self.assertEqual("BSD-2-Clause", squashfuse["proposedLicense"])
+        self.assertIn(b"Redistribution and use in source and binary forms",
+                      squashfuse["materials"][0]["content"])
+        musl = components["AppImage:musl:1.2.5"]
+        self.assertEqual("MIT", musl["proposedLicense"])
+        self.assertIn(b"musl as a whole is licensed", musl["materials"][0]["content"])
+        graal = components["org.graalvm.js:js-isolate-linux-amd64:25.4.4.1.1"]
+        self.assertEqual(
+            "GraalVM Free Terms and Conditions (GFTC)",
+            graal["proposedLicense"],
+        )
+        self.assertEqual(
+            "58f1795f7d12d12260d0c0423811e846c7632649",
+            graal["upstreamCommit"],
+        )
+        self.assertEqual(
+            "81c71eea20f3c272c69d9d6ba3ed392f3651562150f3a4f34401004fcb403821",
+            components["org.graalvm.js:js-isolate-darwin-aarch64:25.4.4.1.1"]["expectedSourceSha256"],
+        )
+        self.assertIn(b"re-signing an embedded macOS library", graal["materials"][0]["content"])
+        self.assertTrue(any("unmodified-Program condition" in item for item in graal["remaining"]))
+        self.assertFalse(any("no-fee redistribution condition" in item for item in graal["remaining"]))
+        self.assertIn("without charging recipients", graal["materials"][0]["content"].decode())
+        self.assertIn("public GitHub Releases", graal["materials"][0]["content"].decode())
+        self.assertFalse(json.loads(registry.read_text())["redistributionApproved"])
+        self.assertFalse(json.loads(registry.read_text())["redistributionApproved"])
+
+    def test_skiko_retains_original_notice_without_clearing_native_dependencies(self):
+        root = pathlib.Path(__file__).parents[1]
+        registry = root / "docs/licensing/third-party/sources.json"
+        component = load_supplements(registry)["org.jetbrains.skiko:skiko-awt:0.150.2"]
+        notice = next(item for item in component["materials"]
+                      if item["path"] == "skiko-0.150.2/NOTICE")
+        self.assertIn(b"The Android Open Source Project", notice["content"])
+        self.assertIn(component["upstreamCommit"], notice["url"])
+        remaining = " ".join(component["remaining"])
+        for library in ("skia_ganesh_ext", "skunicode_icu", "harfbuzz", "webp_sse41",
+                        "piex", "dng_sdk", "d3d12allocator"):
+            self.assertIn(library, remaining)
+        self.assertFalse(json.loads(registry.read_text())["redistributionApproved"])
+
+    def test_skia_embedded_component_evidence_is_pinned_and_not_approved(self):
+        root = pathlib.Path(__file__).parents[1]
+        registry_path = root / "docs/licensing/third-party/sources.json"
+        registry = json.loads(registry_path.read_text())
+        components = {item["name"]: item for item in registry["embeddedComponents"]}
+        self.assertEqual({"dng_sdk", "piex", "wuffs"}, set(components))
+        expected_commits = {
+            "dng_sdk": "dbe0a676450d9b8c71bf00688bb306409b779e90",
+            "piex": "bb217acdca1cc0c16b704669dd6f91a1b509c406",
+            "wuffs": "e3f919ccfe3ef542cfc983a82146070258fb57f8",
+        }
+        for name, commit in expected_commits.items():
+            with self.subTest(name=name):
+                component = components[name]
+                self.assertEqual(commit, component["upstreamCommit"])
+                self.assertEqual("unreviewed", component["reviewStatus"])
+                self.assertTrue(component["remaining"])
+                for path in component["materialPaths"]:
+                    material = next(item for item in registry["materials"] if item["path"] == path)
+                    content = (registry_path.parent / path).read_bytes()
+                    self.assertEqual(material["sha256"], hashlib.sha256(content).hexdigest())
+        dng_platforms = components["dng_sdk"]["binaryEvidence"]
+        self.assertIn("Unknown", dng_platforms["windows-x64"])
+        self.assertIn("found", dng_platforms["linux-x64"])
+        package = registry["packageEvidence"][0]
+        self.assertEqual(42388152203, package["workflowRun"])
+        self.assertEqual("historical-smoke-artifact-not-final-release-candidate", package["status"])
+        self.assertEqual(
+            "8596fdd05feffc299febae7ddf8833b85c725fdae66b81d6a03d88e9a91f717a",
+            package["sha256"],
+        )
+        self.assertTrue(any("DNG SDK, Piex, Wuffs, or libffi" in item for item in package["remaining"]))
+        self.assertFalse(registry["redistributionApproved"])
+
+    def test_pdfbox_embedded_liberation_font_has_exact_upstream_license_evidence(self):
+        root = pathlib.Path(__file__).parents[1]
+        registry = json.loads((root / "docs/licensing/third-party/sources.json").read_text())
+        asset = next(item for item in registry["embeddedAssets"]
+                     if item["name"] == "LiberationSans-Regular.ttf")
+        self.assertEqual("org.apache.pdfbox:pdfbox:3.0.8", asset["containerCoordinate"])
+        self.assertEqual("76d04c18ea243f426b7de1f3ad208e927008f961dc5945e5aad352d0dfde8ee8",
+                         asset["assetSha256"])
+        self.assertEqual("OFL-1.1", asset["proposedLicense"])
+        self.assertEqual("reviewed", asset["reviewStatus"])
+        self.assertEqual([], asset["remaining"])
+        review_notes = asset["reviewNotes"]
+        self.assertIn("permits bundling the font with software", review_notes)
+        self.assertIn("prohibits selling the font by itself", review_notes)
+        self.assertIn("does not approve the complete release package", review_notes)
+        component = load_supplements(root / "docs/licensing/third-party/sources.json")
+        self.assertEqual(34, len(component))
+        license_file = root / "docs/licensing/third-party/liberation-fonts-2.1.5/LICENSE"
+        self.assertEqual(asset["licenseMaterialPath"],
+                         "liberation-fonts-2.1.5/LICENSE")
+        self.assertIn(b"SIL OPEN FONT LICENSE Version 1.1", license_file.read_bytes())
+        self.assertFalse(registry["redistributionApproved"])
 
     def test_existing_report_plugin_exports_all_license_alternatives(self):
         root = pathlib.Path(__file__).parents[1]
@@ -107,15 +258,105 @@ class SupplementalNoticesTest(unittest.TestCase):
         self.assertIn('ExtendedJsonReportRenderer("licenses-all.json", false)', build)
         self.assertIn("build/reports/dependency-license/licenses-all.json", workflow)
 
+    def test_jna_retains_pinned_libffi_notice_without_granting_native_clearance(self):
+        root = pathlib.Path(__file__).parents[1]
+        registry = root / "docs/licensing/third-party/sources.json"
+        component = load_supplements(registry)["net.java.dev.jna:jna:5.19.1"]
+        notice = next(item for item in component["materials"]
+                      if item["path"] == "jna-5.19.1/libffi-LICENSE")
+        self.assertEqual("2c9c2acb9743e6b007b91350475308aee44691d96aa20eacef8e199988c8c388",
+                         notice["sha256"])
+        self.assertIn(component["upstreamCommit"] + "/native/libffi/LICENSE", notice["url"])
+        self.assertTrue(notice["content"].startswith(b"libffi - Copyright"))
+        self.assertTrue(any("source-file-specific attribution" in item for item in component["remaining"]))
+        self.assertTrue(any("libffi provenance" in item for item in component["remaining"]))
+        self.assertFalse(json.loads(registry.read_text())["redistributionApproved"])
+
+    def test_collector_includes_pinned_icu_license_for_exact_packaged_artifact(self):
+        package, inventory = self.prepare_package()
+        artifact_hash = "02f9e8a76ed2f8fa80d53054ca4632c7058354010df27c8f4e7e7443543f7e1e"
+        inventory.write_text(
+            "packagePath,coordinate,packageSha256,sourceSha256\n"
+            f"lib.jar,org.graalvm.shadowed:icu4j:25.4.4.1.1,{NOTICES.sha256(package / 'lib.jar')},{artifact_hash}\n"
+        )
+        self.license_report.write_text(
+            '{"dependencies":[{"moduleName":"org.graalvm.shadowed:icu4j",'
+            '"moduleVersion":"25.4.4.1.1","moduleUrls":[],"moduleLicenses":['
+            '{"moduleLicense":"Unicode/ICU License",'
+            '"moduleLicenseUrl":"https://raw.githubusercontent.com/unicode-org/icu/main/LICENSE"}]}]}'
+        )
+        root = pathlib.Path(__file__).parents[1]
+        registry = root / "docs/licensing/third-party/sources.json"
+        output = self.root / "icu-collected"
+        report = NOTICES.collect(
+            package,
+            inventory,
+            output,
+            self.license_report,
+            self.project_license,
+            registry,
+        )
+        component = report["components"][0]
+        material = component["supplement"]["materials"][0]
+        expected = root / "docs/licensing/third-party/icu4j-78.2/LICENSE"
+        self.assertEqual(expected.read_bytes(), (output / material["path"]).read_bytes())
+        self.assertEqual("unreviewed", component["reviewStatus"])
+        self.assertTrue(component["supplement"]["remaining"])
+        self.assertFalse(report["redistributionApproved"])
+
+    def test_collector_includes_pinned_upl_text_for_exact_packaged_artifact(self):
+        package, inventory = self.prepare_package()
+        artifact_hash = "cbacc2628fd5f99dbcebff7d398bcddde43ea15ebadc873d1da4454c718727d8"
+        inventory.write_text(
+            "packagePath,coordinate,packageSha256,sourceSha256\n"
+            f"lib.jar,org.graalvm.polyglot:polyglot:25.4.4.1.1,{NOTICES.sha256(package / 'lib.jar')},{artifact_hash}\n"
+        )
+        self.license_report.write_text(
+            '{"dependencies":[{"moduleName":"org.graalvm.polyglot:polyglot",'
+            '"moduleVersion":"25.4.4.1.1","moduleUrls":[],"moduleLicenses":['
+            '{"moduleLicense":"UPL-1.0",'
+            '"moduleLicenseUrl":"https://opensource.org/licenses/UPL"}]}]}'
+        )
+        root = pathlib.Path(__file__).parents[1]
+        registry = root / "docs/licensing/third-party/sources.json"
+        output = self.root / "upl-collected"
+        report = NOTICES.collect(
+            package,
+            inventory,
+            output,
+            self.license_report,
+            self.project_license,
+            registry,
+        )
+        component = report["components"][0]
+        material = component["supplement"]["materials"][0]
+        expected = root / "docs/licensing/third-party/graalvm-25.4.4.1.1/UPL-1.0.txt"
+        self.assertEqual(expected.read_bytes(), (output / material["path"]).read_bytes())
+        self.assertEqual("UPL-1.0", component["supplement"]["proposedLicense"])
+        self.assertEqual("unreviewed", component["reviewStatus"])
+        self.assertTrue(component["supplement"]["remaining"])
+        self.assertFalse(report["redistributionApproved"])
+
     def prepare_package(self):
         package = self.root / "package"
         package.mkdir()
+        runtime_legal = package / "Visual Agent/resources/legal/java-runtime"
+        (runtime_legal / "vendor").mkdir(parents=True)
+        (runtime_legal / "vendor/readme.txt").write_text("Synthetic source-offer information")
         archive = package / "lib.jar"
         with zipfile.ZipFile(archive, "w") as jar:
             jar.writestr("library.class", b"synthetic bytecode")
         digest = NOTICES.sha256(archive)
         inventory = self.root / "inventory.csv"
         inventory.write_text("packagePath,coordinate,packageSha256,sourceSha256\nlib.jar,example:lib:1," + digest + "," + "d" * 64 + "\n")
+        self.license_report = self.root / "licenses-all.json"
+        self.license_report.write_text(
+            '{"dependencies":[{"moduleName":"example:lib","moduleVersion":"1",'
+            '"moduleUrls":[],"moduleLicenses":[{"moduleLicense":"Example",'
+            '"moduleLicenseUrl":"https://example.org/license"}]}]}'
+        )
+        self.project_license = self.root / "LICENSE"
+        self.project_license.write_text("Project license")
         self.data["components"][0]["sourceArtifacts"]["example:lib:1"] = "d" * 64
         self.load()
         return package, inventory
@@ -123,7 +364,7 @@ class SupplementalNoticesTest(unittest.TestCase):
     def test_collector_retains_supplement_without_hiding_missing_embedded_notice(self):
         package, inventory = self.prepare_package()
         output = self.root / "collected"
-        report = NOTICES.collect(package, inventory, output, self.registry)
+        report = NOTICES.collect(package, inventory, output, self.license_report, self.project_license, self.registry)
         component = report["components"][0]
         self.assertEqual("no-detected-notice", component["noticeStatus"])
         self.assertEqual("unreviewed", component["reviewStatus"])
@@ -139,7 +380,7 @@ class SupplementalNoticesTest(unittest.TestCase):
         self.load()
         output = self.root / "collected"
         with self.assertRaisesRegex(ValueError, "exact source artifact"):
-            NOTICES.collect(package, inventory, output, self.registry)
+            NOTICES.collect(package, inventory, output, self.license_report, self.project_license, self.registry)
         self.assertFalse((output / "manifest.json").exists())
 
     def test_source_identity_is_required_when_using_supplements(self):
@@ -147,7 +388,7 @@ class SupplementalNoticesTest(unittest.TestCase):
         lines = inventory.read_text().splitlines()
         inventory.write_text("\n".join(line.rsplit(",", 1)[0] for line in lines) + "\n")
         with self.assertRaisesRegex(ValueError, "exact source artifact"):
-            NOTICES.collect(package, inventory, self.root / "collected", self.registry)
+            NOTICES.collect(package, inventory, self.root / "collected", self.license_report, self.project_license, self.registry)
 
 
 if __name__ == "__main__":

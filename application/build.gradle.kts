@@ -1,4 +1,5 @@
 import de.heckenmann.visualagent.gradle.verifyJarProjectLegalMaterials
+import org.gradle.language.jvm.tasks.ProcessResources
 import org.springframework.boot.gradle.tasks.bundling.BootJar
 import java.nio.file.Files
 import java.util.jar.JarFile
@@ -214,10 +215,13 @@ val verifyExecutableJar =
         }
     }
 
-tasks.named<BootJar>("bootJar") {
-    manifest.attributes["Enable-Native-Access"] = "ALL-UNNAMED"
+tasks.named<ProcessResources>("processResources") {
     from(rootProject.file("LICENSE")) { into("META-INF/visual-agent/legal/visual-agent") }
     from(rootProject.file("docs/licensing/third-party")) { into("META-INF/visual-agent/legal/third-party") }
+}
+
+tasks.named<BootJar>("bootJar") {
+    manifest.attributes["Enable-Native-Access"] = "ALL-UNNAMED"
 }
 
 tasks.register("runServer") {

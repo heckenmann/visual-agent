@@ -140,6 +140,23 @@ class RuntimeLegalMaterialsTest(unittest.TestCase):
         self.assertNotEqual(0, result.returncode)
         self.assertIn("Missing or escaping source-JDK file", result.stderr)
 
+    def test_empty_optional_module_legal_placeholder_is_preserved(self):
+        placeholder = self.jdk / "legal/java.management.rmi/LICENSE"
+        placeholder.parent.mkdir(parents=True)
+        placeholder.write_bytes(b"")
+        self.assert_prepared()
+        retained = self.output / "legal/java.management.rmi/LICENSE"
+        self.assertTrue(retained.is_file())
+        self.assertEqual(b"", retained.read_bytes())
+        manifest = (self.output / "source-inputs.sha256").read_text()
+        self.assertIn(hashlib.sha256(b"").hexdigest() + "  legal/java.management.rmi/LICENSE", manifest)
+
+    def test_empty_required_base_license_still_fails(self):
+        (self.jdk / "legal/java.base/LICENSE").write_bytes(b"")
+        result = self.prepare()
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn("Empty source-JDK legal/input file: legal/java.base/LICENSE", result.stderr)
+
     def test_missing_exact_build_identity_fails(self):
         (self.jdk / "release").write_text('JAVA_VERSION="27"\nIMPLEMENTOR="Synthetic Vendor"\n')
         result = self.prepare()

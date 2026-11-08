@@ -75,6 +75,26 @@ class BundledLegalMaterialsTest(unittest.TestCase):
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertEqual(before, (self.root / "native/legal/third-party/LICENSE.txt").read_bytes())
 
+    def test_native_packager_tracks_generated_legal_directory_as_input(self):
+        init = self.root / "native-legal-inputs.init.gradle.kts"
+        init.write_text(
+            'gradle.projectsEvaluated { rootProject.findProject(":desktop")?.let { desktop ->\n'
+            'desktop.tasks.register("verifyLegalInputTracking") {\n'
+            'dependsOn("prepareDistributionLegalResources")\n'
+            'doLast {\n'
+            'val expected = desktop.layout.buildDirectory.dir("generated/distribution-legal-resources").get().asFile.canonicalFile\n'
+            'val packager = desktop.tasks.getByName("createDistributable")\n'
+            'val required = expected.walkTopDown().filter { it.isFile }.map { it.canonicalFile }.toSet()\n'
+            'val tracked = packager.inputs.files.files.map { it.canonicalFile }.toSet()\n'
+            'check(required.isNotEmpty() && tracked.containsAll(required)) { "Legal resources must invalidate native packaging" }\n'
+            '} } } }\n'
+        )
+        result = subprocess.run(
+            [str(ROOT / "gradlew"), "-I", str(init), ":desktop:verifyLegalInputTracking",
+             "--offline", "--quiet", "--no-daemon"], capture_output=True, text=True,
+        )
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+
     def test_jar_retains_original_bytes(self):
         before = (self.root / "app.jar").read_bytes()
         result = self.verify("verifyJar")

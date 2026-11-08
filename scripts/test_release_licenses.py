@@ -7,6 +7,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import zipfile
 
 
 ROOT = pathlib.Path(__file__).parents[1]
@@ -27,7 +28,12 @@ class ReleaseLicenseTest(unittest.TestCase):
         evidence = self.root / "review.md"
         evidence.write_text("Synthetic review fixture, not a real legal approval.")
         for name in GATE.PACKAGE_NAMES | GATE.LEGAL_NAMES:
-            (self.assets / name).write_bytes(name.encode())
+            asset = self.assets / name
+            if name in GATE.LEGAL_NAMES:
+                with zipfile.ZipFile(asset, "w") as archive:
+                    archive.writestr("README.txt", "Recipient-ready fixture.")
+            else:
+                asset.write_bytes(name.encode())
         self.review = {
             "sourceCommit": self.commit,
             "reviewedBy": "Synthetic reviewer",
@@ -68,6 +74,24 @@ class ReleaseLicenseTest(unittest.TestCase):
     def test_changing_a_package_invalidates_its_review(self):
         (self.assets / "visual-agent-windows.msi").write_bytes(b"changed")
         with self.assertRaisesRegex(ValueError, "changed after review"):
+            self.verify()
+
+    def test_review_only_archives_are_rejected_even_when_their_hashes_are_approved(self):
+        for name in GATE.LEGAL_NAMES:
+            asset = self.assets / name
+            with zipfile.ZipFile(asset, "w") as archive:
+                archive.writestr("nested/REVIEW-ONLY.txt", "Not for release.")
+            self.review["sha256"][name] = GATE.digest(asset)
+            self.write_policy()
+            with self.subTest(name=name), self.assertRaisesRegex(ValueError, "Review-only archive"):
+                self.verify()
+
+    def test_non_zip_legal_archive_is_rejected(self):
+        asset = self.assets / "visual-agent-legal.zip"
+        asset.write_bytes(b"not a zip archive")
+        self.review["sha256"][asset.name] = GATE.digest(asset)
+        self.write_policy()
+        with self.assertRaisesRegex(ValueError, "Invalid release archive"):
             self.verify()
 
     def test_extra_files_cannot_be_published(self):
@@ -133,13 +157,33 @@ class ReleaseLicenseTest(unittest.TestCase):
     def test_publication_checks_the_trusted_policy_before_uploading(self):
         workflow = (ROOT / ".github/workflows/release.yml").read_text()
         self.assertIn("ref: ${{ github.event.repository.default_branch }}", workflow)
+        self.assertIn(".tag_name == $tag and .draft == true", workflow)
         gate = workflow.index("- name: Verify exact release license clearance")
-        upload = workflow.index("- name: Attach artifacts to existing GitHub release")
+        upload = workflow.index("- name: Attach verified artifacts to the draft release")
+        publish = workflow.index("- name: Publish only after exact license clearance passes")
         self.assertLess(gate, upload)
+        self.assertLess(upload, publish)
         self.assertIn("scripts/verify-release-licenses.py", workflow[gate:upload])
         self.assertNotIn("continue-on-error", workflow)
         self.assertIn("visual-agent-corresponding-sources", workflow)
         self.assertIn("visual-agent-legal", workflow)
+
+    def test_docs_disclose_that_github_write_access_can_bypass_the_publisher(self):
+        docs = " ".join((ROOT / "docs/licensing/README.md").read_text().split())
+        self.assertIn("write access to manage releases", docs)
+        self.assertIn("Do not describe the workflow alone as a platform-enforced publication", docs)
+
+    def test_build_and_inventory_workflows_pin_the_reviewed_zulu_runtime(self):
+        expected = 'ZULU_JDK_VERSION: "27.0.1.0.3+1"'
+        for name in ("test.yml", "package-smoke.yml", "license-inventory.yml"):
+            workflow = (ROOT / ".github/workflows" / name).read_text()
+            with self.subTest(workflow=name):
+                self.assertIn(expected, workflow)
+                self.assertEqual(
+                    workflow.count("distribution: zulu"),
+                    workflow.count("java-version: ${{ env.ZULU_JDK_VERSION }}"),
+                )
+                self.assertNotIn('java-version: "27"', workflow)
 
 
 if __name__ == "__main__":

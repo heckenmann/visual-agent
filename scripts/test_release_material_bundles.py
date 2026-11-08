@@ -1,0 +1,312 @@
+"""Verify deterministic review-only release material archives."""
+
+import hashlib
+import json
+import pathlib
+import shutil
+import sys
+import tempfile
+import unittest
+import zipfile
+
+
+ROOT = pathlib.Path(__file__).parents[1]
+sys.path.insert(0, str(ROOT / "scripts"))
+import build_release_material_bundles as bundler
+
+
+class ReleaseMaterialBundleTest(unittest.TestCase):
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temporary.cleanup)
+        self.root = pathlib.Path(self.temporary.name)
+        self.project = self.root / "project"
+        self.materials = self.root / "source-materials"
+        self.notice_evidence = self.root / "package-notices"
+        self.output = self.root / "output"
+        self.test_platform = "linux-appimage"
+        (self.project / "docs/licensing/third-party/vendor").mkdir(parents=True)
+        (self.materials / "archives/vendor").mkdir(parents=True)
+        (self.materials / "legal/vendor").mkdir(parents=True)
+        (self.project / "LICENSE").write_text("Project license")
+        (self.project / "docs/licensing/README.md").write_text("Review status")
+        (self.project / "docs/licensing/source-delivery.md").write_text("Scope remains partial")
+        (self.project / "docs/licensing/third-party/vendor/LICENSE").write_text("Vendor license")
+        license_bytes = b"Vendor license"
+        (self.project / "docs/licensing/third-party/sources.json").write_text(
+            json.dumps(
+                {
+                    "redistributionApproved": False,
+                    "components": [{"reviewStatus": "unreviewed", "materialPaths": ["vendor/LICENSE"]}],
+                    "embeddedAssets": [],
+                    "materials": [
+                        {
+                            "path": "vendor/LICENSE",
+                            "sha256": hashlib.sha256(license_bytes).hexdigest(),
+                        },
+                    ],
+                },
+            ),
+        )
+        (self.materials / "archives/vendor/source.tar.gz").write_bytes(b"source archive bytes")
+        (self.materials / "legal/vendor/LICENSE").write_text("Vendor license copy")
+        (self.materials / "source-delivery.md").write_text("Not complete or approved")
+        for platform in sorted(bundler.EXPECTED_NOTICE_PLATFORMS):
+            self.add_notice_evidence(platform, f"{platform} dependency notice".encode())
+
+    def add_notice_evidence(self, platform, notice_text):
+        notice_directory = self.notice_evidence / platform / "artifacts/package-hash"
+        notice_directory.mkdir(parents=True)
+        (notice_directory / "LICENSE").write_bytes(notice_text)
+        runtime_notice = b"Runtime legal file"
+        runtime_path = self.notice_evidence / platform / "runtime-legal/vendor/readme.txt"
+        runtime_path.parent.mkdir(parents=True)
+        runtime_path.write_bytes(runtime_notice)
+        notice_manifest = {
+            "redistributionApproved": False,
+            "projectLicenseSha256": hashlib.sha256((self.project / "LICENSE").read_bytes()).hexdigest(),
+            "components": [
+                {
+                    "reviewStatus": "unreviewed",
+                    "noticeStatus": "retained",
+                    "notices": [
+                        {
+                            "path": "artifacts/package-hash/LICENSE",
+                            "sha256": hashlib.sha256(notice_text).hexdigest(),
+                        },
+                    ],
+                },
+            ],
+            "runtimeLegal": {
+                "packagePath": "Visual Agent/resources/legal/java-runtime",
+                "reviewStatus": "unreviewed",
+                "files": [
+                    {
+                        "packagePath": "Visual Agent/resources/legal/java-runtime/vendor/readme.txt",
+                        "path": "runtime-legal/vendor/readme.txt",
+                        "sha256": hashlib.sha256(runtime_notice).hexdigest(),
+                        "size": len(runtime_notice),
+                    },
+                ],
+            },
+        }
+        (self.notice_evidence / platform / "manifest.json").write_text(json.dumps(notice_manifest))
+
+    def build(self, recipient_candidate=False):
+        return bundler.build_bundles(
+            self.project,
+            self.materials,
+            self.notice_evidence,
+            self.output,
+            recipient_candidate,
+        )
+
+    def test_archives_include_review_status_and_hash_manifests(self):
+        legal, sources = self.build()
+
+        with zipfile.ZipFile(legal) as archive:
+            self.assertEqual(
+                {
+                    "LICENSE",
+                    "licensing/README.md",
+                    "licensing/source-delivery.md",
+                    "licensing/third-party/vendor/LICENSE",
+                    "licensing/third-party/sources.json",
+                    "MANIFEST.sha256",
+                    "REVIEW-ONLY.txt",
+                },
+                set(archive.namelist())
+                - {
+                    name
+                    for platform in bundler.EXPECTED_NOTICE_PLATFORMS
+                    for name in (
+                        f"package-notice-evidence/{platform}/manifest.json",
+                        f"package-notice-evidence/{platform}/artifacts/package-hash/LICENSE",
+                        f"package-notice-evidence/{platform}/runtime-legal/vendor/readme.txt",
+                    )
+                },
+            )
+            self.assertIn(b"must not be published", archive.read("REVIEW-ONLY.txt"))
+            for platform in bundler.EXPECTED_NOTICE_PLATFORMS:
+                self.assertEqual(
+                    f"{platform} dependency notice".encode(),
+                    archive.read(f"package-notice-evidence/{platform}/artifacts/package-hash/LICENSE"),
+                )
+                self.assertEqual(
+                    b"Runtime legal file",
+                    archive.read(f"package-notice-evidence/{platform}/runtime-legal/vendor/readme.txt"),
+                )
+            self.assertIn(
+                f"{hashlib.sha256(b'Project license').hexdigest()}  LICENSE".encode(),
+                archive.read("MANIFEST.sha256"),
+            )
+
+        with zipfile.ZipFile(sources) as archive:
+            self.assertEqual(
+                {
+                    "source-materials/archives/vendor/source.tar.gz",
+                    "source-materials/legal/vendor/LICENSE",
+                    "source-materials/source-delivery.md",
+                    "MANIFEST.sha256",
+                    "REVIEW-ONLY.txt",
+                },
+                set(archive.namelist()),
+            )
+            self.assertEqual(b"source archive bytes", archive.read("source-materials/archives/vendor/source.tar.gz"))
+
+    def test_archives_are_reproducible(self):
+        first = self.build()
+        first_hashes = [hashlib.sha256(path.read_bytes()).digest() for path in first]
+        second = self.build()
+        self.assertEqual(first_hashes, [hashlib.sha256(path.read_bytes()).digest() for path in second])
+
+    def test_downloaded_artifact_folder_names_are_normalized(self):
+        for platform in bundler.EXPECTED_NOTICE_PLATFORMS:
+            (self.notice_evidence / platform).rename(self.notice_evidence / f"license-notices-{platform}")
+
+        legal, _ = self.build()
+
+        with zipfile.ZipFile(legal) as archive:
+            for platform in bundler.EXPECTED_NOTICE_PLATFORMS:
+                self.assertIn(
+                    f"package-notice-evidence/{platform}/manifest.json",
+                    archive.namelist(),
+                )
+
+    def test_duplicate_normalized_platform_evidence_fails_closed(self):
+        self.add_notice_evidence("license-notices-linux-appimage", b"Duplicate platform")
+
+        with self.assertRaisesRegex(ValueError, "Duplicate package notice evidence"):
+            self.build()
+
+    def test_recipient_candidates_omit_review_marker_but_do_not_change_review_registry(self):
+        legal, sources = self.build(recipient_candidate=True)
+
+        for archive_path in (legal, sources):
+            with zipfile.ZipFile(archive_path) as archive:
+                self.assertNotIn("REVIEW-ONLY.txt", archive.namelist())
+                self.assertTrue(archive.read("MANIFEST.sha256"))
+
+        registry = json.loads((self.project / "docs/licensing/third-party/sources.json").read_text())
+        self.assertFalse(registry["redistributionApproved"])
+        self.assertIn("must not be published as a release asset", bundler.REVIEW_ONLY_NOTICE)
+
+    def test_missing_source_archive_fails_closed(self):
+        (self.materials / "archives/vendor/source.tar.gz").unlink()
+        with self.assertRaisesRegex(ValueError, "archive directory is empty"):
+            self.build()
+
+    def test_missing_runtime_legal_material_fails_closed(self):
+        manifest = self.notice_evidence / self.test_platform / "manifest.json"
+        data = json.loads(manifest.read_text())
+        del data["runtimeLegal"]
+        manifest.write_text(json.dumps(data))
+        with self.assertRaisesRegex(ValueError, "Runtime legal evidence is missing"):
+            self.build()
+
+    def test_missing_platform_notice_evidence_fails_closed(self):
+        missing_platform = sorted(bundler.EXPECTED_NOTICE_PLATFORMS)[0]
+        shutil.rmtree(self.notice_evidence / missing_platform)
+        with self.assertRaisesRegex(ValueError, "Platform notice evidence mismatch"):
+            self.build()
+
+    def test_unexpected_platform_notice_evidence_fails_closed(self):
+        self.add_notice_evidence("unexpected-platform", b"Unexpected platform")
+        with self.assertRaisesRegex(ValueError, "Platform notice evidence mismatch"):
+            self.build()
+
+    def test_changed_runtime_legal_material_fails_closed(self):
+        (self.notice_evidence / self.test_platform / "runtime-legal/vendor/readme.txt").write_bytes(b"changed")
+        with self.assertRaisesRegex(ValueError, "Runtime legal evidence hash mismatch"):
+            self.build()
+
+    @unittest.skipIf(sys.platform == "win32", "Creating symlinks requires Windows developer privileges")
+    def test_symlinked_source_material_is_rejected(self):
+        linked = self.materials / "archives/vendor/linked.tar.gz"
+        linked.symlink_to(self.materials / "archives/vendor/source.tar.gz")
+        with self.assertRaisesRegex(ValueError, "Linked release material"):
+            bundler.build_bundles(self.project, self.materials, self.notice_evidence, self.output)
+
+    @unittest.skipIf(sys.platform == "win32", "Creating symlinks requires Windows developer privileges")
+    def test_symlinked_source_root_is_rejected(self):
+        linked_root = self.root / "linked-source-materials"
+        linked_root.symlink_to(self.materials, target_is_directory=True)
+        with self.assertRaisesRegex(ValueError, "directory is missing or linked"):
+            bundler.build_bundles(self.project, linked_root, self.notice_evidence, self.output)
+
+    def test_output_cannot_be_written_inside_source_materials(self):
+        with self.assertRaisesRegex(ValueError, "must not be inside source materials"):
+            bundler.build_bundles(self.project, self.materials, self.notice_evidence, self.materials / "output")
+
+    def test_notice_evidence_hash_mismatch_fails_closed(self):
+        (self.notice_evidence / self.test_platform / "artifacts/package-hash/LICENSE").write_text("changed")
+        with self.assertRaisesRegex(ValueError, "hash mismatch"):
+            self.build()
+
+    def test_curated_legal_material_hash_mismatch_fails_closed(self):
+        registry_path = self.project / "docs/licensing/third-party/sources.json"
+        registry = json.loads(registry_path.read_text())
+        registry["materials"][0]["sha256"] = "0" * 64
+        registry_path.write_text(json.dumps(registry))
+        with self.assertRaisesRegex(ValueError, "Curated legal material is missing or has a hash mismatch"):
+            self.build()
+
+    def test_undeclared_component_material_fails_closed(self):
+        registry_path = self.project / "docs/licensing/third-party/sources.json"
+        registry = json.loads(registry_path.read_text())
+        registry["materials"] = []
+        registry_path.write_text(json.dumps(registry))
+        with self.assertRaisesRegex(ValueError, "Curated materials are not declared in the registry"):
+            self.build()
+
+    def test_notice_evidence_cannot_claim_review_or_redistribution_approval(self):
+        manifest_path = self.notice_evidence / self.test_platform / "manifest.json"
+        manifest = json.loads(manifest_path.read_text())
+        manifest["redistributionApproved"] = True
+        manifest_path.write_text(json.dumps(manifest))
+        with self.assertRaisesRegex(ValueError, "not explicitly unreviewed"):
+            self.build()
+
+    def test_notice_evidence_must_match_the_project_license_in_the_bundle(self):
+        manifest_path = self.notice_evidence / self.test_platform / "manifest.json"
+        manifest = json.loads(manifest_path.read_text())
+        manifest["projectLicenseSha256"] = "0" * 64
+        manifest_path.write_text(json.dumps(manifest))
+        with self.assertRaisesRegex(ValueError, "does not match the legal bundle"):
+            self.build()
+
+    def test_package_workflow_uploads_both_review_only_archives(self):
+        workflow = (ROOT / ".github/workflows/package-smoke.yml").read_text()
+        self.assertIn("prepareReleaseSourceMaterials", workflow)
+        self.assertEqual(
+            2,
+            workflow.count("--source-materials modules/desktop/build/reports/dependency-license/release-source-materials"),
+        )
+        self.assertIn(":desktop:generateDistributionArtifactInventory", workflow)
+        self.assertIn("actions/setup-python@v7", workflow)
+        self.assertIn("collect-third-party-notices.py", workflow)
+        self.assertIn("--package-root modules/desktop/build/compose/binaries/main/app", workflow)
+        self.assertIn("--inventory modules/desktop/build/reports/dependency-license/packaged-artifacts.csv", workflow)
+        self.assertEqual(2, workflow.count("--notice-evidence release-materials/package-notices"))
+        self.assertIn("--output-directory release-materials/review-only", workflow)
+        self.assertIn("--output-directory release-materials/recipient-candidates", workflow)
+        self.assertIn("--recipient-candidate", workflow)
+        self.assertIn(":desktop:generateDistributionArtifactInventory", workflow)
+        self.assertIn("needs: [verify, package]", workflow)
+        self.assertIn("pattern: license-notices-*", workflow)
+        self.assertIn("if: matrix.collect_notice_evidence", workflow)
+        for platform in ("linux-deb", "linux-rpm", "linux-appimage", "macos-arm64", "macos-x64", "windows"):
+            self.assertIn(f"license-notices-${{{{ matrix.platform }}}}", workflow)
+            self.assertRegex(
+                workflow,
+                rf"platform: {platform}\n(?:.*\n){{1,6}}\s+collect_notice_evidence: true",
+            )
+        self.assertIn("scripts/build_release_material_bundles.py", workflow)
+        self.assertIn("name: visual-agent-legal-review", workflow)
+        self.assertIn("name: visual-agent-corresponding-sources-review", workflow)
+        self.assertIn("name: visual-agent-legal\n", workflow)
+        self.assertIn("name: visual-agent-corresponding-sources\n", workflow)
+
+
+if __name__ == "__main__":
+    unittest.main()

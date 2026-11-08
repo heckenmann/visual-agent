@@ -9,6 +9,7 @@ import hashlib
 import json
 import pathlib
 import re
+import zipfile
 
 
 PACKAGE_NAMES = {
@@ -38,6 +39,17 @@ def checked_file(root, name):
     return file
 
 
+def verify_recipient_archive(path):
+    try:
+        with zipfile.ZipFile(path) as archive:
+            if archive.testzip() is not None:
+                raise ValueError(f"Corrupt release archive: {path.name}")
+            if any(pathlib.PurePosixPath(name).name == "REVIEW-ONLY.txt" for name in archive.namelist()):
+                raise ValueError(f"Review-only archive cannot be published: {path.name}")
+    except zipfile.BadZipFile as error:
+        raise ValueError(f"Invalid release archive: {path.name}") from error
+
+
 def verify(policy_path, assets, tag, source_commit):
     policy = json.loads(policy_path.read_text(encoding="utf-8"))
     if policy.get("schemaVersion") != 1:
@@ -64,8 +76,11 @@ def verify(policy_path, assets, tag, source_commit):
     for name, expected in hashes.items():
         if not isinstance(expected, str) or not re.fullmatch(r"[0-9a-f]{64}", expected):
             raise ValueError(f"Invalid reviewed SHA-256: {name}")
-        if digest(checked_file(assets, name)) != expected:
+        file = checked_file(assets, name)
+        if digest(file) != expected:
             raise ValueError(f"Release file changed after review: {name}")
+        if name in LEGAL_NAMES:
+            verify_recipient_archive(file)
 
 
 def main():

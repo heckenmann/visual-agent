@@ -5,6 +5,7 @@ import de.heckenmann.visualagent.gradle.verifyNativeProjectLegalMaterials
 import de.heckenmann.visualagent.gradle.verifyPackagedRuntimeLegalMaterials
 import org.gradle.api.artifacts.component.ModuleComponentIdentifier
 import org.gradle.api.tasks.SourceSetContainer
+import org.gradle.jvm.toolchain.JvmVendorSpec
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import org.jlleitschuh.gradle.ktlint.tasks.BaseKtLintCheckTask
 import org.springframework.boot.gradle.tasks.bundling.BootJar
@@ -98,7 +99,14 @@ val desktopDispatcherProbeClasspath = files(sourceSets.main.get().runtimeClasspa
 
 // Resolve sources from the selected runtime graph, not independently selected versions.
 // This is a partial evidence set; JDK/native source obligations remain open in #410.
-val requiredSourceModules = setOf("com.h2database:h2", "ch.qos.logback:logback-core", "ch.qos.logback:logback-classic")
+val requiredSourceModules =
+    setOf(
+        "com.h2database:h2",
+        "ch.qos.logback:logback-core",
+        "ch.qos.logback:logback-classic",
+        "net.java.dev.jna:jna",
+        "org.jetbrains.skiko:skiko-awt",
+    )
 val runtimeSourceMaterials =
     configurations.runtimeClasspath.map { configuration ->
         configuration.incoming
@@ -116,19 +124,163 @@ val runtimeSourceMaterials =
             }.files
     }
 
-tasks.register<Sync>("prepareLibrarySourceMaterials") {
-    group = "distribution"
-    description = "Collects partial H2/Logback source evidence; does not approve redistribution."
-    from(runtimeSourceMaterials) { into("archives") }
-    from(rootProject.layout.projectDirectory.dir("docs/licensing/third-party")) { into("legal") }
-    from(rootProject.layout.projectDirectory.file("docs/licensing/source-delivery.md"))
-    into(layout.buildDirectory.dir("reports/dependency-license/library-source-materials"))
-    duplicatesStrategy = DuplicatesStrategy.FAIL
-    doFirst {
-        check(runtimeSourceMaterials.get().files.size == requiredSourceModules.size) {
-            "Missing required H2/Logback source artifacts; source evidence is incomplete."
+// Preserve the exact AppImage runtime source inputs used by the pinned binary.
+// This is partial evidence: the upstream Alpine image did not pin all APK revisions.
+val appImageRuntimeSourceArchives =
+    listOf(
+        Triple(
+            "type2-runtime-dd6cebed.tar.gz",
+            "https://codeload.github.com/AppImage/type2-runtime/tar.gz/dd6cebedcbddde9c82f89b011e8e1d40b6e43868",
+            "f5fec23be76e50e2445ed2d018bac49b367490fc483c62c4637e99ec705d27ba",
+        ),
+        Triple(
+            "fuse-3.15.0.tar.xz",
+            "https://github.com/libfuse/libfuse/releases/download/fuse-3.15.0/fuse-3.15.0.tar.xz",
+            "70589cfd5e1cff7ccd6ac91c86c01be340b227285c5e200baa284e401eea2ca0",
+        ),
+        Triple(
+            "squashfuse-0.5.2.tar.gz",
+            "https://github.com/vasi/squashfuse/archive/0.5.2.tar.gz",
+            "db0238c5981dabbd80ee09ae15387f390091668ca060a7bc38047912491443d3",
+        ),
+        Triple(
+            "musl-1.2.5.tar.gz",
+            "https://musl.libc.org/releases/musl-1.2.5.tar.gz",
+            "a9a118bbe84d8764da0ea0d28b3ab3fae8477fc7e4085d90102b8596fc7c75e4",
+        ),
+        Triple(
+            "alpine-musl-package.tar.gz",
+            "https://gitlab.alpinelinux.org/alpine/aports/-/archive/efd4d5df7be0ea48d98512671f676fc5ceb14899/aports-efd4d5df7be0ea48d98512671f676fc5ceb14899-main-musl.tar.gz?path=main/musl",
+            "9efdd30d79cf42ae2c336f44ca536a77353af41e0d567f865813ab361e3dfcaf",
+        ),
+        Triple(
+            "mimalloc-2.1.7.tar.gz",
+            "https://github.com/microsoft/mimalloc/archive/refs/tags/v2.1.7.tar.gz",
+            "0eed39319f139afde8515010ff59baf24de9e47ea316a315398e8027d198202d",
+        ),
+        Triple(
+            "alpine-mimalloc-package.tar.gz",
+            "https://gitlab.alpinelinux.org/alpine/aports/-/archive/5a1a5dc3216a69e3cd66a57ee07cb5ef01b8be39/aports-5a1a5dc3216a69e3cd66a57ee07cb5ef01b8be39-community-mimalloc2.tar.gz?path=community/mimalloc2",
+            "595484cc18a6c383783c277e5d4425caa7bab1174e72f7377d9be16ec3c36a0d",
+        ),
+        Triple(
+            "zstd-1.5.6.tar.gz",
+            "https://github.com/facebook/zstd/archive/v1.5.6.tar.gz",
+            "30f35f71c1203369dc979ecde0400ffea93c27391bfd2ac5a9715d2173d92ff7",
+        ),
+        Triple(
+            "alpine-zstd-package.tar.gz",
+            "https://gitlab.alpinelinux.org/alpine/aports/-/archive/5c2ddf18f193dafdd25ae7391d96c7e30766eecd/aports-5c2ddf18f193dafdd25ae7391d96c7e30766eecd-main-zstd.tar.gz?path=main/zstd",
+            "b6119204a1b1211edeeb84d30abb9490f2876e05546a33a83c376696bec54123",
+        ),
+        Triple(
+            "zlib-1.3.1.tar.gz",
+            "https://www.zlib.net/fossils/zlib-1.3.1.tar.gz",
+            "9a93b2b7dfdac77ceba5a558a580e74667dd6fede4585b91eefb60f03b72df23",
+        ),
+        Triple(
+            "alpine-zlib-package.tar.gz",
+            "https://gitlab.alpinelinux.org/alpine/aports/-/archive/4c2722e7ecc1c5e3ba882429044a101497121223/aports-4c2722e7ecc1c5e3ba882429044a101497121223-main-zlib.tar.gz?path=main/zlib",
+            "11df2b1f95a9f3acaf7a51f7a4efea480afa1a5fb82fa3e2595f7944289237fa",
+        ),
+    )
+val appImageRuntimeSourceDirectory =
+    layout.buildDirectory.dir("reports/dependency-license/appimage-runtime-sources")
+val appImageRuntimeSourceFiles =
+    appImageRuntimeSourceArchives.map { (name, _, _) -> appImageRuntimeSourceDirectory.get().file(name).asFile }
+val liberationFontSourceArchive =
+    Triple(
+        "liberation-fonts-2.1.5.tar.gz",
+        "https://github.com/liberationfonts/liberation-fonts/files/7261483/liberation-fonts-2.1.5.tar.gz",
+        "fb22c2109dcbb25202aeb6202c0a58fd2e536dbf7c72879c4bbfa2b8a9a75d60",
+    )
+val liberationFontSourceArchiveFile =
+    layout.buildDirectory.file("reports/dependency-license/liberation-font-source/${liberationFontSourceArchive.first}")
+val validateRuntimeSourceMaterials =
+    tasks.register("validateRuntimeSourceMaterials") {
+        group = "verification"
+        description = "Fails before downloads when a selected runtime source artifact is unavailable."
+        doLast {
+            check(runtimeSourceMaterials.get().files.size == requiredSourceModules.size) {
+                "Missing required selected-library source artifacts; source evidence is incomplete."
+            }
         }
     }
+val zuluSourcePackage =
+    Triple(
+        "zulu27-ca-src_27.0.1.0.3-5_amd64.deb",
+        "https://repos.azul.com/zulu/deb/pool/main/z/zulu/27/zulu27-ca-src_27.0.1.0.3-5_amd64.deb",
+        "c803bd7fa69e94c8f1a7370e00dd98212480d8648d6e27eed06c27b97bd4b6b4",
+    )
+val zuluSourcePackageFile =
+    layout.buildDirectory.file("reports/dependency-license/zulu-source-package/${zuluSourcePackage.first}")
+val prepareZuluSourcePackage =
+    tasks.register("prepareZuluSourcePackage") {
+        group = "distribution"
+        description = "Collects the checksum-pinned supplemental Zulu Java source package."
+        inputs.property("sourcePackage", zuluSourcePackage)
+        outputs.file(zuluSourcePackageFile)
+        doLast {
+            downloadVerifiedFile(
+                zuluSourcePackage.second,
+                zuluSourcePackageFile.get().asFile,
+                zuluSourcePackage.third,
+            )
+        }
+    }
+val librarySourceMaterialsDirectory =
+    layout.buildDirectory.dir("reports/dependency-license/library-source-materials")
+val releaseSourceMaterialsDirectory =
+    layout.buildDirectory.dir("reports/dependency-license/release-source-materials")
+val prepareLiberationFontSourceMaterial =
+    tasks.register("prepareLiberationFontSourceMaterial") {
+        group = "distribution"
+        description = "Collects the checksum-pinned source archive for the embedded Liberation font."
+        dependsOn(validateRuntimeSourceMaterials)
+        inputs.property("sourceArchive", liberationFontSourceArchive)
+        outputs.file(liberationFontSourceArchiveFile)
+        doLast {
+            downloadVerifiedFile(
+                liberationFontSourceArchive.second,
+                liberationFontSourceArchiveFile.get().asFile,
+                liberationFontSourceArchive.third,
+            )
+        }
+    }
+val prepareAppImageRuntimeSourceMaterials =
+    tasks.register("prepareAppImageRuntimeSourceMaterials") {
+        group = "distribution"
+        description = "Collects checksum-pinned, partial AppImage runtime source evidence."
+        dependsOn(validateRuntimeSourceMaterials)
+        inputs.property("sourceArchives", appImageRuntimeSourceArchives)
+        outputs.files(appImageRuntimeSourceFiles)
+        doLast {
+            appImageRuntimeSourceArchives.zip(appImageRuntimeSourceFiles).forEach { (archive, target) ->
+                downloadVerifiedFile(archive.second, target, archive.third)
+            }
+        }
+    }
+
+tasks.register<Sync>("prepareLibrarySourceMaterials") {
+    group = "distribution"
+    description = "Collects partial source evidence for selected runtime libraries; does not approve redistribution."
+    dependsOn(prepareAppImageRuntimeSourceMaterials, prepareLiberationFontSourceMaterial)
+    from(runtimeSourceMaterials) { into("archives") }
+    from(appImageRuntimeSourceFiles) { into("archives/appimage-runtime") }
+    from(liberationFontSourceArchiveFile) { into("archives/liberation-fonts") }
+    from(rootProject.layout.projectDirectory.dir("docs/licensing/third-party")) { into("legal") }
+    from(rootProject.layout.projectDirectory.file("docs/licensing/source-delivery.md"))
+    into(librarySourceMaterialsDirectory)
+    duplicatesStrategy = DuplicatesStrategy.FAIL
+}
+
+tasks.register<Sync>("prepareReleaseSourceMaterials") {
+    group = "distribution"
+    description = "Adds the supplemental pinned Zulu source package once for the release review archive."
+    dependsOn("prepareLibrarySourceMaterials", prepareZuluSourcePackage)
+    from(librarySourceMaterialsDirectory)
+    from(zuluSourcePackageFile) { into("archives/zulu-jdk") }
+    into(releaseSourceMaterialsDirectory)
 }
 
 val generateDesktopDispatcherProbeClasspath =
@@ -216,8 +368,10 @@ val desktopJavaVersion =
         .toInt()
 val desktopJavaHome =
     javaToolchains
-        .launcherFor { languageVersion.set(JavaLanguageVersion.of(desktopJavaVersion)) }
-        .get()
+        .launcherFor {
+            languageVersion.set(JavaLanguageVersion.of(desktopJavaVersion))
+            vendor.set(JvmVendorSpec.AZUL)
+        }.get()
         .metadata.installationPath.asFile
 
 val prepareRuntimeLegalMaterials =
@@ -334,6 +488,8 @@ installPackagedKeytool.configure {
 
 tasks.matching { it.name == "createDistributable" }.configureEach {
     dependsOn(generatedBranding, installPackagedKeytool)
+    // A task dependency alone does not invalidate a previously signed app image.
+    inputs.dir(prepareDistributionLegalResources.map { it.destinationDir }).withPropertyName("distributionLegalMaterials")
 }
 
 val linuxApplicationImage =
@@ -484,12 +640,21 @@ tasks.register("generateDistributionArtifactInventory") {
     dependsOn("verifyNativeDistributionLauncher")
     val report = layout.buildDirectory.file("reports/dependency-license/packaged-artifacts.csv")
     doLast {
-        val artifactsByPackagingHash =
+        val runtimeArtifacts =
             configurations
                 .getByName("runtimeClasspath")
                 .incoming.artifacts.artifacts
                 .filter { artifact -> artifact.file.isFile && artifact.file.extension == "jar" }
-                .groupBy { artifact -> auditPackagingHash(artifact.file) }
+        val artifactsByPackagingHash =
+            runtimeArtifacts.groupBy { artifact -> auditPackagingHash(artifact.file) }
+        val projectJar =
+            tasks
+                .named<org.gradle.jvm.tasks.Jar>("jar")
+                .get()
+                .archiveFile
+                .get()
+                .asFile
+        val bundledJdkJar = desktopJavaHome.resolve("lib/jrt-fs.jar")
         val packageRoot =
             layout.buildDirectory
                 .dir("compose/binaries/main/app")
@@ -505,21 +670,55 @@ tasks.register("generateDistributionArtifactInventory") {
                         artifactsByPackagingHash[packagingHash].orEmpty().filter { artifact ->
                             file.name == "${artifact.file.name.removeSuffix(".jar")}-$packagingHash.jar"
                         }
-                    val artifact = artifacts.singleOrNull()
+                    val transformedArtifactCandidates =
+                        if (artifacts.isEmpty()) {
+                            // Compose removes the host-native entry from platform JARs, changing their content hash.
+                            runtimeArtifacts.filter { candidate ->
+                                val packagedPrefix = "${candidate.file.name.removeSuffix(".jar")}-"
+                                val packagedSuffix = file.name.removePrefix(packagedPrefix).removeSuffix(".jar")
+                                file.name.startsWith(packagedPrefix) && packagedSuffix.matches(Regex("[0-9a-f]{1,32}"))
+                            }
+                        } else {
+                            emptyList()
+                        }
+                    val artifact = (artifacts.ifEmpty { transformedArtifactCandidates }).singleOrNull()
                     val component = artifact?.id?.componentIdentifier
+                    val packagedPrefix = "${projectJar.nameWithoutExtension}-"
+                    val packagedSuffix = file.name.removePrefix(packagedPrefix).removeSuffix(".jar")
+                    val isProjectJar =
+                        file.name.startsWith(packagedPrefix) && packagedSuffix.matches(Regex("[0-9a-f]{1,32}"))
+                    val isBundledJdkJar =
+                        file.name == "jrt-fs.jar" && file.invariantSeparatorsPath.contains("/runtime/")
+                    val resolvedFile =
+                        artifact?.file
+                            ?: when {
+                                isProjectJar -> projectJar
+                                isBundledJdkJar -> bundledJdkJar
+                                else -> null
+                            }
                     val coordinate =
                         if (component is ModuleComponentIdentifier) {
                             "${component.group}:${component.module}:${component.version}"
+                        } else if (artifact != null) {
+                            component?.displayName ?: "UNMATCHED"
+                        } else if (isProjectJar) {
+                            "project ':desktop'"
+                        } else if (isBundledJdkJar) {
+                            "bundled-jdk:$desktopJavaVersion:jrt-fs"
                         } else {
-                            component?.displayName ?: if (artifacts.size > 1) "AMBIGUOUS" else "UNMATCHED"
+                            if (artifacts.size > 1 || transformedArtifactCandidates.size > 1) "AMBIGUOUS" else "UNMATCHED"
                         }
-                    val sourceHash = artifact?.let { auditHash(it.file, "SHA-256") }.orEmpty()
+                    val sourceHash = resolvedFile?.takeIf(File::isFile)?.let { auditHash(it, "SHA-256") }.orEmpty()
                     val packageHash = auditHash(file, "SHA-256")
                     "${file.relativeTo(
                         packageRoot,
-                    ).invariantSeparatorsPath},$coordinate,${artifact?.file?.name.orEmpty()},$sourceHash,$packageHash"
+                    ).invariantSeparatorsPath},$coordinate,${resolvedFile?.name.orEmpty()},$sourceHash,$packageHash"
                 }.sorted()
                 .toList()
+        val unresolvedArtifacts = rows.filter { row -> ",UNMATCHED," in row || ",AMBIGUOUS," in row }
+        check(unresolvedArtifacts.isEmpty()) {
+            "Unable to map packaged JARs to unique resolved runtime artifacts:\n${unresolvedArtifacts.joinToString("\n")}"
+        }
         report.get().asFile.apply {
             parentFile.mkdirs()
             writeText((listOf("packagePath,coordinate,resolvedFile,sourceSha256,packageSha256") + rows).joinToString("\n", postfix = "\n"))
@@ -662,16 +861,20 @@ private fun downloadVerifiedFile(
     expectedSha256: String,
 ) {
     target.parentFile.mkdirs()
-    URI(url).toURL().openStream().use { source ->
-        target.outputStream().use(source::copyTo)
-    }
-    val actualSha256 =
-        MessageDigest
-            .getInstance("SHA-256")
-            .digest(target.readBytes())
-            .joinToString(separator = "") { byte -> "%02x".format(byte.toInt() and 0xff) }
-    check(actualSha256 == expectedSha256) {
-        "Downloaded file checksum mismatch: expected $expectedSha256 but received $actualSha256."
+    if (target.isFile && auditHash(target, "SHA-256") == expectedSha256) return
+
+    val temporaryFile = Files.createTempFile(target.parentFile.toPath(), target.name, ".download")
+    try {
+        URI(url).toURL().openStream().use { source ->
+            Files.newOutputStream(temporaryFile).use(source::copyTo)
+        }
+        val actualSha256 = auditHash(temporaryFile.toFile(), "SHA-256")
+        check(actualSha256 == expectedSha256) {
+            "Downloaded file checksum mismatch: expected $expectedSha256 but received $actualSha256."
+        }
+        Files.move(temporaryFile, target.toPath(), REPLACE_EXISTING)
+    } finally {
+        Files.deleteIfExists(temporaryFile)
     }
 }
 

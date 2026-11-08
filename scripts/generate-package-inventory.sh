@@ -23,11 +23,17 @@ while IFS= read -r -d '' archive; do
   jar tf "$archive" |
     awk -v archive="$relative_archive" -v assets="$embedded_assets" -v notices="$embedded_notices" '
       {
-        path = tolower($0)
-        if (path ~ /\.(so|dylib|dll|jnilib|ttf|otf|ttc|otc|woff|woff2|afm)$/) {
+        entry = tolower($0)
+        if (entry ~ /\.(so|dylib|dll|jnilib|ttf|otf|ttc|otc|woff|woff2|afm)$/) {
           print archive ": " $0 >> assets
         }
-        if (path ~ /(^|\/)(license|notice|copying)(\.|\/|$)/) {
+        if (entry !~ /\/$/) {
+          count = split(entry, parts, "/")
+          basename = parts[count]
+        } else {
+          basename = ""
+        }
+        if (basename ~ /^(license|licence|notice|copying|copyright|disclaimer|authors)([._-].*)?$/) {
           print archive ": " $0 >> notices
         }
       }
