@@ -25,9 +25,8 @@ internal class JavaScriptContextFactory(
                     untrustedSandboxSupported.set(true)
                     return it
                 }.onFailure {
-                    // Community and stock OpenJDK runtimes do not ship the native
-                    // isolate. Keep the constrained host-access boundary there;
-                    // Oracle GraalVM uses this branch with hard guest-memory limits.
+                    // Keep the constrained host-access boundary if the native
+                    // isolate is unavailable or cannot be initialized.
                     untrustedSandboxSupported.set(false)
                 }
         }
