@@ -261,13 +261,17 @@ recipient-ready corresponding-source package:
 | libfuse 3.15.0 | [source archive](https://github.com/libfuse/libfuse/releases/download/fuse-3.15.0/fuse-3.15.0.tar.xz) | `70589cfd5e1cff7ccd6ac91c86c01be340b227285c5e200baa284e401eea2ca0` |
 | squashfuse 0.5.2 | [source archive](https://github.com/vasi/squashfuse/archive/0.5.2.tar.gz) | `db0238c5981dabbd80ee09ae15387f390091668ca060a7bc38047912491443d3` |
 | musl 1.2.5 upstream source | [source archive](https://musl.libc.org/releases/musl-1.2.5.tar.gz) | `a9a118bbe84d8764da0ea0d28b3ab3fae8477fc7e4085d90102b8596fc7c75e4` |
-| Alpine v3.21 musl packaging recipe and patches at commit `efd4d5df7be0ea48d98512671f676fc5ceb14899` | [source archive](https://gitlab.alpinelinux.org/alpine/aports/-/archive/efd4d5df7be0ea48d98512671f676fc5ceb14899/aports-efd4d5df7be0ea48d98512671f676fc5ceb14899-main-musl.tar.gz?path=main/musl) | `9efdd30d79cf42ae2c336f44ca536a77353af41e0d567f865813ab361e3dfcaf` |
+| Alpine v3.21 musl packaging recipe and patches at commit `efd4d5df7be0ea48d98512671f676fc5ceb14899` | [source archive](https://github.com/alpinelinux/aports/archive/efd4d5df7be0ea48d98512671f676fc5ceb14899.tar.gz) | `f7bc8cb0515d1145aaf5fa8bb9227dfc1c6cbd22c842134323ad8491024a43e5` |
 | mimalloc 2.1.7 upstream source | [source archive](https://github.com/microsoft/mimalloc/archive/refs/tags/v2.1.7.tar.gz) | `0eed39319f139afde8515010ff59baf24de9e47ea316a315398e8027d198202d` |
-| Alpine v3.21 mimalloc2 packaging recipe and patch at commit `5a1a5dc3216a69e3cd66a57ee07cb5ef01b8be39` | [source archive](https://gitlab.alpinelinux.org/alpine/aports/-/archive/5a1a5dc3216a69e3cd66a57ee07cb5ef01b8be39/aports-5a1a5dc3216a69e3cd66a57ee07cb5ef01b8be39-community-mimalloc2.tar.gz?path=community/mimalloc2) | `595484cc18a6c383783c277e5d4425caa7bab1174e72f7377d9be16ec3c36a0d` |
+| Alpine v3.21 mimalloc2 packaging recipe and patch at commit `5a1a5dc3216a69e3cd66a57ee07cb5ef01b8be39` | [source archive](https://github.com/alpinelinux/aports/archive/5a1a5dc3216a69e3cd66a57ee07cb5ef01b8be39.tar.gz) | `6f4f50fca873868e754053c828d8336a531dbca365c678dc75db8111873d87e1` |
 | zstd 1.5.6 upstream source | [source archive](https://github.com/facebook/zstd/archive/v1.5.6.tar.gz) | `30f35f71c1203369dc979ecde0400ffea93c27391bfd2ac5a9715d2173d92ff7` |
-| Alpine v3.21 zstd packaging recipe at commit `5c2ddf18f193dafdd25ae7391d96c7e30766eecd` | [source archive](https://gitlab.alpinelinux.org/alpine/aports/-/archive/5c2ddf18f193dafdd25ae7391d96c7e30766eecd/aports-5c2ddf18f193dafdd25ae7391d96c7e30766eecd-main-zstd.tar.gz?path=main/zstd) | `b6119204a1b1211edeeb84d30abb9490f2876e05546a33a83c376696bec54123` |
+| Alpine v3.21 zstd packaging recipe at commit `5c2ddf18f193dafdd25ae7391d96c7e30766eecd` | [source archive](https://github.com/alpinelinux/aports/archive/5c2ddf18f193dafdd25ae7391d96c7e30766eecd.tar.gz) | `cdc49cb68d5358eefcc83955bf285ce50fbcf6b223b271ef71e1008402c201f0` |
 | zlib 1.3.1 upstream source | [source archive](https://www.zlib.net/fossils/zlib-1.3.1.tar.gz) | `9a93b2b7dfdac77ceba5a558a580e74667dd6fede4585b91eefb60f03b72df23` |
-| Alpine v3.21 zlib packaging recipe at commit `4c2722e7ecc1c5e3ba882429044a101497121223` | [source archive](https://gitlab.alpinelinux.org/alpine/aports/-/archive/4c2722e7ecc1c5e3ba882429044a101497121223/aports-4c2722e7ecc1c5e3ba882429044a101497121223-main-zlib.tar.gz?path=main/zlib) | `11df2b1f95a9f3acaf7a51f7a4efea480afa1a5fb82fa3e2595f7944289237fa` |
+| Alpine v3.21 zlib packaging recipe at commit `4c2722e7ecc1c5e3ba882429044a101497121223` | [source archive](https://github.com/alpinelinux/aports/archive/4c2722e7ecc1c5e3ba882429044a101497121223.tar.gz) | `acccb0c0907bf68dca717477ecda79b42bab87a1126c45b4dd0b59d721282284` |
+
+The GitLab archive endpoint returned HTTP 418 from GitHub-hosted runners. These
+four packaging snapshots therefore use Alpine's official GitHub mirror at the
+same pinned commits; the full commit archives are retained and checksum-pinned.
 
 Original legal texts have also been retained from the pinned source archives:
 AppImage runtime `LICENSE`, libfuse `LICENSE` and `LGPL2.txt`, squashfuse

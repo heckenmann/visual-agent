@@ -8,6 +8,7 @@ import tarfile
 import tempfile
 import unittest
 import zipfile
+from urllib.parse import urlsplit
 
 
 ROOT = pathlib.Path(__file__).parents[1]
@@ -59,7 +60,8 @@ class LibrarySourceMaterialsTest(unittest.TestCase):
         archives = OUTPUT / "archives/appimage-runtime"
         self.assertEqual(11, len(list(archives.iterdir())))
         for url, expected_hash in expected.items():
-            name = url.rsplit("/", 1)[-1]
+            parsed_url = urlsplit(url)
+            name = pathlib.PurePosixPath(parsed_url.path).name
             if name == "dd6cebedcbddde9c82f89b011e8e1d40b6e43868":
                 name = "type2-runtime-dd6cebed.tar.gz"
             elif name == "0.5.2.tar.gz":
@@ -68,14 +70,13 @@ class LibrarySourceMaterialsTest(unittest.TestCase):
                 name = "mimalloc-2.1.7.tar.gz"
             elif name == "v1.5.6.tar.gz":
                 name = "zstd-1.5.6.tar.gz"
-            elif "gitlab.alpinelinux.org" in url and "main/zstd" in url:
-                name = "alpine-zstd-package.tar.gz"
-            elif "gitlab.alpinelinux.org" in url and "main/zlib" in url:
-                name = "alpine-zlib-package.tar.gz"
-            elif "gitlab.alpinelinux.org" in url and "community/mimalloc2" in url:
-                name = "alpine-mimalloc-package.tar.gz"
-            elif "gitlab.alpinelinux.org" in url:
-                name = "alpine-musl-package.tar.gz"
+            elif parsed_url.hostname == "github.com" and parsed_url.path.startswith("/alpinelinux/aports/archive/"):
+                name = {
+                    "efd4d5df7be0ea48d98512671f676fc5ceb14899.tar.gz": "alpine-musl-package.tar.gz",
+                    "5a1a5dc3216a69e3cd66a57ee07cb5ef01b8be39.tar.gz": "alpine-mimalloc-package.tar.gz",
+                    "5c2ddf18f193dafdd25ae7391d96c7e30766eecd.tar.gz": "alpine-zstd-package.tar.gz",
+                    "4c2722e7ecc1c5e3ba882429044a101497121223.tar.gz": "alpine-zlib-package.tar.gz",
+                }.get(name, name)
             path = archives / name
             self.assertEqual(expected_hash, hashlib.sha256(path.read_bytes()).hexdigest())
             with tarfile.open(path, "r:*") as archive:

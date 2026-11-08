@@ -150,8 +150,8 @@ val appImageRuntimeSourceArchives =
         ),
         Triple(
             "alpine-musl-package.tar.gz",
-            "https://gitlab.alpinelinux.org/alpine/aports/-/archive/efd4d5df7be0ea48d98512671f676fc5ceb14899/aports-efd4d5df7be0ea48d98512671f676fc5ceb14899-main-musl.tar.gz?path=main/musl",
-            "9efdd30d79cf42ae2c336f44ca536a77353af41e0d567f865813ab361e3dfcaf",
+            "https://github.com/alpinelinux/aports/archive/efd4d5df7be0ea48d98512671f676fc5ceb14899.tar.gz",
+            "f7bc8cb0515d1145aaf5fa8bb9227dfc1c6cbd22c842134323ad8491024a43e5",
         ),
         Triple(
             "mimalloc-2.1.7.tar.gz",
@@ -160,8 +160,8 @@ val appImageRuntimeSourceArchives =
         ),
         Triple(
             "alpine-mimalloc-package.tar.gz",
-            "https://gitlab.alpinelinux.org/alpine/aports/-/archive/5a1a5dc3216a69e3cd66a57ee07cb5ef01b8be39/aports-5a1a5dc3216a69e3cd66a57ee07cb5ef01b8be39-community-mimalloc2.tar.gz?path=community/mimalloc2",
-            "595484cc18a6c383783c277e5d4425caa7bab1174e72f7377d9be16ec3c36a0d",
+            "https://github.com/alpinelinux/aports/archive/5a1a5dc3216a69e3cd66a57ee07cb5ef01b8be39.tar.gz",
+            "6f4f50fca873868e754053c828d8336a531dbca365c678dc75db8111873d87e1",
         ),
         Triple(
             "zstd-1.5.6.tar.gz",
@@ -170,8 +170,8 @@ val appImageRuntimeSourceArchives =
         ),
         Triple(
             "alpine-zstd-package.tar.gz",
-            "https://gitlab.alpinelinux.org/alpine/aports/-/archive/5c2ddf18f193dafdd25ae7391d96c7e30766eecd/aports-5c2ddf18f193dafdd25ae7391d96c7e30766eecd-main-zstd.tar.gz?path=main/zstd",
-            "b6119204a1b1211edeeb84d30abb9490f2876e05546a33a83c376696bec54123",
+            "https://github.com/alpinelinux/aports/archive/5c2ddf18f193dafdd25ae7391d96c7e30766eecd.tar.gz",
+            "cdc49cb68d5358eefcc83955bf285ce50fbcf6b223b271ef71e1008402c201f0",
         ),
         Triple(
             "zlib-1.3.1.tar.gz",
@@ -180,8 +180,8 @@ val appImageRuntimeSourceArchives =
         ),
         Triple(
             "alpine-zlib-package.tar.gz",
-            "https://gitlab.alpinelinux.org/alpine/aports/-/archive/4c2722e7ecc1c5e3ba882429044a101497121223/aports-4c2722e7ecc1c5e3ba882429044a101497121223-main-zlib.tar.gz?path=main/zlib",
-            "11df2b1f95a9f3acaf7a51f7a4efea480afa1a5fb82fa3e2595f7944289237fa",
+            "https://github.com/alpinelinux/aports/archive/4c2722e7ecc1c5e3ba882429044a101497121223.tar.gz",
+            "acccb0c0907bf68dca717477ecda79b42bab87a1126c45b4dd0b59d721282284",
         ),
     )
 val appImageRuntimeSourceDirectory =
