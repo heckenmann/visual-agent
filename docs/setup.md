@@ -3,7 +3,7 @@
 ## Prerequisites
 
 - JDK 27 for development, compilation, tests, and native packaging/runtime. Point `JAVA_HOME` at JDK 27 when running Gradle; CI installs JDK 27 explicitly. Gradle can also resolve the configured toolchain automatically. No second development JDK is required.
-- CI uses Azul Zulu JDK 27 across all platforms, including Intel macOS. Temurin stopped publishing macOS x64 builds starting with JDK 27; using the same supported distribution throughout avoids an architecture-specific Java-version fallback.
+- CI pins Azul Zulu JDK `27.0.1.0.3+1` across all platforms, including Intel macOS, so packaged runtime provenance stays aligned with the reviewed vendor materials. Temurin stopped publishing macOS x64 builds starting with JDK 27; using the same supported distribution throughout avoids an architecture-specific Java-version fallback.
 - The Gradle wrapper version is defined centrally in `gradle/wrapper/gradle-wrapper.properties` and is independent of the Visual Agent application version. The Wrapper JAR is intentionally excluded from version control. In a fresh clone, run `gradle wrapper --gradle-version <version from gradle-wrapper.properties> --no-daemon` once before using `./gradlew`.
 - A configured model provider: Ollama (local or remote), OpenAI-compatible, Codex CLI, or Codex Direct. Ollama must be running (`ollama serve`) only when using that provider.
 - H2 is embedded and accessed through Spring Data R2DBC. Versioned schema migrations run automatically before the stores are created.
@@ -17,8 +17,10 @@
 
 ## Supported Operating Systems and Release Packages
 
-GitHub Releases provide native desktop packages. A Java installation is not required for any of
-them.
+Binary downloads are temporarily unavailable while the beta packages and their required
+third-party license/source materials are completed and reviewed. The existing `v0.1.0`
+prerelease has no downloadable assets. The platform matrix below describes the planned formats;
+check [GitHub Releases](https://github.com/heckenmann/visual-agent/releases) for availability.
 
 | Operating system | Architecture | Release package | Installation |
 | --- | --- | --- | --- |
@@ -60,15 +62,22 @@ container; DMGs and MSI are tested on matching macOS and Windows runners. Platfo
 with Java 27. Smoke runs use isolated temporary data and require an explicit desktop-ready signal,
 database/workspace creation, and orderly shutdown. Native packages are tested without a system JDK.
 These platform checks run in parallel after packaging. Maintainers can manually dispatch the
-package-and-smoke workflow for `master` or another branch using GitHub's branch selector, without
-creating a tag or release. Manual runs never publish assets. All jobs test the same selected commit.
-Publishing a release through GitHub triggers the package-and-smoke workflow for that release's tag;
-the separate asset workflow uploads the verified packages to the existing release. The release
-itself is already visible while packages are being tested; a failed test leaves it without these assets.
+package-and-smoke workflow for a selected commit. For a release candidate, provide its SemVer tag
+as `release_tag`; this builds versioned candidate artifacts but does not create or publish a GitHub
+release. Manual runs without a tag are unversioned smoke tests, and all jobs test the same selected
+commit.
+
+After a tagged candidate succeeds, create a GitHub draft release for that tag and commit. Then
+manually dispatch `Publish verified desktop release` from the trusted default branch with the same
+tag. The publisher reuses the successful candidate, verifies its exact commit and the trusted
+license-clearance record, attaches the packages, and only then publishes the draft. Creating or
+publishing a release does not automatically start the package workflow; a failed or unapproved
+candidate leaves the draft without published assets.
 
 ### Release Versions
 
-Create and publish a GitHub release with a Semantic Version tag. An optional `v` prefix is accepted;
+Create a GitHub draft release with a Semantic Version tag after the matching candidate has passed.
+An optional `v` prefix is accepted;
 `v1.2.3`, `v1.2.3-beta.1`, and `v1.2.3-beta.1+build.7` are valid examples.
 The workflow supplies the tag to every Gradle build through `ORG_GRADLE_PROJECT_releaseTag`.
 `gradle/release-version.settings.gradle.kts` validates it, removes the optional `v`, and overrides
