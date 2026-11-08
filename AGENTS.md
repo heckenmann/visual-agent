@@ -67,6 +67,15 @@ Always run, in this order:
 - Do **not** use the `java` label — the project is Kotlin-only and every issue touches Kotlin code, so the label carries no information.
 - Issue titles use Conventional Commits format: `type(scope): short imperative summary`.
 
+## Disk and Temporary Data Hygiene
+
+- Before downloading, extracting, packaging, or building large runtimes or native artifacts, inspect available disk space and estimate peak temporary plus final-output usage. Keep at least 5 GiB free after the operation; if that reserve cannot be maintained, use the existing GitHub workflow or ask before proceeding.
+- Do not start Colima, Docker, or another VM/container runtime for a release check until the disk-space preflight passes and the local run is necessary. Prefer the existing platform CI jobs for native package validation.
+- Put generated build outputs under the repository's ignored `build/` directories. Put scratch data in one uniquely named temporary directory per run, install cleanup traps immediately, and remove only that exact directory on success, failure, or interruption.
+- Do not accumulate run-numbered, platform-specific, or duplicate evidence directories in system temporary locations. Keep only small, necessary, reproducible evidence in the repository; large package images, extracted runtimes, and downloaded archives must be deleted after the check unless the user explicitly asks to retain them.
+- Never clean broad system, application, Gradle, or user cache directories as a disk-space workaround. Remove only artifacts created by the current task and verify the target paths before deletion.
+- After a large task, verify that its scratch directory was removed and report the remaining free space. Do not claim a cleanup unless `df` and the target-directory check confirm it.
+
 ## Development Workflow
 
 - Prefer database-level guarantees for consistency, ordering, locking, and persistence races whenever the database can solve the problem. Do not add a UI or Spring-server workaround for a problem that is already solvable at the database layer.
