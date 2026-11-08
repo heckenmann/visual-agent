@@ -39,6 +39,8 @@ fun restoreWorkspaceWindows(
 /** Bundles only transport ports and Compose-owned presentation state. */
 data class ComposePanelServices(
     val settings: de.heckenmann.visualagent.protocol.SettingsPort,
+    val openSourceLicenses: de.heckenmann.visualagent.protocol.OpenSourceLicensePort,
+    val applicationInformation: de.heckenmann.visualagent.protocol.ApplicationInformationPort,
     val updates: de.heckenmann.visualagent.protocol.UpdatePort,
     val updateState: State<UpdatePresentationState>,
     val onUpdateStateChanged: (UpdatePresentationState) -> Unit,

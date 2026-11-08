@@ -87,4 +87,12 @@ internal fun defaultWindows(): List<ComposeWorkspaceWindow> =
                 )
             else -> error("Unsupported workspace panel id: $id")
         }
-    }
+    } +
+        ComposeWorkspaceWindow(
+            id = "about",
+            icon = "I",
+            title = "About",
+            subtitle = "Visual Agent project information and open-source licenses",
+            bounds = ComposeWorkspaceWindowBounds(x = 300, y = 180, width = 620, height = 520),
+            visible = false,
+        )

@@ -50,4 +50,26 @@ class ComposeWorkspaceShortcutsTest {
         assertEquals(listOf("close-application"), filterCommands(commands, "close").map { it.id })
         assertEquals(emptyList(), filterCommands(commands, "missing").map { it.id })
     }
+
+    @Test
+    fun `workspace commands activate panels and expose application close`() {
+        val activated = mutableListOf<String>()
+        var closed = false
+        val window =
+            ComposeWorkspaceWindow(
+                id = "chat",
+                icon = "chat",
+                title = "Conversation",
+                subtitle = "Main agent conversation",
+                bounds = ComposeWorkspaceWindowBounds(0, 0, 800, 600),
+            )
+
+        val commands = workspaceCommands(listOf(window), activated::add, { closed = true })
+
+        assertEquals(listOf("open-chat", "close-application"), commands.map { it.id })
+        commands.first().action()
+        commands.last().action()
+        assertEquals(listOf("chat"), activated)
+        assertEquals(true, closed)
+    }
 }
