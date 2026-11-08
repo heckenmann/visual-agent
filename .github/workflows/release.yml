@@ -74,9 +74,9 @@ jobs:
           }
           mkdir candidate-metadata
           gh run download "$candidate_run" --repo "$GH_REPO" --name "$artifact_name" --dir candidate-metadata
-          grep -Fx "tag=$RELEASE_TAG" candidate-metadata/release-metadata/manifest
-          grep -Fx 'candidate=true' candidate-metadata/release-metadata/manifest
-          grep -Fx "source_commit=$source_commit" candidate-metadata/release-metadata/manifest
+          grep -Fx "tag=$RELEASE_TAG" candidate-metadata/manifest
+          grep -Fx 'candidate=true' candidate-metadata/manifest
+          grep -Fx "source_commit=$source_commit" candidate-metadata/manifest
           printf 'RELEASE_TAG=%s\nRELEASE_ID=%s\nSOURCE_COMMIT=%s\nCANDIDATE_RUN_ID=%s\n' \
             "$RELEASE_TAG" "$release_id" "$source_commit" "$candidate_run" >> "$GITHUB_ENV"
 
