@@ -307,6 +307,155 @@
       "remaining": [
         "The hash-pinned Alpine aports snapshot contains musl 1.2.5-r9 and its patch set, while the matching debug companion identifies upstream 1.2.5; because the original build log expired, verify whether this recipe produced the linked object and which patches/build inputs apply"
       ]
+    },
+    {
+      "sourceArtifacts": {
+        "org.antlr:ST4:4.3.4": "f927ac384c46d749f8b5ec68972a53aed21e00313509299616edb73bfa15ff33"
+      },
+      "proposedLicense": "BSD-3-Clause",
+      "upstreamCommit": "a2c4ef074e7c5018c7eb46372ed07f756c140404",
+      "materialPaths": ["antlr-st4-4.3.4/LICENSE.txt"],
+      "reviewStatus": "unreviewed",
+      "reviewNotes": "The original license text is from the exact ST4-4.3.4 upstream tag. The source artifact hash matches all four platform inventories.",
+      "remaining": [
+        "Verify the exact binary's attribution and inclusion in each final recipient package."
+      ]
+    },
+    {
+      "sourceArtifacts": {
+        "org.codehaus.mojo:animal-sniffer-annotations:1.27": "cfd7e51a828fe6b98bc0dbb99e34900c9e9012322cb9ddd57fd8dd0b02da5e27"
+      },
+      "proposedLicense": "MIT",
+      "upstreamCommit": "5adf3aad06658c44de48ba2fddf9819685230e5f",
+      "materialPaths": ["animal-sniffer-1.27/LICENSE"],
+      "reviewStatus": "unreviewed",
+      "reviewNotes": "The original project license and versioned parent POM are from the exact Animal Sniffer 1.27 release tag; that POM selects MIT. The generated Gradle report also lists Apache-2.0, which is not present in that tagged parent POM and must be reconciled.",
+      "remaining": [
+        "Reconcile the Gradle report's extra Apache-2.0 entry against the exact published annotation POM and verify final package attribution."
+      ]
+    },
+    {
+      "sourceArtifacts": {
+        "org.antlr:antlr-runtime:3.5.3": "68bf9f5a33dfcb34033495c587e6236bef4e37aa6612919f5b1e843b90669fb9"
+      },
+      "proposedLicense": "BSD-3-Clause",
+      "upstreamCommit": "0519032bb167b37f206968d9037753ad655a2623",
+      "materialPaths": [
+        "antlr-runtime-3.5.3/ANTLR3-LICENSE.txt",
+        "antlr-runtime-3.5.3/RUNTIME-SOURCE-NOTICES.txt"
+      ],
+      "reviewStatus": "unreviewed",
+      "reviewNotes": "The license file is from the exact ANTLR 3 source tag. The additional copyright notices were extracted verbatim from two distinct headers in the exact published 3.5.3 runtime source JAR, SHA-256 b4353aa5270d5ddedbc59de6fc7bb170c6d8fa6293d37533a304144a18e4b24d.",
+      "remaining": [
+        "Verify the two retained runtime source headers cover all copyright notices applicable to the distributed binary and confirm the artifact's license selection."
+      ]
+    },
+    {
+      "sourceArtifacts": {
+        "org.antlr:antlr4-runtime:4.13.1": "54665d2838cc66458343468efc539e454fc95b46a8a04b13c6ac43fc9be63505"
+      },
+      "proposedLicense": "BSD-3-Clause",
+      "upstreamCommit": "7ed420ff2c78d62883875c442d75f32e73bc86c8",
+      "materialPaths": ["antlr4-runtime-4.13.1/LICENSE.txt"],
+      "reviewStatus": "unreviewed",
+      "reviewNotes": "The original license text is from the exact ANTLR 4.13.1 upstream tag. The source artifact hash matches all four platform inventories.",
+      "remaining": [
+        "Verify exact artifact attribution and inclusion in each final recipient package."
+      ]
+    },
+    {
+      "sourceArtifacts": {
+        "org.ow2.asm:asm:9.11.1": "ae4e6e10d59d0a1500317764b21881ad883f8550e33c66e6142f7032c6fb566c"
+      },
+      "proposedLicense": "BSD-3-Clause",
+      "upstreamCommit": "e1f096ce6e9f6de64921ea8b437676f146798185",
+      "materialPaths": ["asm-9.11.1/LICENSE.txt"],
+      "reviewStatus": "unreviewed",
+      "reviewNotes": "The original license text is from the exact ASM 9.11.1 GitLab release tag; the exact cached asm-9.11.1 POM names BSD-3-Clause. The Gradle report records duplicate and additional alternatives, which must be reconciled with that artifact POM.",
+      "remaining": [
+        "Reconcile the generated report's additional license entries with the exact published asm POM and verify source attribution in the final package."
+      ]
+    },
+    {
+      "sourceArtifacts": {
+        "org.nibor.autolink:autolink:0.12.0": "04647ef989bd8096cfc253a8b5b8c36760918e3f163c1d918df6dfbfb79aa8c6"
+      },
+      "proposedLicense": "MIT",
+      "upstreamCommit": "8b07a6911fd62871042c5b63412d3ac3489a0531",
+      "materialPaths": ["autolink-0.12.0/LICENSE"],
+      "reviewStatus": "unreviewed",
+      "reviewNotes": "The original license is from the exact autolink-java 0.12.0 release tag. The source artifact hash matches all four platform inventories.",
+      "remaining": [
+        "Verify the exact artifact's copyright attribution and inclusion in each final recipient package."
+      ]
+    },
+    {
+      "sourceArtifacts": {
+        "com.github.hypfvieh:dbus-java-core:5.2.2": "dd625ba59a632b7d05d712f29ee04551736d584d0f6c40d1d8a09eabaedc9cf0",
+        "com.github.hypfvieh:dbus-java-transport-native-unixsocket:5.2.2": "6174f8256fbae335548be75e57167042cbfae7bafb442295c56ea7f38466da6a"
+      },
+      "proposedLicense": "MIT",
+      "upstreamCommit": "37d6c62403e0d4a30aab8ba044784eefa26d7260",
+      "materialPaths": ["dbus-java-5.2.2/LICENSE"],
+      "reviewStatus": "unreviewed",
+      "reviewNotes": "The original project license is from the exact dbus-java 5.2.2 release tag. Both artifact hashes match all four platform inventories.",
+      "remaining": [
+        "Verify native transport attribution and license coverage for both exact artifacts in each final recipient package."
+      ]
+    },
+    {
+      "sourceArtifacts": {
+        "io.github.vinceglb:filekit-core-jvm:0.17.0": "d35a1c44b47b6566712e8f6e7340778c3bb6f49b61496152d9bc64125387e992",
+        "io.github.vinceglb:filekit-dialogs-compose-jvm:0.17.0": "dcbc4ba25b493f5501ae08f86a39e1c29b51857f57afa67e67683faff2ac8f6d",
+        "io.github.vinceglb:filekit-dialogs-jvm:0.17.0": "1c2afa8001a9cc5f136c25a53856573c65334cdd7d2352a6c8da8bd91a983557"
+      },
+      "proposedLicense": "MIT",
+      "upstreamCommit": "38fe6b384b33c726d95d372e23cf0ef7c101cf48",
+      "materialPaths": ["filekit-0.17.0/LICENSE"],
+      "reviewStatus": "unreviewed",
+      "reviewNotes": "The original license is from the exact FileKit 0.17.0 release tag. All three source artifact hashes match the four platform inventories.",
+      "remaining": [
+        "Verify the exact artifact attribution and ensure the recipient bundle covers all three JVM modules."
+      ]
+    },
+    {
+      "sourceArtifacts": {
+        "com.knuddels:jtokkit:1.1.0": "1501ce0259ab897c6746ccfafa1d208acd404fb17e1ac62e157172f2678b1183"
+      },
+      "proposedLicense": "MIT",
+      "upstreamCommit": "4c98bebbbc285de0432abca6b2c8f55f2f51133a",
+      "materialPaths": ["jtokkit-1.1.0/LICENSE"],
+      "reviewStatus": "unreviewed",
+      "reviewNotes": "The original license is from the exact JTokkit 1.1.0 release tag. The source artifact hash matches all four platform inventories.",
+      "remaining": [
+        "Verify exact artifact copyright attribution and recipient-package inclusion."
+      ]
+    },
+    {
+      "sourceArtifacts": {
+        "com.google.protobuf:protobuf-java:4.36.2": "0773e72eaf375e1285df330575bfec5bda5da674d544d0e142a17f89c8f754da"
+      },
+      "proposedLicense": "BSD-3-Clause",
+      "upstreamCommit": "2c74169b34066ceb8ddb6b882fcb3fb32d737a55",
+      "materialPaths": ["protobuf-java-4.36.2/LICENSE"],
+      "reviewStatus": "unreviewed",
+      "reviewNotes": "The original license is from the Protocol Buffers v36.2 upstream tag. The exact tag's java/pom.xml inherits version 4.36.2, matching the packaged Maven artifact.",
+      "remaining": [
+        "Confirm the artifact-specific copyright notices and verify recipient-package inclusion."
+      ]
+    },
+    {
+      "sourceArtifacts": {
+        "org.reactivestreams:reactive-streams:1.0.4": "f75ca597789b3dac58f61857b9ac2e1034a68fa672db35055a8fb4509e325f28"
+      },
+      "proposedLicense": "MIT-0",
+      "upstreamCommit": "944163a4b2477a2bebaaada86b0ba910b6302f2f",
+      "materialPaths": ["reactive-streams-1.0.4/LICENSE"],
+      "reviewStatus": "unreviewed",
+      "reviewNotes": "The original MIT No Attribution license is from the exact Reactive Streams 1.0.4 release tag. The source artifact hash matches all four platform inventories.",
+      "remaining": [
+        "Verify the exact artifact's notice needs and inclusion in each final recipient package."
+      ]
     }
   ],
   "embeddedComponents": [
@@ -704,6 +853,66 @@
       "path": "musl-1.2.5/COPYRIGHT",
       "sha256": "f9bc4423732350eb0b3f7ed7e91d530298476f8fec0c6c427a1c04ade22655af",
       "url": "https://musl.libc.org/releases/musl-1.2.5.tar.gz"
+    },
+    {
+      "path": "antlr-st4-4.3.4/LICENSE.txt",
+      "sha256": "022bdae9c4f408d375f8c3c16b7695c22a2152c56535af180059e3ab92adffb0",
+      "url": "https://raw.githubusercontent.com/antlr/stringtemplate4/a2c4ef074e7c5018c7eb46372ed07f756c140404/LICENSE.txt"
+    },
+    {
+      "path": "animal-sniffer-1.27/LICENSE",
+      "sha256": "0d17e86dbd1f3504cfa311e67827e1569ad27bbfff29cc405194e4a2549e9df8",
+      "url": "https://raw.githubusercontent.com/mojohaus/animal-sniffer/5adf3aad06658c44de48ba2fddf9819685230e5f/LICENSE"
+    },
+    {
+      "path": "antlr-runtime-3.5.3/ANTLR3-LICENSE.txt",
+      "sha256": "95fc87cbe29814a32fc97f6f8eb7ae55e4816d4b75143635c4db736e7e374fa2",
+      "url": "https://raw.githubusercontent.com/antlr/antlr3/0519032bb167b37f206968d9037753ad655a2623/tool/LICENSE.txt"
+    },
+    {
+      "path": "antlr-runtime-3.5.3/RUNTIME-SOURCE-NOTICES.txt",
+      "sha256": "7176404e3cd16d5478314419aab4175aea7fc77c5b4334df8fb6dcee36def649",
+      "url": "https://repo.maven.apache.org/maven2/org/antlr/antlr-runtime/3.5.3/antlr-runtime-3.5.3-sources.jar"
+    },
+    {
+      "path": "antlr4-runtime-4.13.1/LICENSE.txt",
+      "sha256": "3db1fb3ee79a4b4f9918fc4d0f6133bf18a3cf787f126cd22f8aa9b862281c0c",
+      "url": "https://raw.githubusercontent.com/antlr/antlr4/7ed420ff2c78d62883875c442d75f32e73bc86c8/LICENSE.txt"
+    },
+    {
+      "path": "asm-9.11.1/LICENSE.txt",
+      "sha256": "293b6af371eee28b0ff16f0334ea19e20a3d5522143faa4b95b346855507879a",
+      "url": "https://gitlab.ow2.org/asm/asm/-/raw/e1f096ce6e9f6de64921ea8b437676f146798185/LICENSE.txt"
+    },
+    {
+      "path": "autolink-0.12.0/LICENSE",
+      "sha256": "2d7b0f54def673747d75e8399c26f313ac1ee3e00dc86d2c488ebd0b790bb022",
+      "url": "https://raw.githubusercontent.com/robinst/autolink-java/8b07a6911fd62871042c5b63412d3ac3489a0531/LICENSE"
+    },
+    {
+      "path": "dbus-java-5.2.2/LICENSE",
+      "sha256": "d14b6f26eaa5b4cf0060d243fffb2600d9c7c36b1085c2ad61cf095db50c9840",
+      "url": "https://raw.githubusercontent.com/hypfvieh/dbus-java/37d6c62403e0d4a30aab8ba044784eefa26d7260/LICENSE"
+    },
+    {
+      "path": "filekit-0.17.0/LICENSE",
+      "sha256": "5ceb0f372844932c328a4d34bfb6b1903b157d4b3467c5de484bfec8e5aea7ca",
+      "url": "https://raw.githubusercontent.com/vinceglb/FileKit/38fe6b384b33c726d95d372e23cf0ef7c101cf48/LICENSE"
+    },
+    {
+      "path": "jtokkit-1.1.0/LICENSE",
+      "sha256": "1591448c197de536ece69aa858d63044f148ba73f14e96e981c46753a9d8ba71",
+      "url": "https://raw.githubusercontent.com/knuddelsgmbh/jtokkit/4c98bebbbc285de0432abca6b2c8f55f2f51133a/LICENSE"
+    },
+    {
+      "path": "protobuf-java-4.36.2/LICENSE",
+      "sha256": "6e5e117324afd944dcf67f36cf329843bc1a92229a8cd9bb573d7a83130fea7d",
+      "url": "https://raw.githubusercontent.com/protocolbuffers/protobuf/2c74169b34066ceb8ddb6b882fcb3fb32d737a55/LICENSE"
+    },
+    {
+      "path": "reactive-streams-1.0.4/LICENSE",
+      "sha256": "96a3b2d45af72054d0676e8eb9a944a096812a7f8ff1b71bd82dadbc60ce0444",
+      "url": "https://raw.githubusercontent.com/reactive-streams/reactive-streams-jvm/944163a4b2477a2bebaaada86b0ba910b6302f2f/LICENSE"
     }
   ]
 }
