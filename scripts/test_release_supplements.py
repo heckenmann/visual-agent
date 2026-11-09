@@ -96,7 +96,7 @@ class SupplementalNoticesTest(unittest.TestCase):
     def test_repository_snapshots_match_the_recorded_hashes(self):
         registry = pathlib.Path(__file__).parents[1] / "docs/licensing/third-party/sources.json"
         components = load_supplements(registry)
-        self.assertEqual(50, len(components))
+        self.assertEqual(64, len(components))
         self.assertEqual("MPL-2.0", components["com.h2database:h2:2.5.252"]["proposedLicense"])
         self.assertEqual("EPL-2.0", components["ch.qos.logback:logback-core:1.6.6"]["proposedLicense"])
         self.assertEqual("Apache-2.0", components["net.java.dev.jna:jna:5.19.1"]["proposedLicense"])
@@ -114,6 +114,34 @@ class SupplementalNoticesTest(unittest.TestCase):
         self.assertIn(b"The Universal Permissive License (UPL), Version 1.0", upl["materials"][0]["content"])
         self.assertTrue(upl["remaining"])
         registry_data = json.loads(registry.read_text())
+        newly_mapped_coordinates = {
+            "org.antlr:ST4:4.3.4",
+            "org.codehaus.mojo:animal-sniffer-annotations:1.27",
+            "org.antlr:antlr-runtime:3.5.3",
+            "org.antlr:antlr4-runtime:4.13.1",
+            "org.ow2.asm:asm:9.11.1",
+            "org.nibor.autolink:autolink:0.12.0",
+            "com.github.hypfvieh:dbus-java-core:5.2.2",
+            "com.github.hypfvieh:dbus-java-transport-native-unixsocket:5.2.2",
+            "io.github.vinceglb:filekit-core-jvm:0.17.0",
+            "io.github.vinceglb:filekit-dialogs-compose-jvm:0.17.0",
+            "io.github.vinceglb:filekit-dialogs-jvm:0.17.0",
+            "com.knuddels:jtokkit:1.1.0",
+            "com.google.protobuf:protobuf-java:4.36.2",
+            "org.reactivestreams:reactive-streams:1.0.4",
+        }
+        self.assertTrue(newly_mapped_coordinates.issubset(components))
+        for coordinate in newly_mapped_coordinates:
+            with self.subTest(coordinate=coordinate):
+                self.assertTrue(components[coordinate]["remaining"])
+        antlr_runtime = components["org.antlr:antlr-runtime:3.5.3"]
+        runtime_notices = next(
+            material["content"]
+            for material in antlr_runtime["materials"]
+            if material["path"].endswith("RUNTIME-SOURCE-NOTICES.txt")
+        )
+        self.assertIn(b"2005-2009 Terence Parr", runtime_notices)
+        self.assertIn(b"2012 Sam Harwell", runtime_notices)
         upl_record = next(
             item for item in registry_data["components"]
             if "org.graalvm.polyglot:polyglot:25.4.4.1.1" in item["sourceArtifacts"]
@@ -332,7 +360,7 @@ class SupplementalNoticesTest(unittest.TestCase):
         self.assertIn("prohibits selling the font by itself", review_notes)
         self.assertIn("does not approve the complete release package", review_notes)
         component = load_supplements(root / "docs/licensing/third-party/sources.json")
-        self.assertEqual(50, len(component))
+        self.assertEqual(64, len(component))
         license_file = root / "docs/licensing/third-party/liberation-fonts-2.1.5/LICENSE"
         self.assertEqual(asset["licenseMaterialPath"],
                          "liberation-fonts-2.1.5/LICENSE")
