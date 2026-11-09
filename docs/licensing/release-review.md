@@ -310,6 +310,36 @@ Do not introduce another scanner or infer linkage from a notice filename.
 
 ## Remaining Decisions Before Exact-Hash Approval
 
+### Candidate Inventory: Unmapped Permissive Dependencies
+
+The four platform inventory artifacts for PR head
+`b8f2204316d4cb41ce7a386bb09d4de2f1323b5d` (workflow `42678989326`) were
+downloaded and inspected. Each platform report contains 110 packaged dependency
+coordinates with `noticeStatus: no-detected-notice` and no curated supplement.
+109 have declared-license metadata; one is the bundled JDK `jrt-fs` entry
+delegated to `runtimeLegal`, without a module-specific link in this manifest.
+97 rows mention Apache-2.0, 9 mention MIT, and 5 mention BSD; two rows declare
+more than one option, so these counts overlap. A common Apache-2.0 text is
+already retained, but that alone does not establish applicable project-specific
+notices.
+
+Fourteen distinct coordinates declare MIT and/or BSD terms without any
+package-detected or curated license text: `org.antlr:ST4:4.3.4`,
+`org.codehaus.mojo:animal-sniffer-annotations:1.27`,
+`org.antlr:antlr-runtime:3.5.3`, `org.antlr:antlr4-runtime:4.13.1`,
+`org.ow2.asm:asm:9.11.1`, `org.nibor.autolink:autolink:0.12.0`,
+`com.github.hypfvieh:dbus-java-core:5.2.2`,
+`com.github.hypfvieh:dbus-java-transport-native-unixsocket:5.2.2`,
+`io.github.vinceglb:filekit-core-jvm:0.17.0`,
+`io.github.vinceglb:filekit-dialogs-compose-jvm:0.17.0`,
+`io.github.vinceglb:filekit-dialogs-jvm:0.17.0`, `com.knuddels:jtokkit:1.1.0`,
+`com.google.protobuf:protobuf-java:4.36.2`, and
+`org.reactivestreams:reactive-streams:1.0.4`. These should be checked against
+the exact upstream artifacts for the required copyright/permission notices and
+any existing NOTICE content. The Gradle license report's names/URLs alone are
+not a substitute for those texts. Until reconciled with the four candidate
+packages, including the JDK `jrt-fs` mapping, the notice review is incomplete.
+
 The official [GFTC](https://www.oracle.com/downloads/licenses/graal-free-license.html)
 and [GraalVM FAQ](https://www.graalvm.org/faq/) were checked again. Neither
 explicitly addresses replacement of a native library's macOS signature. The
