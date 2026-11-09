@@ -91,7 +91,7 @@ class BundledLegalMaterialsTest(unittest.TestCase):
         )
         result = subprocess.run(
             [str(ROOT / "gradlew"), "-I", str(init), ":desktop:verifyLegalInputTracking",
-             "--offline", "--quiet", "--no-daemon"], capture_output=True, text=True,
+             "--quiet", "--no-daemon"], capture_output=True, text=True,
         )
         self.assertEqual(0, result.returncode, result.stdout + result.stderr)
 
