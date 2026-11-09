@@ -29,7 +29,7 @@ class LibrarySourceMaterialsTest(unittest.TestCase):
     def test_source_archives_match_verified_exact_version_inputs(self):
         document = (ROOT / "docs/licensing/source-delivery.md").read_text()
         expected = dict(re.findall(r"\[([^\]]+-sources\.jar)\].*?`([0-9a-f]{64})`", document))
-        self.assertEqual(5, len(expected))
+        self.assertEqual(6, len(expected))
         self.assertIn("no libffi native source tree", document)
         normalized_document = " ".join(document.split())
         self.assertIn(
@@ -105,6 +105,25 @@ class LibrarySourceMaterialsTest(unittest.TestCase):
                         self.assertIn("license=\"Zlib\"", source)
                 else:
                     self.assertTrue(any(member.name.endswith(("LICENSE", "COPYING", "COPYRIGHT")) for member in members))
+
+    def test_fuse_relink_guide_matches_the_retained_patched_build_recipe(self):
+        guide = (ROOT / "docs/licensing/third-party/libfuse-3.15.0/SOURCE-AND-RELINK.txt").read_text()
+        for reference in ("LGPL-2.1 section 6(a)", "fuse-3.15.0.tar.xz",
+                          "type2-runtime-dd6cebed.tar.gz", "mount.c.diff", "--runtime-file"):
+            self.assertIn(reference, guide)
+        archives = OUTPUT / "archives/appimage-runtime"
+        with tarfile.open(archives / "type2-runtime-dd6cebed.tar.gz", "r:gz") as archive:
+            prefix = "type2-runtime-dd6cebedcbddde9c82f89b011e8e1d40b6e43868/"
+            for name in ("BUILD.md", "patches/libfuse/mount.c.diff",
+                         "scripts/docker/build-with-docker.sh", "src/runtime/runtime.c",
+                         "src/runtime/Makefile"):
+                self.assertIsNotNone(archive.getmember(prefix + name))
+            dockerfile = archive.extractfile(prefix + "scripts/docker/Dockerfile").read()
+            self.assertIn(b"COPY patches/ /tmp/patches/", dockerfile)
+            installer = archive.extractfile(prefix + "scripts/common/install-dependencies.sh").read()
+            self.assertIn(b"70589cfd5e1cff7ccd6ac91c86c01be340b227285c5e200baa284e401eea2ca0", installer)
+            self.assertIn(b"patch -p1", installer)
+            self.assertIn(b"--default-library static", installer)
 
     def test_liberation_font_source_archive_is_pinned_and_included(self):
         document = (ROOT / "docs/licensing/source-delivery.md").read_text()

@@ -106,6 +106,7 @@ val requiredSourceModules =
         "ch.qos.logback:logback-classic",
         "net.java.dev.jna:jna",
         "org.jetbrains.skiko:skiko-awt",
+        "org.graalvm.js:js-language",
     )
 val runtimeSourceMaterials =
     configurations.runtimeClasspath.map { configuration ->
