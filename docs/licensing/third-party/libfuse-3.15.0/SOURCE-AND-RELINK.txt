@@ -1,0 +1,49 @@
+AppImage runtime: libfuse source and relinking information
+
+The Linux AppImage runtime uses a statically linked libfuse 3.15.0 library,
+including the upstream AppImage mount.c patch. The library and its use are
+covered by LGPL-2.1; the accompanying LICENSE and LGPL2.txt explain its terms.
+Other components retain their own licenses. Visual Agent does not prohibit
+modification for your own use or reverse engineering to debug such changes.
+
+This source-and-relink route requires visual-agent-corresponding-sources.zip
+to accompany the AppImage download. An incomplete development candidate without
+that matching archive has not completed this route. Extract the archive; its
+source-materials/archives/appimage-runtime directory includes:
+
+- fuse-3.15.0.tar.xz: original complete libfuse source;
+- type2-runtime-dd6cebed.tar.gz: AppImage runtime source, build scripts,
+  and patches/libfuse/mount.c.diff;
+- source archives and package recipes for the other retained runtime inputs.
+
+The original libfuse archive SHA-256 is:
+70589cfd5e1cff7ccd6ac91c86c01be340b227285c5e200baa284e401eea2ca0
+
+The runtime source archive SHA-256 is:
+f5fec23be76e50e2445ed2d018bac49b367490fc483c62c4637e99ec705d27ba
+
+Rebuild/relink on Linux:
+
+1. Extract the runtime source archive and read its BUILD.md. Use the supplied
+   Docker method, not the chroot method on an ordinary host. The build requires
+   Docker, disk space for its image, and network access for build dependencies.
+2. The dependency installer verifies the original libfuse archive, then applies
+   patches/libfuse/mount.c.diff and builds the library. To change the library,
+   extend that patch with your source changes while retaining the upstream
+   patch and applicable license/modification notices. Do not present changed
+   source archives as having the original checksum.
+3. From the extracted runtime source directory, run:
+   ARCH=x86_64 bash scripts/docker/build-with-docker.sh
+   The Docker build copies the patch directory, so changing the patch rebuilds
+   libfuse before the runtime is linked. The output is runtime-x86_64.
+4. To use your runtime with the application, extract an AppImage using its
+   --appimage-extract option, then use appimagetool's --runtime-file option
+   with your rebuilt runtime and the extracted squashfs-root AppDir. Create a
+   new output AppImage; do not overwrite the original while testing it.
+
+This is a source-and-relink route under LGPL-2.1 section 6(a), not a promise of
+byte-identical reproduction of an upstream binary. Build-tool availability and
+Alpine repository contents can change. Preserve the source and notices supplied
+with the release; use the recorded sources and recipes when investigating
+dependency changes. This guide does not grant release clearance or replace the
+licenses of the runtime and its constituent libraries.

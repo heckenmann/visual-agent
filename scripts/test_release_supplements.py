@@ -5,6 +5,7 @@ import hashlib
 import importlib.util
 import json
 import pathlib
+import re
 import tempfile
 import unittest
 import zipfile
@@ -95,7 +96,7 @@ class SupplementalNoticesTest(unittest.TestCase):
     def test_repository_snapshots_match_the_recorded_hashes(self):
         registry = pathlib.Path(__file__).parents[1] / "docs/licensing/third-party/sources.json"
         components = load_supplements(registry)
-        self.assertEqual(34, len(components))
+        self.assertEqual(50, len(components))
         self.assertEqual("MPL-2.0", components["com.h2database:h2:2.5.252"]["proposedLicense"])
         self.assertEqual("EPL-2.0", components["ch.qos.logback:logback-core:1.6.6"]["proposedLicense"])
         self.assertEqual("Apache-2.0", components["net.java.dev.jna:jna:5.19.1"]["proposedLicense"])
@@ -180,6 +181,44 @@ class SupplementalNoticesTest(unittest.TestCase):
         self.assertFalse(json.loads(registry.read_text())["redistributionApproved"])
         self.assertFalse(json.loads(registry.read_text())["redistributionApproved"])
 
+    def test_current_graal_catalog_version_has_hash_bound_runtime_notices(self):
+        root = pathlib.Path(__file__).parents[1]
+        catalog = (root / "gradle/libs.versions.toml").read_text()
+        selected = re.search(r'^graaljs\s*=\s*"([^"]+)"\s*$', catalog, re.MULTILINE)
+        self.assertIsNotNone(selected, "Missing central GraalJS version")
+        version = selected.group(1)
+        components = load_supplements(root / "docs/licensing/third-party/sources.json")
+        modules = (
+            "org.graalvm.js:js-language", "org.graalvm.polyglot:polyglot",
+            "org.graalvm.regex:regex", "org.graalvm.sdk:collections",
+            "org.graalvm.sdk:jniutils", "org.graalvm.sdk:nativebridge",
+            "org.graalvm.sdk:nativeimage", "org.graalvm.sdk:word",
+            "org.graalvm.shadowed:xz", "org.graalvm.truffle:truffle-api",
+            "org.graalvm.truffle:truffle-compiler", "org.graalvm.truffle:truffle-runtime",
+        )
+        for module in modules:
+            with self.subTest(module=module, version=version):
+                component = components[f"{module}:{version}"]
+                self.assertEqual("UPL-1.0", component["proposedLicense"])
+                self.assertIn(b"Universal Permissive License", component["materials"][0]["content"])
+        icu = components[f"org.graalvm.shadowed:icu4j:{version}"]
+        self.assertEqual("Unicode/ICU License", icu["proposedLicense"])
+        language = components[f"org.graalvm.js:js-language:{version}"]
+        self.assertIn(b"Copyright (c) 2010, 2022, Oracle", language["materials"][0]["content"])
+        third_party = next(item for item in language["materials"]
+                           if item["path"].endswith("THIRD_PARTY_LICENSE_GRAALJS.txt"))
+        for notice in (b"Lucent Technologies", b"V8 project authors", b"Mozilla Public"):
+            self.assertIn(notice, third_party["content"])
+        source_notice = next(item for item in language["materials"]
+                             if item["path"].endswith("SOURCE-AVAILABILITY.txt"))
+        self.assertIn(f"js-language-{version}-sources.jar".encode(), source_notice["content"])
+        for platform in ("linux-amd64", "darwin-aarch64", "windows-amd64"):
+            with self.subTest(platform=platform, version=version):
+                component = components[f"org.graalvm.js:js-isolate-{platform}:{version}"]
+                self.assertEqual("GraalVM Free Terms and Conditions (GFTC)", component["proposedLicense"])
+                self.assertIn(version.encode(), component["materials"][0]["content"])
+                self.assertTrue(component["remaining"])
+
     def test_skiko_retains_original_notice_without_clearing_native_dependencies(self):
         root = pathlib.Path(__file__).parents[1]
         registry = root / "docs/licensing/third-party/sources.json"
@@ -193,6 +232,55 @@ class SupplementalNoticesTest(unittest.TestCase):
                         "piex", "dng_sdk", "d3d12allocator"):
             self.assertIn(library, remaining)
         self.assertFalse(json.loads(registry.read_text())["redistributionApproved"])
+
+    def test_skia_dependency_notices_and_required_credits_are_retained(self):
+        root = pathlib.Path(__file__).parents[1]
+        components = load_supplements(root / "docs/licensing/third-party/sources.json")
+        expected = {
+            "expat-6154446f/COPYING": "6154446fccefbf3ca644894f598969113b0c7bcd",
+            "harfbuzz-9cb1fee5/COPYING": "9cb1fee51069b206effb4736e443b038d230789d",
+            "d3d12allocator-169895d5/LICENSE.txt": "169895d529dfce00390a20e69c2f516066fe7a3b",
+            "libwebp-845d5476/COPYING": "845d5476a866141ba35ac133f856fa62f0b7445f",
+            "libwebp-845d5476/PATENTS": "845d5476a866141ba35ac133f856fa62f0b7445f",
+            "libpng-d5515b5b/LICENSE": "d5515b5b8be3901aac04e5bd8bd5c89f287bcd33",
+            "libjpeg-turbo-e14cbfaa/LICENSE.md": "e14cbfaa85529d47f9f55b0f104a579c1061f9ad",
+            "libjpeg-turbo-e14cbfaa/README.ijg": "e14cbfaa85529d47f9f55b0f104a579c1061f9ad",
+            "zlib-646b7f56/LICENSE": "646b7f569718921d7d4b5b8e22572ff6c76f2596",
+            "icu-364118a1/LICENSE": "364118a1d9da24bb5b770ac3d762ac144d6da5a4",
+        }
+        for name in ("LICENSE.TXT", "FTL.TXT", "bdf-README", "pcf-README"):
+            expected[f"freetype-264b5fbf/{name}"] = "264b5fbf5b912b39f98d038bf75d39be0a73f21b"
+        for platform in ("linux-x64", "macos-arm64", "macos-x64", "windows-x64"):
+            with self.subTest(platform=platform):
+                component = components[f"org.jetbrains.skiko:skiko-awt-runtime-{platform}:0.150.2"]
+                materials = {item["path"]: item for item in component["materials"]}
+                self.assertTrue(set(expected).issubset(materials))
+                for path, revision in expected.items():
+                    self.assertIn(revision, materials[path]["url"])
+                attribution = materials["skia-m150-a3f509bf52/ATTRIBUTIONS.txt"]["content"]
+                self.assertIn(b"This software is based in part on the work of the Independent JPEG Group.", attribution)
+                self.assertIn(b"1996-2026 The FreeType Project", attribution)
+                self.assertIn(b"not the alternative GPL option", attribution)
+
+    def test_angle_dependency_notices_preserve_distinct_upstream_licenses(self):
+        root = pathlib.Path(__file__).parents[1]
+        components = load_supplements(root / "docs/licensing/third-party/sources.json")
+        component = components["org.jetbrains.skiko:skiko-awt-runtime-angle-windows-x64:0.150.2"]
+        materials = {item["path"]: item for item in component["materials"]}
+        expected = {
+            "angle-ec4d8f8e4d/xxhash-LICENSE": "ec4d8f8e4d3f1a9e64430abd8b6b436253732adf",
+            "abseil-24012838/LICENSE": "2401283880a451e9ea10787920117fb67695abb4",
+            "zlib-e8ff3f35/LICENSE": "e8ff3f35551275330696606d7fef3a2a0f73a831",
+            "chromium-055e258e/LICENSE": "055e258e91fc310ded1c0071f108c08f0e924a53",
+        }
+        for path, revision in expected.items():
+            with self.subTest(path=path):
+                self.assertIn(revision, materials[path]["url"])
+                self.assertTrue(materials[path]["content"])
+        self.assertNotEqual(
+            materials["chromium-055e258e/LICENSE"]["content"],
+            materials["zlib-e8ff3f35/LICENSE"]["content"],
+        )
 
     def test_skia_embedded_component_evidence_is_pinned_and_not_approved(self):
         root = pathlib.Path(__file__).parents[1]
@@ -244,7 +332,7 @@ class SupplementalNoticesTest(unittest.TestCase):
         self.assertIn("prohibits selling the font by itself", review_notes)
         self.assertIn("does not approve the complete release package", review_notes)
         component = load_supplements(root / "docs/licensing/third-party/sources.json")
-        self.assertEqual(34, len(component))
+        self.assertEqual(50, len(component))
         license_file = root / "docs/licensing/third-party/liberation-fonts-2.1.5/LICENSE"
         self.assertEqual(asset["licenseMaterialPath"],
                          "liberation-fonts-2.1.5/LICENSE")

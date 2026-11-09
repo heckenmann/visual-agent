@@ -63,8 +63,16 @@
       },
       "proposedLicense": "BSD-3-Clause",
       "upstreamCommit": "a3f509bf52564dc8b27940bebe599d77ac0c4ae3",
-      "materialPaths": ["skia-m150-a3f509bf52/LICENSE"],
+      "materialPaths": [
+        "skia-m150-a3f509bf52/LICENSE", "skia-m150-a3f509bf52/ATTRIBUTIONS.txt",
+        "expat-6154446f/COPYING", "harfbuzz-9cb1fee5/COPYING",
+        "d3d12allocator-169895d5/LICENSE.txt", "libwebp-845d5476/COPYING", "libwebp-845d5476/PATENTS",
+        "libpng-d5515b5b/LICENSE", "libjpeg-turbo-e14cbfaa/LICENSE.md", "libjpeg-turbo-e14cbfaa/README.ijg",
+        "zlib-646b7f56/LICENSE", "icu-364118a1/LICENSE", "freetype-264b5fbf/LICENSE.TXT",
+        "freetype-264b5fbf/FTL.TXT", "freetype-264b5fbf/bdf-README", "freetype-264b5fbf/pcf-README"
+      ],
       "reviewStatus": "unreviewed",
+      "reviewNotes": "The original dependency texts are retained from revisions pinned by this exact Skia DEPS. Additional IJG and FreeType acknowledgments are project-authored. FTL is selected for FreeType core; separate driver notices remain. Retaining candidate notices does not assert that all dependencies are present on every platform or approve final binary coverage.",
       "remaining": [
         "Review third-party code statically linked into the Skia libraries actually present in each platform runtime; Skiko's build declaration and Skia DEPS file identify candidates but do not prove every candidate is in each binary",
         "Retain and review applicable license and NOTICE texts for dependencies confirmed or potentially linked into each platform binary, including piex, dng_sdk, Wuffs, and d3d12allocator",
@@ -78,7 +86,7 @@
       },
       "proposedLicense": "BSD-3-Clause",
       "upstreamCommit": "ec4d8f8e4d3f1a9e64430abd8b6b436253732adf",
-      "materialPaths": ["angle-ec4d8f8e4d/LICENSE"],
+      "materialPaths": ["angle-ec4d8f8e4d/LICENSE", "d3d12allocator-169895d5/LICENSE.txt", "angle-ec4d8f8e4d/xxhash-LICENSE", "abseil-24012838/LICENSE", "zlib-e8ff3f35/LICENSE", "chromium-055e258e/LICENSE"],
       "reviewStatus": "unreviewed",
       "remaining": [
         "Inspect the exact ANGLE DEPS revisions and identify dependencies embedded in the two redistributed DLLs; retain and review their applicable notices",
@@ -143,6 +151,74 @@
     },
     {
       "sourceArtifacts": {
+        "org.graalvm.js:js-isolate-linux-amd64:25.5.5.0.3": "057e2c8af1f3620ee7c283698b63abf8e713d0414e761d1dbabfb8a22fbdf94e",
+        "org.graalvm.js:js-isolate-darwin-aarch64:25.5.5.0.3": "41bdbf425dc998ebb6a6061eff9fa1e42ae4a762b980bffd98e4bda7e793f015",
+        "org.graalvm.js:js-isolate-windows-amd64:25.5.5.0.3": "f3ddefe0561ad68a4ea126d2235b7ed2c7ec2e75fe04e8e3ca44da444ee87c3c"
+      },
+      "proposedLicense": "GraalVM Free Terms and Conditions (GFTC)",
+      "upstreamCommit": "dd265d542fad72d0e7e1ae4032ef7c040911e700",
+      "materialPaths": ["graaljs-25.5.5.0.3/GFTC-TERMS-REFERENCE.md"],
+      "reviewStatus": "unreviewed",
+      "reviewNotes": "Source artifact hashes were observed in the Linux x64, macOS ARM64, and Windows x64 inventories of workflow 42649987764 at source commit 4163037e6b17d4d973f425726ab31208e017b881. These are original Maven JAR hashes, not signed package hashes or release approval.",
+      "remaining": [
+        "Verify the GFTC unmodified-Program condition for the exact macOS library signing transformation",
+        "Verify Oracle terms access, proprietary-rights markings, and separately licensed technology in final recipient packages"
+      ]
+    },
+    {
+      "sourceArtifacts": {
+        "org.graalvm.js:js-language:25.5.5.0.3": "8de5a84f9028c3835ad79f97657dcf3ef213e6e0f7413637a28138349bd8d04b"
+      },
+      "proposedLicense": "UPL-1.0",
+      "upstreamCommit": "dd265d542fad72d0e7e1ae4032ef7c040911e700",
+      "materialPaths": ["graaljs-25.5.5.0.3/LICENSE_GRAALJS", "graaljs-25.5.5.0.3/THIRD_PARTY_LICENSE_GRAALJS.txt", "graaljs-25.5.5.0.3/SOURCE-AVAILABILITY.txt"],
+      "reviewStatus": "unreviewed",
+      "reviewNotes": "Retain this implementation's own original Oracle copyright and separately licensed code notices, not just the SDK UPL text. The exact source variant is included in the runtime-selected source collection.",
+      "remaining": [
+        "Verify applicability of the upstream separately licensed code notices to the exact packaged language implementation",
+        "Verify source availability, original notices, and absence of additional restrictions in all final recipient packages"
+      ]
+    },
+    {
+      "sourceArtifacts": {
+        "org.graalvm.polyglot:polyglot:25.5.5.0.3": "51096bb48c663a82a720358d9f5f9145b9809ea3d155459211a6a05759f4f43c",
+        "org.graalvm.regex:regex:25.5.5.0.3": "646db57872bff76d4794a20f4be2a7e6d37cf4ea698d5c6c3b529532699d744b",
+        "org.graalvm.sdk:collections:25.5.5.0.3": "694c52b4536e744fd091257d190af6ba95c78f37a2eb1cb7b5d1cfc8e7c1efca",
+        "org.graalvm.sdk:jniutils:25.5.5.0.3": "1c46ac4d58434d9118026ab2f4a585102460ec07a4cfcf31973b0fb13f84268e",
+        "org.graalvm.sdk:nativebridge:25.5.5.0.3": "fe2cf1b0cfbb83b1507ba33883282894e085553e18fe47a6cb2a18645f1c381c",
+        "org.graalvm.sdk:nativeimage:25.5.5.0.3": "b8d337a9d413169953285b600bb1bd243f1b294a10654a324751f56b2a88d749",
+        "org.graalvm.sdk:word:25.5.5.0.3": "11a21c7f6a132bd21c566ec4b8b397fb06656db5d293ff52966ee8582b79ddd1",
+        "org.graalvm.shadowed:xz:25.5.5.0.3": "2f3a1fc185b269c852c5098e533a45be480bd45953bdc9f239d45ac36001f3c0",
+        "org.graalvm.truffle:truffle-api:25.5.5.0.3": "ce6662ca5f319c329eb8867f4aa809ea3e892e07b2975bf9d364d94bdad166d0",
+        "org.graalvm.truffle:truffle-compiler:25.5.5.0.3": "f12a579e489daea109d7e19d231b48fe33b2a8a34033251618ef7a54579a236d",
+        "org.graalvm.truffle:truffle-runtime:25.5.5.0.3": "a4b8df5041e6001d00019d92617cad6b7f5628a4f84d4d94b53b9e56c6b80a0e"
+      },
+      "proposedLicense": "UPL-1.0",
+      "upstreamCommit": "e3cb74fceaf6ee4f50366d5ab2bbf602e464475d",
+      "materialPaths": ["graalvm-25.4.4.1.1/UPL-1.0.txt"],
+      "reviewStatus": "unreviewed",
+      "reviewNotes": "The current Graal release tag vm-25.5.5.0.3 resolves to this commit. Its sdk/LICENSE.md SHA-256 is 4a9972e09a394d6a9f693d3e8343d4918e5c0c25863665320a7fd3b6dcac4571, identical to the retained original UPL text; reuse those exact bytes rather than duplicate the file. Artifact hashes are from workflow 42649987764.",
+      "remaining": [
+        "Review applicable copyright and separately licensed code notices for the selected runtime artifacts, including js-language",
+        "Verify retained terms in every final recipient package and keep js-isolate under its separate GFTC conditions"
+      ]
+    },
+    {
+      "sourceArtifacts": {
+        "org.graalvm.shadowed:icu4j:25.5.5.0.3": "5474c939fcd8c054d60f43978f3dd6331d762cafa71d06d9f6b292c4496432eb"
+      },
+      "proposedLicense": "Unicode/ICU License",
+      "upstreamCommit": "f1b3db8ecd39d5b3a6eff4d5641b176c7f914dfb",
+      "materialPaths": ["icu4j-78.2/LICENSE"],
+      "reviewStatus": "unreviewed",
+      "reviewNotes": "The exact-version Maven source archive has SHA-256 485f54aaa23f47224ae0fe8c12c622314dfb46a0ca93f5c3d7e2683281c612d6. VersionInfo.java still identifies ICU 78.2 and Unicode 17.0; retain the corresponding original ICU license. The binary hash comes from workflow 42649987764.",
+      "remaining": [
+        "Review notices applicable to the exact shadowed ICU distribution",
+        "Verify original ICU notices accompany every final package containing this artifact"
+      ]
+    },
+    {
+      "sourceArtifacts": {
         "mimalloc2:2.1.7-r0": "0eed39319f139afde8515010ff59baf24de9e47ea316a315398e8027d198202d"
       },
       "proposedLicense": "MIT",
@@ -199,8 +275,9 @@
       },
       "proposedLicense": "LGPL-2.1-only",
       "upstreamCommit": "6d08472ea47db895748d5ca7d3daf032c3fefcf8",
-      "materialPaths": ["libfuse-3.15.0/LICENSE", "libfuse-3.15.0/LGPL2.txt"],
+      "materialPaths": ["libfuse-3.15.0/LICENSE", "libfuse-3.15.0/LGPL2.txt", "libfuse-3.15.0/SOURCE-AND-RELINK.txt"],
       "reviewStatus": "unreviewed",
+      "reviewNotes": "The recipient guide selects the LGPL-2.1 section 6(a) source-and-relink route. Workflow 42651138364 built the retained runtime recipe with its mount.c patch applied to libfuse; the source archive, patch, and static-link recipe are retained. Final archive delivery and exact package review remain required.",
       "remaining": [
         "The runtime/debug pair identifies libfuse 3.15.0 and the embedded source commit includes the build script and local mount.c patch; confirm the retained source/build material is sufficient to relink the exact distributed runtime",
         "Complete and validate the LGPL static-link relinking/source delivery for recipients"
@@ -359,6 +436,26 @@
   ],
   "materials": [
     {
+      "path": "angle-ec4d8f8e4d/xxhash-LICENSE",
+      "sha256": "86ec6953794503942b70fcd4f35b565d44f63f703b7037ce44dad965c4aaae91",
+      "url": "https://chromium.googlesource.com/angle/angle/+/ec4d8f8e4d3f1a9e64430abd8b6b436253732adf/src/common/third_party/xxhash/LICENSE?format=TEXT"
+    },
+    {
+      "path": "abseil-24012838/LICENSE",
+      "sha256": "c79a7fea0e3cac04cd43f20e7b648e5a0ff8fa5344e644b0ee09ca1162b62747",
+      "url": "https://chromium.googlesource.com/chromium/src/third_party/abseil-cpp/+/2401283880a451e9ea10787920117fb67695abb4/LICENSE?format=TEXT"
+    },
+    {
+      "path": "zlib-e8ff3f35/LICENSE",
+      "sha256": "e1cfcc55c325b3f78cf55df9664abaa066e2271dffe8213347d9fccdfbac8f2c",
+      "url": "https://chromium.googlesource.com/chromium/src/third_party/zlib/+/e8ff3f35551275330696606d7fef3a2a0f73a831/LICENSE?format=TEXT"
+    },
+    {
+      "path": "chromium-055e258e/LICENSE",
+      "sha256": "368cca1106be99d39ecd32a38d8305585d802a475effb66380b91ffc9bcf709b",
+      "url": "https://chromium.googlesource.com/chromium/src/+/055e258e91fc310ded1c0071f108c08f0e924a53/LICENSE?format=TEXT"
+    },
+    {
       "path": "liberation-fonts-2.1.5/LICENSE",
       "sha256": "93fed46019c38bbe566b479d22148e2e8a1e85ada614accb0211c37b2c61c19b",
       "url": "https://raw.githubusercontent.com/liberationfonts/liberation-fonts/4b0192046158094654e865245832c66d2104219e/LICENSE"
@@ -372,6 +469,81 @@
       "path": "skiko-0.150.2/NOTICE",
       "sha256": "35dd077c24768b53625101cfcc0ad853ae7e2abc08bd2a111a0267760d1406d8",
       "url": "https://raw.githubusercontent.com/JetBrains/skiko/caed3841b8725429bb9b9805ff162a40eb7bce47/NOTICE"
+    },
+    {
+      "path": "skia-m150-a3f509bf52/ATTRIBUTIONS.txt",
+      "sha256": "c1126f3a474dca835771734c8406cac5a08e5a21eaaba55c37a6062263fd9777",
+      "url": "https://github.com/heckenmann/visual-agent"
+    },
+    {
+      "path": "expat-6154446f/COPYING",
+      "sha256": "31b15de82aa19a845156169a17a5488bf597e561b2c318d159ed583139b25e87",
+      "url": "https://raw.githubusercontent.com/libexpat/libexpat/6154446fccefbf3ca644894f598969113b0c7bcd/expat/COPYING"
+    },
+    {
+      "path": "harfbuzz-9cb1fee5/COPYING",
+      "sha256": "ba8f810f2455c2f08e2d56bb49b72f37fcf68f1f4fade38977cfd7372050ad64",
+      "url": "https://raw.githubusercontent.com/harfbuzz/harfbuzz/9cb1fee51069b206effb4736e443b038d230789d/COPYING"
+    },
+    {
+      "path": "d3d12allocator-169895d5/LICENSE.txt",
+      "sha256": "e078ee4f8c5ed0673f4d93b5318557eb8b4e0d7dbccef2ab45c763c7693f0f37",
+      "url": "https://raw.githubusercontent.com/GPUOpen-LibrariesAndSDKs/D3D12MemoryAllocator/169895d529dfce00390a20e69c2f516066fe7a3b/LICENSE.txt"
+    },
+    {
+      "path": "libwebp-845d5476/COPYING",
+      "sha256": "5aec868f669e384a22372a4e8a1a6cd7d44c64cd451f960ca69cc170d1e13acf",
+      "url": "https://chromium.googlesource.com/webm/libwebp/+/845d5476a866141ba35ac133f856fa62f0b7445f/COPYING"
+    },
+    {
+      "path": "libwebp-845d5476/PATENTS",
+      "sha256": "cc3273e0694ea5896145e0677699b53471b03ea43021ddc50e7923fbb9f5023c",
+      "url": "https://chromium.googlesource.com/webm/libwebp/+/845d5476a866141ba35ac133f856fa62f0b7445f/PATENTS"
+    },
+    {
+      "path": "libpng-d5515b5b/LICENSE",
+      "sha256": "bdb0a645ea18c60507d0368379b1ac5474b92255fcc2d115e07486a7672ba526",
+      "url": "https://skia.googlesource.com/third_party/libpng/+/d5515b5b8be3901aac04e5bd8bd5c89f287bcd33/LICENSE"
+    },
+    {
+      "path": "libjpeg-turbo-e14cbfaa/LICENSE.md",
+      "sha256": "96f5b328adbb78eeaaec6980d73fd558cb1e4d62560ed615646bc3cf5e532430",
+      "url": "https://chromium.googlesource.com/chromium/deps/libjpeg_turbo/+/e14cbfaa85529d47f9f55b0f104a579c1061f9ad/LICENSE.md"
+    },
+    {
+      "path": "libjpeg-turbo-e14cbfaa/README.ijg",
+      "sha256": "75815e3bf6484201a3c3d17a1bbf10f2e8e3237f84df10a2357ea896db2a81d6",
+      "url": "https://chromium.googlesource.com/chromium/deps/libjpeg_turbo/+/e14cbfaa85529d47f9f55b0f104a579c1061f9ad/README.ijg"
+    },
+    {
+      "path": "zlib-646b7f56/LICENSE",
+      "sha256": "e1cfcc55c325b3f78cf55df9664abaa066e2271dffe8213347d9fccdfbac8f2c",
+      "url": "https://chromium.googlesource.com/chromium/src/third_party/zlib/+/646b7f569718921d7d4b5b8e22572ff6c76f2596/LICENSE"
+    },
+    {
+      "path": "icu-364118a1/LICENSE",
+      "sha256": "17510cf7a58b4879b887ec05a45d72cf1b73544dd9ec7e72f20110ed104229ee",
+      "url": "https://chromium.googlesource.com/chromium/deps/icu/+/364118a1d9da24bb5b770ac3d762ac144d6da5a4/LICENSE"
+    },
+    {
+      "path": "freetype-264b5fbf/LICENSE.TXT",
+      "sha256": "bd36c8b474855fa294c2ec5c184544478ef3720aad37d65a6296a4f264fd2d3b",
+      "url": "https://chromium.googlesource.com/chromium/src/third_party/freetype2/+/264b5fbf5b912b39f98d038bf75d39be0a73f21b/LICENSE.TXT"
+    },
+    {
+      "path": "freetype-264b5fbf/FTL.TXT",
+      "sha256": "5a5ee54c5001bbad1cdc1a57cc3dd4c42199b2da09d39c7ee41fab002d02967f",
+      "url": "https://chromium.googlesource.com/chromium/src/third_party/freetype2/+/264b5fbf5b912b39f98d038bf75d39be0a73f21b/docs/FTL.TXT"
+    },
+    {
+      "path": "freetype-264b5fbf/bdf-README",
+      "sha256": "7984455e7e5a9faba3797c8bf095fbe10cc846316b7320aff8c58402e22b82fe",
+      "url": "https://chromium.googlesource.com/chromium/src/third_party/freetype2/+/264b5fbf5b912b39f98d038bf75d39be0a73f21b/src/bdf/README"
+    },
+    {
+      "path": "freetype-264b5fbf/pcf-README",
+      "sha256": "18d9782898d9eac04476e2f744678137b2a889689ed3e923e052fc396a86f86b",
+      "url": "https://chromium.googlesource.com/chromium/src/third_party/freetype2/+/264b5fbf5b912b39f98d038bf75d39be0a73f21b/src/pcf/README"
     },
     {
       "path": "skia-m150-a3f509bf52/LICENSE",
@@ -402,6 +574,26 @@
       "path": "angle-ec4d8f8e4d/LICENSE",
       "sha256": "bf4da21bd20bcfb5b60b7ecc67fa864a79be049e21d6178076887f178dd6c71a",
       "url": "https://chromium.googlesource.com/angle/angle/+/ec4d8f8e4d3f1a9e64430abd8b6b436253732adf/LICENSE?format=TEXT"
+    },
+    {
+      "path": "graaljs-25.5.5.0.3/LICENSE_GRAALJS",
+      "sha256": "1ae263ef11131dfde83daccd63c94d9ea11fc854196370385867adafb0ac3778",
+      "url": "https://raw.githubusercontent.com/oracle/graaljs/dd265d542fad72d0e7e1ae4032ef7c040911e700/graal-js/LICENSE_GRAALJS"
+    },
+    {
+      "path": "graaljs-25.5.5.0.3/THIRD_PARTY_LICENSE_GRAALJS.txt",
+      "sha256": "606c1dd73cc09df7884c5862a4ceebb59a92dae286e1e7b667c50b1a067db6ad",
+      "url": "https://raw.githubusercontent.com/oracle/graaljs/dd265d542fad72d0e7e1ae4032ef7c040911e700/graal-js/THIRD_PARTY_LICENSE_GRAALJS.txt"
+    },
+    {
+      "path": "graaljs-25.5.5.0.3/SOURCE-AVAILABILITY.txt",
+      "sha256": "a2c635e8722197de43027f7a516e10f3beb8a53a22a06e845359777ab76f495c",
+      "url": "https://repo.maven.apache.org/maven2/org/graalvm/js/js-language/25.5.5.0.3/js-language-25.5.5.0.3-sources.jar"
+    },
+    {
+      "path": "graaljs-25.5.5.0.3/GFTC-TERMS-REFERENCE.md",
+      "sha256": "ab902580ebdbbc0d8eef291d251db1a6c986a79fb734ccd00493b4e61c92ba37",
+      "url": "https://www.oracle.com/downloads/licenses/graal-free-license.html"
     },
     {
       "path": "graaljs-25.4.4.1.1/GFTC-TERMS-REFERENCE.md",
@@ -492,6 +684,11 @@
       "path": "libfuse-3.15.0/LICENSE",
       "sha256": "b8832d9caaa075bbbd2aef24efa09f8b7ab66a832812d88c602da0c7b4397fad",
       "url": "https://raw.githubusercontent.com/libfuse/libfuse/6d08472ea47db895748d5ca7d3daf032c3fefcf8/LICENSE"
+    },
+    {
+      "path": "libfuse-3.15.0/SOURCE-AND-RELINK.txt",
+      "sha256": "e3e69474d27bf73d1331d96518381bf733884740a0779af913f4e93067d65d8d",
+      "url": "https://github.com/AppImage/type2-runtime/blob/dd6cebedcbddde9c82f89b011e8e1d40b6e43868/BUILD.md"
     },
     {
       "path": "libfuse-3.15.0/LGPL2.txt",

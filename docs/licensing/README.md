@@ -5,6 +5,10 @@ review.** `release-approvals.json` is intentionally empty. Missing approval, leg
 material, or corresponding sources blocks publication; it is not a CI failure to
 work around by adding a generic license allowlist or a fabricated approval.
 
+The ongoing [beta redistribution review](release-review.md) records attributed
+component decisions and the exact candidate under inspection. Its findings are
+not an approval record until the final package evidence has been checked.
+
 ## Approval Boundary
 
 `scripts/verify-release-licenses.py` binds a review to an exact source commit and

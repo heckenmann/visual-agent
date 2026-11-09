@@ -44,6 +44,15 @@ downloaded bytes, not a legal determination of completeness.
 | Logback Classic 1.6.6 | [logback-classic-1.6.6-sources.jar](https://repo.maven.apache.org/maven2/ch/qos/logback/logback-classic/1.6.6/logback-classic-1.6.6-sources.jar) | `e3a8a1a00701c54f0b23c2c1427c307e9481da6c0696a7abf3a38a77322288d0` |
 | JNA 5.19.1 | [jna-5.19.1-sources.jar](https://repo.maven.apache.org/maven2/net/java/dev/jna/jna/5.19.1/jna-5.19.1-sources.jar) | `0136f719ddd91d92d2368aa2c59a0c436810ac0b9c29024044383758b0e99786` |
 | Skiko AWT 0.150.2 | [skiko-awt-0.150.2-sources.jar](https://repo.maven.apache.org/maven2/org/jetbrains/skiko/skiko-awt/0.150.2/skiko-awt-0.150.2-sources.jar) | `7a10e5e7ec5363ed6ea3b089fd5d619d0088e9e6c05459a33da256a95f9b1d4b` |
+| GraalJS language 25.5.5.0.3 | [js-language-25.5.5.0.3-sources.jar](https://repo.maven.apache.org/maven2/org/graalvm/js/js-language/25.5.5.0.3/js-language-25.5.5.0.3-sources.jar) | `691844c58fa8efef16d550b9a7646674ca78f08751402c250ffc31857184e28b` |
+
+The current GraalJS language source variant is collected from the selected
+runtime graph alongside its original `LICENSE_GRAALJS`,
+`THIRD_PARTY_LICENSE_GRAALJS.txt`, and source-availability instructions in the
+curated package materials. This preserves the language implementation's own
+copyright and separately licensed code notices rather than relying solely on
+the SDK's generic UPL text. It is not the native isolate's source or approval
+under GFTC, and does not resolve the other native-runtime obligations.
 
 The H2 source JAR is currently present in the generated local source-material
 directory with the recorded SHA-256. The resulting source archive is still
@@ -156,11 +165,15 @@ and Wuffs license texts have now been retained from the exact Skia `DEPS`
 revisions: `dng_sdk` `dbe0a676450d9b8c71bf00688bb306409b779e90`, Piex
 `bb217acdca1cc0c16b704669dd6f91a1b509c406`, and Wuffs
 `e3f919ccfe3ef542cfc983a82146070258fb57f8`. Their records remain
-`unreviewed`; in particular, the Adobe DNG SDK License Agreement needs a
-separate terms review, and no repository note here is a legal clearance. The
-Skia, ANGLE, DNG SDK, Piex, and Wuffs entries remain `unreviewed`; the complete
-native dependency mapping, applicable notice/source obligations, and exact
-final-package mapping still require review.
+`unreviewed` for final package clearance. The current
+[redistribution review](release-review.md) records the DNG agreement assessment,
+the selected FreeType core FTL option, and the additional original notices now
+retained for Expat, HarfBuzz, libwebp, libpng, libjpeg-turbo, zlib, native ICU,
+FreeType and D3D12MemoryAllocator at their Skia-pinned revisions. Explicit JPEG
+and FreeType acknowledgments are included separately. These materials do not
+establish that all candidates occur on every platform; complete native mapping
+and final-package delivery still require verification. No whole-release
+clearance is implied by this component assessment.
 
 The Linux AppImage from package-smoke workflow run `42388152203` (source commit
 `c754df8ee2b8dd0235d6ffe355c30cc1c10be017`, AppImage SHA-256
@@ -326,14 +339,17 @@ is not legal clearance.
 
 The release workflow now attempts a build of this retained source recipe in its
 Linux legal-materials job and checks that the resulting x86_64 runtime is static
-and executable. That check has not yet run for this branch. A successful run
-would verify that the current upstream recipe builds in CI; it would not prove
+and executable. Candidate workflow
+[42651138364](https://github.com/heckenmann/visual-agent/actions/runs/42651138364)
+successfully completed this check for source commit
+`4163037e6b17d4d973f425726ab31208e017b881`. This verifies that the current
+upstream recipe builds in CI; it does not prove
 the historical distributed runtime's exact linked inputs or independently
 exercise a recipient's custom libfuse modification.
 
 ## Delivery Approach
 
-`./gradlew :desktop:prepareLibrarySourceMaterials` collects the five
+`./gradlew :desktop:prepareLibrarySourceMaterials` collects the six
 selected-library source archives and the checksum-pinned AppImage source archives
 as partial evidence under
 `modules/desktop/build/reports/dependency-license/library-source-materials/`.

@@ -1,0 +1,16 @@
+Native graphics component acknowledgments
+
+This software is based in part on the work of the Independent JPEG Group.
+
+Portions of this software are copyright (C) 1996-2026 The FreeType Project
+(https://freetype.org). All rights reserved.
+
+For FreeType core code, this distribution selects the FreeType License (FTL),
+not the alternative GPL option. The original LICENSE.TXT and FTL.TXT are
+retained. Separately licensed FreeType driver code retains its own notices.
+
+The accompanying native graphics notices retain the original terms for Skia
+and its pinned dependency candidates. A notice's inclusion does not assert
+that every candidate is linked into every platform binary. Other copyrights,
+patent grants, disclaimers, and license conditions remain as stated in the
+original component texts; Visual Agent's MIT license does not replace them.
