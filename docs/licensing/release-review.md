@@ -310,7 +310,7 @@ Do not introduce another scanner or infer linkage from a notice filename.
 
 ## Remaining Decisions Before Exact-Hash Approval
 
-### Candidate Inventory: Unmapped Permissive Dependencies
+### Candidate Inventory: Unreviewed Permissive Dependencies
 
 The four platform inventory artifacts for PR head
 `b8f2204316d4cb41ce7a386bb09d4de2f1323b5d` (workflow `42678989326`) were
@@ -323,8 +323,9 @@ more than one option, so these counts overlap. A common Apache-2.0 text is
 already retained, but that alone does not establish applicable project-specific
 notices.
 
-Fourteen distinct coordinates declare MIT and/or BSD terms without any
-package-detected or curated license text: `org.antlr:ST4:4.3.4`,
+Fourteen distinct coordinates declared MIT and/or BSD terms without any
+package-detected or curated license text in that captured workflow:
+`org.antlr:ST4:4.3.4`,
 `org.codehaus.mojo:animal-sniffer-annotations:1.27`,
 `org.antlr:antlr-runtime:3.5.3`, `org.antlr:antlr4-runtime:4.13.1`,
 `org.ow2.asm:asm:9.11.1`, `org.nibor.autolink:autolink:0.12.0`,
@@ -336,9 +337,20 @@ package-detected or curated license text: `org.antlr:ST4:4.3.4`,
 `com.google.protobuf:protobuf-java:4.36.2`, and
 `org.reactivestreams:reactive-streams:1.0.4`. These should be checked against
 the exact upstream artifacts for the required copyright/permission notices and
-any existing NOTICE content. The Gradle license report's names/URLs alone are
-not a substitute for those texts. Until reconciled with the four candidate
-packages, including the JDK `jrt-fs` mapping, the notice review is incomplete.
+any existing NOTICE content. In the current worktree, original license files
+from the corresponding release tags have now been retained and mapped by the
+captured artifact hashes. The ANTLR 3 runtime also has distinct copyright
+headers extracted from its exact published source JAR. Regression tests verify
+the material hashes, source coordinates, and that these records remain
+unreviewed; the registry still cannot approve redistribution.
+
+This is an evidence improvement, not final clearance. The exact applicability
+of the multiple metadata choices for Animal Sniffer and ASM remains unresolved,
+the ANTLR 3 notice set needs confirmation against the distributed binary, and
+the captured package manifests predate these newly added materials. Build and
+inspect fresh packages before claiming that recipients receive them. The JDK
+`jrt-fs` mapping and the much larger set of other components without
+package-detected notices also remain part of the full obligation review.
 
 The official [GFTC](https://www.oracle.com/downloads/licenses/graal-free-license.html)
 and [GraalVM FAQ](https://www.graalvm.org/faq/) were checked again. Neither
