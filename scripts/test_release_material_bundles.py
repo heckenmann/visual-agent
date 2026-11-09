@@ -4,6 +4,7 @@ import hashlib
 import json
 import pathlib
 import shutil
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -53,6 +54,31 @@ class ReleaseMaterialBundleTest(unittest.TestCase):
         (self.materials / "source-delivery.md").write_text("Not complete or approved")
         for platform in sorted(bundler.EXPECTED_NOTICE_PLATFORMS):
             self.add_notice_evidence(platform, f"{platform} dependency notice".encode())
+
+    def test_project_license_bytes_survive_a_windows_style_git_checkout(self):
+        checkout = self.root / "windows-checkout"
+        checkout.mkdir()
+        empty_global_attributes = self.root / "empty-global-attributes"
+        empty_global_attributes.write_bytes(b"")
+        git = ["git", "-c", f"core.attributesFile={empty_global_attributes}",
+               "-c", "core.safecrlf=false"]
+        license_bytes = b"Project license\nCopyright notice\n"
+        (checkout / ".gitattributes").write_bytes((ROOT / ".gitattributes").read_bytes())
+        (checkout / "LICENSE").write_bytes(license_bytes)
+        (checkout / "ordinary.txt").write_bytes(b"Ordinary text\n")
+        for command in (
+            ["init", "--quiet"],
+            ["config", "core.autocrlf", "true"],
+            ["config", "core.eol", "crlf"],
+            ["add", ".gitattributes", "LICENSE", "ordinary.txt"],
+        ):
+            subprocess.run(git + command, cwd=checkout, check=True, capture_output=True)
+        (checkout / "LICENSE").unlink()
+        (checkout / "ordinary.txt").unlink()
+        subprocess.run(git + ["checkout-index", "--all"], cwd=checkout,
+                       check=True, capture_output=True)
+        self.assertEqual(b"Ordinary text\r\n", (checkout / "ordinary.txt").read_bytes())
+        self.assertEqual(license_bytes, (checkout / "LICENSE").read_bytes())
 
     def add_notice_evidence(self, platform, notice_text):
         notice_directory = self.notice_evidence / platform / "artifacts/package-hash"
