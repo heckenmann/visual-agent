@@ -301,12 +301,15 @@ claimed from the offer hash alone.
 The retained platform manifests were inspected directly: their runtimeLegal
 lists describe the complete source-JDK legal tree, including javadoc and other
 modules not explicitly selected by the application. The preparation task copies
-that source tree intentionally. These paths are therefore evidence of supplied
-notices, not proof of which modules or native libraries survived jlink. The
-packaged-artifact CSV primarily maps application JARs and does not fill this gap.
-For the final candidate, inspect each packaged runtime's own `release` MODULES
-field (or its `bin/java --list-modules` output) and native-library inventory.
-Do not introduce another scanner or infer linkage from a notice filename.
+that source tree intentionally. These paths are evidence of supplied notices,
+not proof of which modules or native libraries survived jlink. The packaged-
+artifact CSV primarily maps application JARs and does not fill this gap. The
+runtime provenance report now records both source and packaged `MODULES` lists
+from each JDK image's `release` file, alongside hashes of `release` and
+`lib/modules`; this makes the selected modules reviewable without retaining the
+JDK image or adding another scanner. Re-run platform inventory after this change
+and compare those lists with each package's native-library inventory. Do not
+infer linkage from a legal-tree filename.
 
 ## Remaining Decisions Before Exact-Hash Approval
 
@@ -344,13 +347,50 @@ headers extracted from its exact published source JAR. Regression tests verify
 the material hashes, source coordinates, and that these records remain
 unreviewed; the registry still cannot approve redistribution.
 
-This is an evidence improvement, not final clearance. The exact applicability
-of the multiple metadata choices for Animal Sniffer and ASM remains unresolved,
+Fresh four-platform inventories for PR head
+`ac7492c09bd9ec9cd8009d60383f897523d8767b` (workflow `42688634430`) now show
+the 14 candidate coordinates with their hash-matched supplements in every
+platform manifest. The manifests contain 265 components on Linux, Windows, and
+macOS arm64, and 263 on macOS x64 because the platform dependency graph differs.
+They contain 35, 35, 35, and 33 supplemented component entries respectively;
+the variation is also platform-specific. Each platform still has 96 entries
+with neither a detected archive notice nor a curated supplement. Those entries
+are unreviewed candidates, not a determination that every one has a missing
+legal notice. The exact four manifests classify 95 of those entries as variants
+of Apache-2.0 metadata and one as the separately mapped bundled-JDK `jrt-fs`.
+The inventory also retains Apache 2.0 license text from Spring Framework
+artifacts. A canonical copy is now additionally retained as
+`third-party/Apache-2.0.txt`, pinned by SHA-256 and the Apache Foundation's
+official URL in `third-party/sources.json`, and is copied by the existing
+curated-material packaging paths. This covers delivery of the common license
+text, but it does not establish whether any particular upstream work carries a
+`NOTICE` with additional attributions. That obligation still needs review
+against the relevant upstream materials. All four manifests keep
+`redistributionApproved` false.
+
+The JDK entry is now better mapped. Each fresh platform manifest identifies
+`bundled-jdk:27:jrt-fs` at `lib/jrt-fs.jar` and records the matching Azul
+`source-jdk.properties` and vendor `readme.txt` in the recipient package. The
+readme offers, for three years, a machine-readable copy of the OpenJDK-based
+source portions on request and includes a version code. This is concrete
+pass-through evidence for the exact runtime build, not proof that the offer's
+legal applicability has been independently approved. The OpenJDK 27.0.1
+update-branch [`JrtfsJar.gmk`](https://github.com/openjdk/jdk27u/blob/53eadcb2b7896ba55b86bcf5378cb3fab612063c/make/JrtfsJar.gmk)
+build rule compiles `jrt-fs.jar` from `src/java.base/share/classes`, including
+the `jdk/internal/jimage` and `jdk/internal/jrtfs` packages; the shipped runtime
+also carries the `java.base` legal files. This supports mapping the compatibility
+JAR to the `java.base` source/license material rather than treating it as an
+unidentified standalone module. Retain the vendor offer unchanged in every
+recipient package and verify its terms against the exact transformed runtime
+before relying on the noncommercial GPLv2 section 3(c) route.
+
+This is evidence improvement, not final clearance. The exact applicability of
+the multiple metadata choices for Animal Sniffer and ASM remains unresolved,
 the ANTLR 3 notice set needs confirmation against the distributed binary, and
-the captured package manifests predate these newly added materials. Build and
-inspect fresh packages before claiming that recipients receive them. The JDK
-`jrt-fs` mapping and the much larger set of other components without
-package-detected notices also remain part of the full obligation review.
+the upstream `NOTICE` status for Apache-licensed dependencies requires
+obligation-by-obligation review.
+The full native/runtime, source-delivery, and final recipient-package review
+remains open.
 
 The official [GFTC](https://www.oracle.com/downloads/licenses/graal-free-license.html)
 and [GraalVM FAQ](https://www.graalvm.org/faq/) were checked again. Neither

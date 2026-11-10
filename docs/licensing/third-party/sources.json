@@ -585,6 +585,11 @@
   ],
   "materials": [
     {
+      "path": "Apache-2.0.txt",
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+      "url": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+    },
+    {
       "path": "angle-ec4d8f8e4d/xxhash-LICENSE",
       "sha256": "86ec6953794503942b70fcd4f35b565d44f63f703b7037ce44dad965c4aaae91",
       "url": "https://chromium.googlesource.com/angle/angle/+/ec4d8f8e4d3f1a9e64430abd8b6b436253732adf/src/common/third_party/xxhash/LICENSE?format=TEXT"
