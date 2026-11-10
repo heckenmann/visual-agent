@@ -26,6 +26,11 @@ fun verifyPackagedRuntimeLegalMaterials(
     }
     val runtimeVersion = loadRuntimeProperties(runtimeHome.resolve("release")).getProperty("JAVA_VERSION").trim('"')
     check(retained.getProperty("JAVA_VERSION").trim('"') == runtimeVersion) { "Runtime legal provenance has a different Java version" }
+    val sourceModules = runtimeModules(original)
+    val packagedModules = runtimeModules(loadRuntimeProperties(runtimeHome.resolve("release")))
+    check("java.base" in sourceModules && "java.base" in packagedModules) {
+        "Runtime module inventory is missing java.base"
+    }
     val suffix = if (sourceJdk.resolve("bin/keytool.exe").isFile) ".exe" else ""
     val records =
         legal.resolve("source-inputs.sha256").readLines().map { line ->
@@ -75,10 +80,25 @@ fun verifyPackagedRuntimeLegalMaterials(
         "source.vendor" to retained.getProperty("IMPLEMENTOR").trim('"'),
         "source.release.sha256" to inputs.getValue("release"),
         "source.modules.sha256" to inputs.getValue("lib/modules"),
+        "source.modules.list" to sourceModules.joinToString(","),
         "source.keytool.sha256" to inputs.getValue("bin/keytool$suffix"),
         "packaged.modules.sha256" to runtimeLegalSha256(runtimeHome.resolve("lib/modules")),
+        "packaged.modules.list" to packagedModules.joinToString(","),
         "packaged.keytool.sha256" to runtimeLegalSha256(runtimeHome.resolve("bin/keytool$suffix")),
     )
+}
+
+private fun runtimeModules(release: Properties): List<String> {
+    val value = release.getProperty("MODULES")?.trim('"') ?: error("Missing MODULES runtime metadata")
+    val modules = value.split(Regex("\\s+")).filter(String::isNotBlank)
+    val valid =
+        modules.isNotEmpty() &&
+            modules.distinct().size == modules.size &&
+            modules.all { it.matches(Regex("[A-Za-z0-9_.]+")) }
+    check(valid) {
+        "Invalid MODULES runtime metadata"
+    }
+    return modules
 }
 
 /** Public vendor/version fields only; never serialize arbitrary local JDK properties. */
