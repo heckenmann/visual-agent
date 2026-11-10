@@ -307,9 +307,16 @@ artifact CSV primarily maps application JARs and does not fill this gap. The
 runtime provenance report now records both source and packaged `MODULES` lists
 from each JDK image's `release` file, alongside hashes of `release` and
 `lib/modules`; this makes the selected modules reviewable without retaining the
-JDK image or adding another scanner. Re-run platform inventory after this change
-and compare those lists with each package's native-library inventory. Do not
-infer linkage from a legal-tree filename.
+JDK image or adding another scanner. Follow-up inventory workflow
+[`42873741012`](https://github.com/heckenmann/visual-agent/actions/runs/42873741012)
+for PR head `590d94c1c23a99c3e53fde2a411946772027e7f7` passed on all four
+platforms. Every report records the exact source runtime version
+`27.0.1.0.3+1`, non-empty source and packaged module lists, and their module
+hashes; `java.base` is present in both lists for every platform. The four
+reports still identify 96 no-detected-notice/no-supplement entries apiece: 95
+Apache-2.0 metadata variants and the separately mapped `jrt-fs` entry. The
+follow-up inventory verifies module capture, not the separate mapping of every
+native library. Do not infer linkage from a legal-tree filename.
 
 ## Remaining Decisions Before Exact-Hash Approval
 
