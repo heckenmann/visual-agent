@@ -602,10 +602,11 @@
         "windows-x64": "Unknown: the exact MSI-contained DLL matches the Maven DLL hash, but its symbol table is stripped; no positive or negative component conclusion"
       },
       "reviewStatus": "unreviewed",
+      "reviewNotes": "The exact pinned Adobe SDK agreement was checked: section 1 permits use and redistribution without royalties, section 2 requires preserving notices in human-readable form, and section 5 adds indemnification for distribution in a commercial product. The maintainer confirmed the current distribution is noncommercial; revisit section 5 if that changes. Adobe separately grants a patent license for compliant DNG readers/writers and requires a prominent source/documentation notice. The exact notice is retained and present in README and the desktop build source; local package tests verify bundled legal resources. This is an AI-assisted engineering review, not legal advice or final package approval. Linux and macOS runtime binaries contain DNG symbols; Windows remains unknown because its symbol table is stripped.",
       "remaining": [
-        "Have the Adobe DNG SDK License Agreement and exact redistribution/packaging conditions reviewed before release; this record is not a legal determination",
-        "Confirm whether the distributed component is covered by Adobe's separate DNG specification patent license; if so, verify the exact notice in the final platform packages",
-        "Map component presence to exact final package binaries and determine required notice/source materials after review"
+        "Determine whether the embedded implementation is a compliant implementation that reads or writes DNG files and therefore relies on Adobe's separate specification patent license; retain evidence for that determination",
+        "Map DNG presence to the exact binaries in every versioned release package; Windows binary inspection is currently inconclusive because symbols are stripped",
+        "Verify the exact notice is present and prominent in the final recipient-facing documentation and legal materials for every package containing the implementation"
       ]
     },
     {

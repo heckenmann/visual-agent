@@ -470,6 +470,18 @@ it does not decide whether this embedded component is a covered compliant
 implementation, establish Windows/Linux final-candidate inclusion, or grant
 redistribution clearance.
 
+The exact [Skiko `v0.150.2` build configuration](https://github.com/JetBrains/skiko/blob/v0.150.2/skiko/build.gradle.kts)
+statically links `piex` and `dng_sdk` for native targets and macOS JVM targets.
+The corresponding [Skia `m150-a3f509bf52` raw-codec target](https://github.com/JetBrains/skia/blob/m150-a3f509bf52/BUILD.gn#L1572-L1586)
+is enabled only when `skia_use_dng_sdk`, `skia_use_libjpeg_turbo_decode`, and
+`skia_use_piex` are all enabled. The current symbol inspection detects DNG
+symbols in Linux x64 and both macOS runtime artifacts, while the stripped
+Windows payload remains inconclusive. This establishes a concrete implementation
+path and presence evidence, but the available release configuration does not
+record all three GN values for each exact binary. Keep the DNG patent notice in
+source and recipient documentation; do not treat the conditional build rule as
+proof that the final Windows artifact contains or omits the decoder.
+
 ### AppImage libfuse: LGPL-2.1 Section 6(a)
 
 The [retained libfuse LGPL text](third-party/libfuse-3.15.0/LGPL2.txt) permits
