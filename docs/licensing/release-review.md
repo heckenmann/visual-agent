@@ -23,10 +23,12 @@ selected runtime dependencies must be checked in the new package inventories.
 
 ### Latest Non-Publishing Candidate Evidence (PR #533)
 
-After the rebase, PR head `18a8e8e1d41e0f8ab751abb276bb7c735084246c` passed
-the complete CI matrix: Gradle tests, package and launch, release-workflow
-contracts, CodeQL, and four platform license inventories in workflow
-[`43129039070`](https://github.com/heckenmann/visual-agent/actions/runs/43129039070).
+PR head `e4f0e32a1de6a6793d1958733a023b2e958d03ef` passed the complete CI
+matrix: Gradle tests, package and launch, release-workflow contracts, CodeQL,
+and four platform license inventories in workflow
+[`43135760618`](https://github.com/heckenmann/visual-agent/actions/runs/43135760618)
+and inventory workflow
+[`43135760520`](https://github.com/heckenmann/visual-agent/actions/runs/43135760520).
 This is a technical candidate run for the open PR, not a versioned release
 candidate and not redistribution approval.
 
@@ -35,11 +37,14 @@ Windows x64, and macOS ARM64, and 261 for macOS x64. Every component remains
 `unreviewed`, and all four manifests set `redistributionApproved` to `false`.
 The collector retained package notices for 136 components on every platform;
 127 components on Linux, Windows, and macOS ARM64 and 125 on macOS x64 have no
-notice detected in the packaged artifact. Of those, 68 per platform also have
-no curated supplement. These 68 are concrete triage items, not proof that each
-component has a missing legal notice; the applicable upstream license and
-NOTICE scope still need component-level review. The remaining no-detected
-entries have supplements, but those records also remain explicitly unreviewed.
+notice detected in the packaged artifact. Of these, 66 per platform have no
+curated supplement. The prior 68-item set included both Kotlinx IO 0.9.1
+coordinates; the exact upstream NOTICE is now captured as a hash-bound
+supplement in every platform inventory. The remaining 66 are concrete triage
+items, not proof that each component has a missing legal notice; applicable
+upstream license and NOTICE scope still require component-level review. The
+other no-detected entries have supplements, but those records also remain
+explicitly unreviewed.
 
 The same manifests include 241-243 bundled-JDK legal files per platform; the
 runtime legal section is also `unreviewed`. The Linux provenance report records
@@ -50,25 +55,25 @@ Apache NOTICE, GraalJS signing, Skia/ANGLE, AppImage source/relink, JDK-module,
 and final recipient-archive reviews described below. No approval registry
 entry or release tag was changed.
 
-### Kotlinx IO 0.9.1 Upstream NOTICE Gap
+### Kotlinx IO 0.9.1 Upstream NOTICE Evidence
 
-The current Linux inventory run `43131824004` reports no embedded notice for
-`kotlinx-io-bytestring-jvm:0.9.1` and `kotlinx-io-core-jvm:0.9.1`. The exact
-published source JARs also contain no `NOTICE` entry. The exact upstream tag
-resolves to commit `362bdc35e159bad6da1e08101c8321792d762281`, whose root
-`NOTICE` identifies itself as the Apache License section 4(d) notice for
-kotlinx-io. Its original 486-byte content is retained at
+The exact upstream tag resolves to commit
+`362bdc35e159bad6da1e08101c8321792d762281`, whose root `NOTICE` identifies
+itself as the Apache License section 4(d) notice for kotlinx-io. The published
+source JARs and packaged binaries contain no `NOTICE` entry for
+`kotlinx-io-bytestring-jvm:0.9.1` or `kotlinx-io-core-jvm:0.9.1`. Its original
+486-byte content is retained at
 `docs/licensing/third-party/kotlinx-io-0.9.1/NOTICE` with SHA-256
 `a126623d2c0c1ca21814828749243869ae2c44c7f6a56ef6074bb87f430b659e` and is
 mapped to both resolved source-artifact hashes in `sources.json`. All four
 platform inventories resolve those same source hashes; macOS package signing
 changes the packaged JAR hashes, which the notice collector records separately
-for each packaged artifact.
+for each packaged artifact. All four candidate inventory manifests contain the
+supplement under the corresponding actual package hashes.
 
-This closes the evidence-collection gap for those two coordinates only. The
-NOTICE attribution scope and final recipient-package inclusion remain
-unreviewed; redistribution approval remains false. The next inventory run must
-confirm the retained notice is carried into all exact recipient materials.
+This closes the prior evidence-collection gap for those two coordinates only.
+The NOTICE attribution scope and inclusion in the final recipient-facing legal
+archive remain unreviewed; redistribution approval remains false.
 
 ### Verified Graal Evidence Gap and Local Correction
 
