@@ -214,14 +214,27 @@ jobs:
 
       - name: Collect original notices from packaged runtime JARs
         if: matrix.collect_notice_evidence
+        env:
+          PACKAGE_PLATFORM: ${{ matrix.platform }}
         run: |
-          python scripts/collect-third-party-notices.py \
-            --package-root modules/desktop/build/compose/binaries/main/app \
-            --inventory modules/desktop/build/reports/dependency-license/packaged-artifacts.csv \
-            --license-report build/reports/dependency-license/licenses-all.json \
-            --project-license LICENSE \
-            --output notice-evidence \
+          args=(
+            --package-root modules/desktop/build/compose/binaries/main/app
+            --inventory modules/desktop/build/reports/dependency-license/packaged-artifacts.csv
+            --license-report build/reports/dependency-license/licenses-all.json
+            --project-license LICENSE
+            --output notice-evidence
             --supplements docs/licensing/third-party/sources.json
+          )
+          if [[ "$PACKAGE_PLATFORM" == "linux-appimage" ]]; then
+            mapfile -t appimage_packages < <(find modules/desktop/build/compose/binaries/main/packages -maxdepth 1 -type f -name '*.AppImage' -print)
+            test "${#appimage_packages[@]}" -eq 1
+            args+=(
+              --appimage-package "${appimage_packages[0]}"
+              --appimage-runtime modules/desktop/build/appimage/tools/runtime-dd6cebed-x86_64
+              --appimage-source-archive modules/desktop/build/reports/dependency-license/appimage-runtime-sources/type2-runtime-dd6cebed.tar.gz
+            )
+          fi
+          python scripts/collect-third-party-notices.py "${args[@]}"
         shell: bash
 
       - name: Upload platform notice evidence
@@ -306,9 +319,6 @@ jobs:
 
       - name: Collect pinned source and legal inputs
         run: ./gradlew :desktop:prepareReleaseSourceMaterials --no-daemon --no-configuration-cache
-
-      - name: Build the pinned AppImage runtime from retained sources
-        run: bash scripts/verify-appimage-runtime-build.sh modules/desktop/build/reports/dependency-license/library-source-materials/archives/appimage-runtime/type2-runtime-dd6cebed.tar.gz
 
       - name: Download per-platform package notice evidence
         uses: actions/download-artifact@v8

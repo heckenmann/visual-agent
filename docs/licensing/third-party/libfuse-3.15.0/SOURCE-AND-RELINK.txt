@@ -36,6 +36,9 @@ Rebuild/relink on Linux:
    ARCH=x86_64 bash scripts/docker/build-with-docker.sh
    The Docker build copies the patch directory, so changing the patch rebuilds
    libfuse before the runtime is linked. The output is runtime-x86_64.
+   The packaging build stamps src/runtime/version with the short commit from
+   this exact source archive, matching the pinned upstream release workflow,
+   and verifies that --appimage-version reports that commit.
 4. To use your runtime with the application, extract an AppImage using its
    --appimage-extract option, then use appimagetool's --runtime-file option
    with your rebuilt runtime and the extracted squashfs-root AppDir. Create a

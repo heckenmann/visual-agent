@@ -490,12 +490,9 @@ val appImageOutput =
 val appImageToolDownloadUrl =
     "https://github.com/AppImage/appimagetool/releases/download/$appImageToolVersion/appimagetool-x86_64.AppImage"
 val appImageToolSha256 = "ed4ce84f0d9caff66f50bcca6ff6f35aae54ce8135408b3fa33abfc3cb384eb0"
-val appImageRuntimeVersion = "20251108"
+val appImageRuntimeSourceCommit = "dd6cebedcbddde9c82f89b011e8e1d40b6e43868"
 val appImageRuntime =
-    layout.buildDirectory.file("appimage/tools/runtime-$appImageRuntimeVersion-x86_64")
-val appImageRuntimeDownloadUrl =
-    "https://github.com/AppImage/type2-runtime/releases/download/$appImageRuntimeVersion/runtime-x86_64"
-val appImageRuntimeSha256 = "2fca8b443c92510f1483a883f60061ad09b46b978b2631c807cd873a47ec260d"
+    layout.buildDirectory.file("appimage/tools/runtime-${appImageRuntimeSourceCommit.take(8)}-x86_64")
 val developmentLinuxDesktopEntry =
     layout.buildDirectory.file("compose/desktop-integration/visualagent-development.desktop")
 
@@ -754,20 +751,26 @@ val downloadAppImageTool =
         }
     }
 
-val downloadAppImageRuntime =
-    tasks.register("downloadAppImageRuntime") {
+val buildAppImageRuntime =
+    tasks.register<Exec>("buildAppImageRuntime") {
         group = "distribution"
-        description = "Downloads the verified AppImage Type 2 runtime embedded in the portable Linux package."
+        description = "Builds the AppImage Type 2 runtime embedded in the portable Linux package from retained sources."
+        dependsOn(prepareAppImageRuntimeSourceMaterials)
+        val sourceArchive = appImageRuntimeSourceDirectory.get().file("type2-runtime-dd6cebed.tar.gz")
+        val buildScript = rootProject.layout.projectDirectory.file("scripts/verify-appimage-runtime-build.sh")
+        inputs.file(sourceArchive)
+        inputs.file(buildScript)
         outputs.file(appImageRuntime)
         onlyIf {
             System.getProperty("os.name", "").contains("linux", ignoreCase = true) &&
                 System.getProperty("os.arch", "").equals("amd64", ignoreCase = true)
         }
-        doLast {
-            downloadVerifiedFile(
-                appImageRuntimeDownloadUrl,
+        doFirst {
+            commandLine(
+                "bash",
+                buildScript.asFile,
+                sourceArchive.asFile,
                 appImageRuntime.get().asFile,
-                appImageRuntimeSha256,
             )
         }
     }
@@ -815,7 +818,7 @@ val packageAppImage =
     tasks.register<Exec>("packageAppImage") {
         group = "distribution"
         description = "Packages Visual Agent as a portable Linux AppImage."
-        dependsOn(downloadAppImageTool, downloadAppImageRuntime, prepareAppImage)
+        dependsOn(downloadAppImageTool, buildAppImageRuntime, prepareAppImage)
         inputs.dir(appImageDirectory)
         inputs.file(appImageTool)
         inputs.file(appImageRuntime)
@@ -834,6 +837,16 @@ val packageAppImage =
                 appImageDirectory.get().asFile,
                 appImageOutput.get().asFile,
             )
+        }
+        doLast {
+            val runtimeBytes = appImageRuntime.get().asFile.readBytes()
+            val packagedRuntimePrefix =
+                Files.newInputStream(appImageOutput.get().asFile.toPath()).use { input ->
+                    input.readNBytes(runtimeBytes.size)
+                }
+            check(packagedRuntimePrefix.contentEquals(runtimeBytes)) {
+                "The AppImage does not contain the runtime built from the retained source archive."
+            }
         }
     }
 
