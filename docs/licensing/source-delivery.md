@@ -88,6 +88,19 @@ text is notice evidence only. Skiko's Maven archive contains Kotlin bindings,
 not the native Skia/ANGLE source trees or their build inputs. Neither archive
 resolves the corresponding native-component review.
 
+The audited candidate included the Netty macOS DNS resolver. The current build
+switches the GitHub update client to Spring's JDK HTTP connector and excludes
+that optional native resolver from the desktop distribution. The source archive
+and Apple Public Source License 2.0 text are retained as historical review
+evidence, not as a conclusion that the former binary was APSL-covered or that
+its delivery obligations were satisfied. The final platform artifacts must
+still be checked to confirm the resolver is absent. The exact Maven Central
+source archive used for the historical review has SHA-256
+`98a33e5adbbe58cb084ed4ca61350fa0a6311f4f8e54bc8cd823a402d0609c42`. Its
+version/hash provenance remains in `sources.json`; it is not included in the new
+release source bundle because the corresponding native artifact is no longer a
+runtime dependency.
+
 ### GraalVM UPL 1.0 Runtime Artifacts
 
 The current four-platform package inventory contains 12 distinct GraalVM
@@ -337,11 +350,21 @@ working build. The [upstream build guide](https://github.com/AppImage/type2-runt
 documents its Docker and chroot approaches. The full LGPL text is retained; this
 is not legal clearance.
 
-The release workflow now attempts a build of this retained source recipe in its
-Linux legal-materials job and checks that the resulting x86_64 runtime is static
-and executable. Candidate workflow
+The Linux package task builds the embedded AppImage runtime from this retained
+source recipe and checks that the resulting x86_64 runtime is static and
+executable before packaging it. The resulting binary is written to the Gradle
+build directory and passed directly to `appimagetool`; the workflow no longer
+builds and discards a separate runtime. This binds the packaged runtime to the
+retained source commit. The packaging workflow also records the final AppImage
+hash, verifies the runtime prefix against the source-built binary, records the
+runtime/source archive hashes and commit, and retains the original license
+texts for the runtime plus the mapped libfuse, squashfuse, musl, mimalloc, zstd,
+and zlib inputs in the package-bound notice evidence. The evidence is marked
+unreviewed and does not independently prove each static dependency's presence.
+The recipe still uses unpinned Alpine package revisions and does not by itself
+establish complete corresponding-source or LGPL relinking compliance. Candidate workflow
 [42651138364](https://github.com/heckenmann/visual-agent/actions/runs/42651138364)
-successfully completed this check for source commit
+successfully completed the standalone build check for source commit
 `4163037e6b17d4d973f425726ab31208e017b881`. This verifies that the current
 upstream recipe builds in CI; it does not prove
 the historical distributed runtime's exact linked inputs or independently
@@ -477,18 +500,30 @@ reported `Azul Systems, Inc.`, `Zulu27.30+109-CA`, and
 byte. For macOS x64, Linux x64, and Windows x64, I separately downloaded each
 archive, verified its archive digest against Azul's API, extracted only the
 root readme, and confirmed the offer text and platform-specific code. This
-confirms the packaging input and a recipient-visible offer-information route;
-it is not a legal determination that the wording satisfies GPLv2 section 3(b)
-or that section 3(c) can be relied on for this distribution.
+confirms the packaging input and a recipient-visible offer-information
+route. The latest non-publishing package candidate
+[`43114821781`](https://github.com/heckenmann/visual-agent/actions/runs/43114821781)
+was inspected directly: its legal archive contains the original 838-byte,
+platform-specific Azul `vendor/readme.txt` in all six package evidence trees.
+Each file's SHA-256 matches the exact platform hash above. The text identifies
+OpenJDK portions under GPLv2 with the Classpath Exception and says Azul will
+provide their complete machine-readable source for three years from receipt,
+for no more than the physical distribution cost, on request. It includes the
+vendor contact and each archive's request/version code.
 
-The project owner confirmed that this distribution is noncommercial. GPLv2
-section 3(c) is therefore a potential pass-through route if the included offer
-information qualifies under section 3(b) and its scope covers the exact runtime
-components. A competent review must establish those points and ensure the
-included readme remains with every final native package. No request was sent to
-Azul. If the pass-through route is not accepted, obtain the complete exact-build
-source and relevant build material from Azul; another vendor's OpenJDK source or
-a Java-only `src.zip` does not prove equivalence.
+The project owner confirmed that this distribution is noncommercial. The exact
+candidate evidence supports the predicates stated in GPLv2 section 3(c) for
+the OpenJDK portions covered by this received vendor offer: the product is
+noncommercial, the exact object-code archives were received with the offer
+information, and recipients receive that same original information unchanged.
+A new project-authored source offer is therefore not required for those
+covered portions when relying on section 3(c). This is a scoped reading of the
+published license and exact package evidence, not clearance of every JDK
+component. It does not settle separately licensed native components, whether
+they are within the offer, or the effect of platform-specific jlink/signing
+transformations; those remain in the runtime component review. No request was
+sent to Azul. The supplementary Java-only source package remains non-authoritative
+as complete source and is not used to broaden the vendor offer.
 
 An Azul CA source package is also publicly available from the official APT
 repository: `zulu27-ca-src` version `27.0.1.0.3-5`, described by Azul as Zulu

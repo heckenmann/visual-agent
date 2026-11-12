@@ -700,7 +700,13 @@ tasks.register("generateDistributionArtifactInventory") {
         }
         report.get().asFile.apply {
             parentFile.mkdirs()
-            writeText((listOf("packagePath,coordinate,resolvedFile,sourceSha256,packageSha256") + rows).joinToString("\n", postfix = "\n"))
+            writeText(
+                (
+                    listOf(
+                        "packagePath,coordinate,resolvedFile,resolvedArtifactSha256,packageSha256",
+                    ) + rows
+                ).joinToString("\n", postfix = "\n"),
+            )
         }
     }
 }

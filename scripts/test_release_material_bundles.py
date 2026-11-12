@@ -26,8 +26,12 @@ class ReleaseMaterialBundleTest(unittest.TestCase):
         self.notice_evidence = self.root / "package-notices"
         self.output = self.root / "output"
         self.test_platform = "linux-appimage"
+        runtime_source_archive = b"pinned runtime source"
+        runtime_source_hash = hashlib.sha256(runtime_source_archive).hexdigest()
+        self.runtime_source_hash = runtime_source_hash
         (self.project / "docs/licensing/third-party/vendor").mkdir(parents=True)
         (self.materials / "archives/vendor").mkdir(parents=True)
+        (self.materials / "archives/appimage-runtime").mkdir(parents=True)
         (self.materials / "legal/vendor").mkdir(parents=True)
         (self.project / "LICENSE").write_text("Project license")
         (self.project / "docs/licensing/README.md").write_text("Review status")
@@ -38,7 +42,27 @@ class ReleaseMaterialBundleTest(unittest.TestCase):
             json.dumps(
                 {
                     "redistributionApproved": False,
-                    "components": [{"reviewStatus": "unreviewed", "materialPaths": ["vendor/LICENSE"]}],
+                    "components": [
+                        {
+                            "reviewStatus": "unreviewed",
+                            "materialPaths": ["vendor/LICENSE"],
+                            "sourceArtifacts": {
+                                "example:runtime:1": runtime_source_hash,
+                                "example:static:1": "c" * 64,
+                            },
+                            "upstreamCommit": "a" * 40,
+                        },
+                    ],
+                    "runtimePackages": [{
+                        "package": "linux-appimage",
+                        "runtimeSourceArtifact": "example:runtime:1",
+                            "sourceArchivePath": "archives/appimage-runtime/runtime.tar.gz",
+                            "sourceArchives": [{
+                                "path": "archives/appimage-runtime/runtime.tar.gz",
+                                "sha256": runtime_source_hash,
+                            }],
+                        "linkedComponents": ["example:static:1"],
+                    }],
                     "embeddedAssets": [],
                     "materials": [
                         {
@@ -50,6 +74,7 @@ class ReleaseMaterialBundleTest(unittest.TestCase):
             ),
         )
         (self.materials / "archives/vendor/source.tar.gz").write_bytes(b"source archive bytes")
+        (self.materials / "archives/appimage-runtime/runtime.tar.gz").write_bytes(runtime_source_archive)
         (self.materials / "legal/vendor/LICENSE").write_text("Vendor license copy")
         (self.materials / "source-delivery.md").write_text("Not complete or approved")
         for platform in sorted(bundler.EXPECTED_NOTICE_PLATFORMS):
@@ -116,6 +141,42 @@ class ReleaseMaterialBundleTest(unittest.TestCase):
                 ],
             },
         }
+        if platform == "linux-appimage":
+            appimage_notice = b"AppImage runtime component license"
+            appimage_notice_path = self.notice_evidence / platform / "appimage-runtime-legal/example-static-1/LICENSE"
+            appimage_notice_path.parent.mkdir(parents=True)
+            appimage_notice_path.write_bytes(appimage_notice)
+            notice_manifest["appImageRuntime"] = {
+                "reviewStatus": "unreviewed",
+                "packageSha256": "d" * 64,
+                "runtimeSha256": "e" * 64,
+                "sourceArchiveSha256": self.runtime_source_hash,
+                "sourceCommit": "a" * 40,
+                "sourceArchives": [{
+                    "path": "archives/appimage-runtime/runtime.tar.gz",
+                    "sha256": self.runtime_source_hash,
+                }],
+                "embeddedPrefixVerified": True,
+                "components": [
+                    {
+                        "coordinate": "example:runtime:1",
+                        "sourceArtifactSha256": self.runtime_source_hash,
+                        "upstreamCommit": "a" * 40,
+                        "reviewStatus": "unreviewed",
+                        "materials": [],
+                    },
+                    {
+                        "coordinate": "example:static:1",
+                        "sourceArtifactSha256": "c" * 64,
+                        "upstreamCommit": "a" * 40,
+                        "reviewStatus": "unreviewed",
+                        "materials": [{
+                            "path": "appimage-runtime-legal/example-static-1/LICENSE",
+                            "sha256": hashlib.sha256(appimage_notice).hexdigest(),
+                        }],
+                    },
+                ],
+            }
         (self.notice_evidence / platform / "manifest.json").write_text(json.dumps(notice_manifest))
 
     def build(self, recipient_candidate=False):
@@ -149,6 +210,14 @@ class ReleaseMaterialBundleTest(unittest.TestCase):
                         f"package-notice-evidence/{platform}/manifest.json",
                         f"package-notice-evidence/{platform}/artifacts/package-hash/LICENSE",
                         f"package-notice-evidence/{platform}/runtime-legal/vendor/readme.txt",
+                        *(
+                            [
+                                "package-notice-evidence/linux-appimage/"
+                                "appimage-runtime-legal/example-static-1/LICENSE",
+                            ]
+                            if platform == "linux-appimage"
+                            else []
+                        ),
                     )
                 },
             )
@@ -162,6 +231,13 @@ class ReleaseMaterialBundleTest(unittest.TestCase):
                     b"Runtime legal file",
                     archive.read(f"package-notice-evidence/{platform}/runtime-legal/vendor/readme.txt"),
                 )
+            self.assertEqual(
+                b"AppImage runtime component license",
+                archive.read(
+                    "package-notice-evidence/linux-appimage/"
+                    "appimage-runtime-legal/example-static-1/LICENSE",
+                ),
+            )
             self.assertIn(
                 f"{hashlib.sha256(b'Project license').hexdigest()}  LICENSE".encode(),
                 archive.read("MANIFEST.sha256"),
@@ -171,6 +247,7 @@ class ReleaseMaterialBundleTest(unittest.TestCase):
             self.assertEqual(
                 {
                     "source-materials/archives/vendor/source.tar.gz",
+                    "source-materials/archives/appimage-runtime/runtime.tar.gz",
                     "source-materials/legal/vendor/LICENSE",
                     "source-materials/source-delivery.md",
                     "MANIFEST.sha256",
@@ -219,6 +296,7 @@ class ReleaseMaterialBundleTest(unittest.TestCase):
 
     def test_missing_source_archive_fails_closed(self):
         (self.materials / "archives/vendor/source.tar.gz").unlink()
+        (self.materials / "archives/appimage-runtime/runtime.tar.gz").unlink()
         with self.assertRaisesRegex(ValueError, "archive directory is empty"):
             self.build()
 
@@ -228,6 +306,14 @@ class ReleaseMaterialBundleTest(unittest.TestCase):
         del data["runtimeLegal"]
         manifest.write_text(json.dumps(data))
         with self.assertRaisesRegex(ValueError, "Runtime legal evidence is missing"):
+            self.build()
+
+    def test_appimage_evidence_without_embedded_runtime_mapping_fails_closed(self):
+        manifest = self.notice_evidence / "linux-appimage/manifest.json"
+        data = json.loads(manifest.read_text())
+        del data["appImageRuntime"]
+        manifest.write_text(json.dumps(data))
+        with self.assertRaisesRegex(ValueError, "AppImage runtime evidence is missing"):
             self.build()
 
     def test_missing_platform_notice_evidence_fails_closed(self):

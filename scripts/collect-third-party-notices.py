@@ -8,9 +8,10 @@ import json
 import pathlib
 import re
 import stat
+import subprocess
 import zipfile
 
-from third_party_supplements import load_supplements
+from third_party_supplements import load_runtime_packages, load_supplements
 
 
 MAX_NOTICE_BYTES = 8 * 1024 * 1024
@@ -81,6 +82,91 @@ def retain_runtime_legal(root, output, total):
     return {"packagePath": relative_root, "reviewStatus": "unreviewed", "files": retained}
 
 
+def retain_appimage_runtime(package, runtime, source_archive, output, total, declaration):
+    """Bind the AppImage's embedded runtime and retained source set to package evidence."""
+    files = (package, runtime, source_archive)
+    if any(path.is_symlink() or not path.is_file() for path in files):
+        raise ValueError("AppImage package, runtime, and source archive must be regular files")
+    package_hash = sha256(package)
+    runtime_hash = sha256(runtime)
+    source_hash = sha256(source_archive)
+    runtime_source = declaration["runtimeSource"]
+    if source_hash != runtime_source["sourceArtifactSha256"]:
+        raise ValueError("AppImage runtime source archive does not match the pinned evidence")
+    runtime_size = runtime.stat().st_size
+    if package.stat().st_size < runtime_size:
+        raise ValueError("AppImage package is shorter than its embedded runtime")
+    with package.open("rb") as package_stream, runtime.open("rb") as runtime_stream:
+        if package_stream.read(runtime_size) != runtime_stream.read():
+            raise ValueError("AppImage package prefix differs from the verified runtime")
+
+    try:
+        version_result = subprocess.run(
+            [str(runtime.resolve()), "--appimage-version"],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=15,
+        )
+    except (OSError, subprocess.SubprocessError) as error:
+        raise ValueError("Unable to query the built AppImage runtime version") from error
+    version_output = (version_result.stdout + version_result.stderr).strip()
+    expected_version = f"https://github.com/AppImage/type2-runtime/commit/{runtime_source['upstreamCommit'][:7]}"
+    if expected_version not in version_output:
+        raise ValueError("Built AppImage runtime does not identify its pinned source commit")
+
+    total[0] += runtime_size
+    if total[0] > MAX_TOTAL_BYTES:
+        raise ValueError("AppImage runtime evidence size limit exceeded")
+    components = []
+    all_evidence = [("AppImage:type2-runtime:20251108", runtime_source)]
+    all_evidence.extend(declaration["linkedComponentEvidence"].items())
+    for coordinate, evidence in all_evidence:
+        component_materials = []
+        for material in evidence["materials"]:
+            content = material["content"]
+            total[0] += len(content)
+            if total[0] > MAX_TOTAL_BYTES:
+                raise ValueError("AppImage legal evidence size limit exceeded")
+            filename = pathlib.PurePosixPath(material["path"]).name
+            slug = re.sub(r"[^a-z0-9.-]+", "-", coordinate.lower())
+            target = output / "appimage-runtime-legal" / slug / filename
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(content)
+            component_materials.append({
+                "path": target.relative_to(output).as_posix(),
+                "sha256": material["sha256"],
+                "sourcePath": material["path"],
+            })
+        components.append({
+            "coordinate": coordinate,
+            "sourceArtifactSha256": evidence["sourceArtifactSha256"],
+            "upstreamCommit": evidence["upstreamCommit"],
+            "proposedLicense": evidence["proposedLicense"],
+            "reviewStatus": "unreviewed",
+            "remaining": evidence["remaining"],
+            "materials": component_materials,
+        })
+    return {
+        "reviewStatus": "unreviewed",
+        "packagePath": package.name,
+        "packageSha256": package_hash,
+        "runtimeName": runtime.name,
+        "runtimeSha256": runtime_hash,
+        "runtimeSize": runtime_size,
+        "sourceArchiveSha256": source_hash,
+        "sourceArchivePath": declaration["sourceArchivePath"],
+        "sourceArchives": [
+            {"path": path, "sha256": digest}
+            for path, digest in sorted(declaration["sourceArchives"].items())
+        ],
+        "sourceCommit": runtime_source["upstreamCommit"],
+        "reportedVersion": version_output,
+        "embeddedPrefixVerified": True,
+        "components": components,
+    }
+
+
 def load_license_metadata(license_report):
     """Index Gradle's declared license metadata by exact module and version."""
     try:
@@ -147,10 +233,24 @@ def license_metadata_for(coordinate, indexed):
     }
 
 
-def collect(package_root, inventory, output, license_report, project_license, supplements=None):
+def collect(
+    package_root,
+    inventory,
+    output,
+    license_report,
+    project_license,
+    supplements=None,
+    appimage_package=None,
+    appimage_runtime=None,
+    appimage_source_archive=None,
+):
     """Collect byte-exact evidence; absence and presence both remain unreviewed."""
     root = package_root.resolve(strict=True)
     supplemental = load_supplements(supplements)
+    runtime_packages = load_runtime_packages(supplements, supplemental)
+    appimage_inputs = (appimage_package, appimage_runtime, appimage_source_archive)
+    if any(path is not None for path in appimage_inputs) and not all(path is not None for path in appimage_inputs):
+        raise ValueError("AppImage evidence requires the package, runtime, and source archive")
     license_metadata = load_license_metadata(license_report)
     if project_license.is_symlink() or not project_license.is_file():
         raise ValueError("Project license must be a regular file")
@@ -178,6 +278,9 @@ def collect(package_root, inventory, output, license_report, project_license, su
         coordinate = row["coordinate"]
         if not coordinate or coordinate in {"UNMATCHED", "AMBIGUOUS"}:
             raise ValueError("Packaged artifact has no unique resolved component identity: " + relative)
+        resolved_artifact_hash = row.get("resolvedArtifactSha256", "")
+        if not re.fullmatch(r"[0-9a-f]{64}", resolved_artifact_hash):
+            raise ValueError("Packaged artifact has no valid resolved artifact hash: " + relative)
         if coordinate.startswith("project '"):
             project_artifacts.append({
                 "coordinate": coordinate,
@@ -227,6 +330,7 @@ def collect(package_root, inventory, output, license_report, project_license, su
             "coordinate": coordinate,
             "packagePath": relative,
             "packageSha256": actual_hash,
+            "resolvedArtifactSha256": resolved_artifact_hash,
             "reviewStatus": "unreviewed",
             "licenseMetadata": license_metadata_for(coordinate, license_metadata),
             "noticeStatus": "retained" if notices else "no-detected-notice",
@@ -234,8 +338,6 @@ def collect(package_root, inventory, output, license_report, project_license, su
         }
         extra = supplemental.get(coordinate)
         if extra:
-            if extra["expectedSourceSha256"] != row.get("sourceSha256"):
-                raise ValueError("Supplement does not match exact source artifact")
             retained = []
             for material in extra["materials"]:
                 content = material["content"]
@@ -251,7 +353,7 @@ def collect(package_root, inventory, output, license_report, project_license, su
                     "sourceUrl": material["url"],
                 })
             component["supplement"] = {
-                "sourceSha256": row["sourceSha256"],
+                "sourceArtifactSha256": extra["sourceArtifactSha256"],
                 "proposedLicense": extra["proposedLicense"],
                 "upstreamCommit": extra["upstreamCommit"],
                 "remaining": extra["remaining"],
@@ -259,6 +361,19 @@ def collect(package_root, inventory, output, license_report, project_license, su
             }
         components.append(component)
     runtime_legal = retain_runtime_legal(root, output, total)
+    appimage_runtime_evidence = None
+    if appimage_package is not None:
+        declaration = runtime_packages.get("linux-appimage")
+        if declaration is None:
+            raise ValueError("No pinned AppImage runtime evidence mapping is configured")
+        appimage_runtime_evidence = retain_appimage_runtime(
+            appimage_package,
+            appimage_runtime,
+            appimage_source_archive,
+            output,
+            total,
+            declaration,
+        )
     report = {
         "schemaVersion": 1,
         "redistributionApproved": False,
@@ -269,6 +384,8 @@ def collect(package_root, inventory, output, license_report, project_license, su
         "projectArtifacts": sorted(project_artifacts, key=lambda artifact: artifact["packagePath"]),
         "runtimeLegal": runtime_legal,
     }
+    if appimage_runtime_evidence is not None:
+        report["appImageRuntime"] = appimage_runtime_evidence
     (output / "manifest.json").write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return report
 
@@ -281,6 +398,9 @@ def main():
     parser.add_argument("--project-license", type=pathlib.Path, required=True)
     parser.add_argument("--output", type=pathlib.Path, required=True)
     parser.add_argument("--supplements", type=pathlib.Path)
+    parser.add_argument("--appimage-package", type=pathlib.Path)
+    parser.add_argument("--appimage-runtime", type=pathlib.Path)
+    parser.add_argument("--appimage-source-archive", type=pathlib.Path)
     arguments = parser.parse_args()
     collect(
         arguments.package_root,
@@ -289,6 +409,9 @@ def main():
         arguments.license_report,
         arguments.project_license,
         arguments.supplements,
+        arguments.appimage_package,
+        arguments.appimage_runtime,
+        arguments.appimage_source_archive,
     )
 
 

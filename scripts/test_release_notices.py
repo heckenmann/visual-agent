@@ -46,9 +46,18 @@ class PackagedNoticesTest(unittest.TestCase):
             for name, content in entries:
                 jar.writestr(name, content)
         with self.inventory.open("w", newline="") as stream:
-            writer = csv.DictWriter(stream, fieldnames=["packagePath", "coordinate", "packageSha256"])
+            writer = csv.DictWriter(
+                stream,
+                fieldnames=["packagePath", "coordinate", "packageSha256", "resolvedArtifactSha256"],
+            )
             writer.writeheader()
-            writer.writerow({"packagePath": "library.jar", "coordinate": coordinate, "packageSha256": NOTICES.sha256(self.archive)})
+            artifact_hash = NOTICES.sha256(self.archive)
+            writer.writerow({
+                "packagePath": "library.jar",
+                "coordinate": coordinate,
+                "packageSha256": artifact_hash,
+                "resolvedArtifactSha256": artifact_hash,
+            })
 
     def collect(self):
         return NOTICES.collect(self.package, self.inventory, self.output, self.license_report, self.project_license)
@@ -87,6 +96,104 @@ class PackagedNoticesTest(unittest.TestCase):
         self.assertEqual(
             hashlib.sha256(b"Zulu runtime license").hexdigest(),
             next(file["sha256"] for file in runtime["files"] if file["packagePath"].endswith("java.base/LICENSE")),
+        )
+
+    def test_appimage_runtime_evidence_binds_package_prefix_and_source_materials(self):
+        runtime = self.root / "runtime-x86_64"
+        source_archive = self.root / "runtime-source.tar.gz"
+        appimage = self.root / "visual-agent.AppImage"
+        output = self.root / "appimage-evidence"
+        source_archive.write_bytes(b"pinned source archive")
+        license_content = b"Original runtime license\n"
+        license_hash = hashlib.sha256(license_content).hexdigest()
+        runtime.write_text(
+            "#!/bin/sh\nprintf '%s\\n' 'https://github.com/AppImage/type2-runtime/commit/abcdef0'\n",
+        )
+        runtime.chmod(runtime.stat().st_mode | 0o111)
+        runtime_bytes = runtime.read_bytes()
+        appimage.write_bytes(runtime_bytes + b"appimage payload")
+        declaration = {
+            "sourceArchivePath": "archives/appimage-runtime/runtime-source.tar.gz",
+            "sourceArchives": {
+                "archives/appimage-runtime/runtime-source.tar.gz": NOTICES.sha256(source_archive),
+            },
+            "runtimeSource": {
+                "sourceArtifactSha256": NOTICES.sha256(source_archive),
+                "upstreamCommit": "abcdef0123456789abcdef0123456789abcdef01",
+                "proposedLicense": "MIT",
+                "remaining": ["Pending independent review"],
+                "materials": [{
+                    "path": "runtime/LICENSE",
+                    "sha256": license_hash,
+                    "content": license_content,
+                }],
+            },
+            "linkedComponentEvidence": {
+                "example:static-library:1": {
+                    "sourceArtifactSha256": "a" * 64,
+                    "upstreamCommit": "b" * 40,
+                    "proposedLicense": "BSD-2-Clause",
+                    "remaining": ["Verify exact linked source"],
+                    "materials": [{
+                        "path": "library/LICENSE",
+                        "sha256": license_hash,
+                        "content": license_content,
+                    }],
+                },
+            },
+        }
+        output.mkdir()
+        report = NOTICES.retain_appimage_runtime(
+            appimage,
+            runtime,
+            source_archive,
+            output,
+            [0],
+            declaration,
+        )
+        self.assertTrue(report["embeddedPrefixVerified"])
+        self.assertEqual(NOTICES.sha256(appimage), report["packageSha256"])
+        self.assertEqual(NOTICES.sha256(runtime), report["runtimeSha256"])
+        self.assertEqual("unreviewed", report["reviewStatus"])
+        self.assertEqual(2, len(report["components"]))
+        material = report["components"][1]["materials"][0]
+        self.assertEqual(license_content, (output / material["path"]).read_bytes())
+        self.assertEqual(license_hash, material["sha256"])
+
+    def test_appimage_runtime_prefix_mismatch_fails_closed(self):
+        runtime = self.root / "runtime-x86_64"
+        source_archive = self.root / "runtime-source.tar.gz"
+        appimage = self.root / "visual-agent.AppImage"
+        runtime.write_bytes(b"runtime")
+        runtime.chmod(runtime.stat().st_mode | 0o111)
+        source_archive.write_bytes(b"pinned source archive")
+        appimage.write_bytes(b"wrong!!payload")
+        declaration = {
+            "runtimeSource": {
+                "sourceArtifactSha256": NOTICES.sha256(source_archive),
+                "upstreamCommit": "abcdef0123456789abcdef0123456789abcdef01",
+            },
+            "linkedComponentEvidence": {},
+        }
+        with self.assertRaisesRegex(ValueError, "prefix differs"):
+            NOTICES.retain_appimage_runtime(appimage, runtime, source_archive, self.root, [0], declaration)
+
+    def test_registry_declares_all_pinned_appimage_runtime_components(self):
+        registry = pathlib.Path(__file__).parents[1] / "docs/licensing/third-party/sources.json"
+        supplements = NOTICES.load_supplements(registry)
+        declarations = NOTICES.load_runtime_packages(registry, supplements)
+        appimage = declarations["linux-appimage"]
+        self.assertEqual(
+            {
+                "AppImage:type2-runtime:20251108",
+                "AppImage:libfuse:3.15.0",
+                "AppImage:squashfuse:0.5.2",
+                "AppImage:musl:1.2.5",
+                "mimalloc2:2.1.7-r0",
+                "zstd:1.5.6",
+                "zlib:1.3.1",
+            },
+            {"AppImage:type2-runtime:20251108", *appimage["linkedComponentEvidence"]},
         )
 
     def test_runtime_legal_directory_is_found_in_each_native_package_layout(self):
@@ -304,6 +411,9 @@ class PackagedNoticesTest(unittest.TestCase):
         self.assertIn("generateLicenseReport :desktop:generateDistributionArtifactInventory", package_workflow)
         self.assertIn("--license-report build/reports/dependency-license/licenses-all.json", package_workflow)
         self.assertIn("--project-license LICENSE", package_workflow)
+        self.assertIn("--appimage-package", package_workflow)
+        self.assertIn("--appimage-runtime modules/desktop/build/appimage/tools/runtime-dd6cebed-x86_64", package_workflow)
+        self.assertIn("--appimage-source-archive", package_workflow)
         self.assertIn("if: matrix.collect_notice_evidence", package_workflow)
         for platform in ("linux-deb", "linux-rpm", "linux-appimage", "macos-arm64", "macos-x64", "windows"):
             self.assertRegex(

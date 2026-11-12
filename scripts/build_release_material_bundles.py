@@ -85,7 +85,7 @@ def _zip_info(name):
     return info
 
 
-def _notice_evidence_files(notice_evidence, project_license_sha256):
+def _notice_evidence_files(notice_evidence, project_license_sha256, runtime_packages):
     evidence_files = _files_under(notice_evidence)
     evidence_directories = {name.split("/", 1)[0] for name, _ in evidence_files}
     platform_directories = {}
@@ -140,6 +140,54 @@ def _notice_evidence_files(notice_evidence, project_license_sha256):
         actual_runtime_files = {name for name in by_name if name.startswith("runtime-legal/")}
         if referenced_runtime_files != actual_runtime_files:
             raise ValueError(f"Runtime legal evidence is incomplete or has unmanifested files for {platform}")
+        appimage_evidence = manifest.get("appImageRuntime")
+        expected_runtime = runtime_packages.get("linux-appimage")
+        if platform == "linux-appimage":
+            if not isinstance(appimage_evidence, dict) or expected_runtime is None:
+                raise ValueError("AppImage runtime evidence is missing")
+            if (
+                appimage_evidence.get("reviewStatus") != "unreviewed"
+                or appimage_evidence.get("embeddedPrefixVerified") is not True
+                or not re.fullmatch(r"[0-9a-f]{64}", appimage_evidence.get("packageSha256", ""))
+                or not re.fullmatch(r"[0-9a-f]{64}", appimage_evidence.get("runtimeSha256", ""))
+                or not re.fullmatch(r"[0-9a-f]{64}", appimage_evidence.get("sourceArchiveSha256", ""))
+                or appimage_evidence.get("sourceArchiveSha256")
+                != expected_runtime["runtimeSourceArtifactSha256"]
+                or appimage_evidence.get("sourceArchives") != expected_runtime["sourceArchives"]
+                or appimage_evidence.get("sourceCommit") != expected_runtime["runtimeSourceCommit"]
+            ):
+                raise ValueError("AppImage runtime evidence does not match its pinned package mapping")
+            runtime_components = appimage_evidence.get("components")
+            expected_coordinates = {
+                expected_runtime["runtimeSourceArtifact"],
+                *expected_runtime["linkedComponents"],
+            }
+            if (
+                not isinstance(runtime_components, list)
+                or {component.get("coordinate") for component in runtime_components} != expected_coordinates
+            ):
+                raise ValueError("AppImage runtime component evidence is incomplete")
+            referenced_appimage_materials = set()
+            for component in runtime_components:
+                coordinate = component.get("coordinate")
+                expected_hash = expected_runtime["componentHashes"].get(coordinate)
+                if (
+                    component.get("reviewStatus") != "unreviewed"
+                    or component.get("sourceArtifactSha256") != expected_hash
+                    or component.get("upstreamCommit") != expected_runtime["componentCommits"].get(coordinate)
+                ):
+                    raise ValueError("AppImage runtime component evidence is not marked unreviewed")
+                for material in component.get("materials", []):
+                    name = material.get("path")
+                    source = by_name.get(name)
+                    if source is None or _sha256(source) != material.get("sha256"):
+                        raise ValueError(f"AppImage runtime license material hash mismatch: {name}")
+                    referenced_appimage_materials.add(name)
+            actual_appimage_materials = {name for name in by_name if name.startswith("appimage-runtime-legal/")}
+            if referenced_appimage_materials != actual_appimage_materials:
+                raise ValueError("AppImage runtime legal materials are incomplete or unmanifested")
+        elif appimage_evidence is not None:
+            raise ValueError(f"Unexpected AppImage runtime evidence for {platform}")
         packaged_files.extend(
             (f"package-notice-evidence/{platform}/{name}", source)
             for name, source in platform_files
@@ -187,6 +235,67 @@ def _verify_curated_materials(legal_root, legal_files):
     missing_references = referenced_materials.difference(declared_materials)
     if missing_references:
         raise ValueError(f"Curated materials are not declared in the registry: {', '.join(sorted(missing_references))}")
+    declared_components = {}
+    for component in registry.get("components", []):
+        for coordinate, digest in component.get("sourceArtifacts", {}).items():
+            if coordinate in declared_components or not re.fullmatch(r"[0-9a-f]{64}", digest):
+                raise ValueError("Duplicate or invalid curated source artifact identity")
+            commit = component.get("upstreamCommit")
+            if not re.fullmatch(r"[0-9a-f]{40}", commit or ""):
+                raise ValueError("Curated source artifact has no exact upstream commit")
+            declared_components[coordinate] = {"sha256": digest, "upstreamCommit": commit}
+    runtime_packages = {}
+    for package in registry.get("runtimePackages", []):
+        name = package.get("package")
+        source_coordinate = package.get("runtimeSourceArtifact")
+        linked_components = package.get("linkedComponents")
+        if name in runtime_packages or source_coordinate not in declared_components:
+            raise ValueError("Invalid or duplicate runtime package evidence mapping")
+        if not isinstance(linked_components, list) or not linked_components:
+            raise ValueError("Runtime package has no mapped linked components")
+        if any(coordinate not in declared_components for coordinate in linked_components):
+            raise ValueError("Runtime package refers to a component without curated legal materials")
+        source_archive_records = package.get("sourceArchives")
+        if not isinstance(source_archive_records, list) or not source_archive_records:
+            raise ValueError("Runtime package has no source archive inventory")
+        source_archives = {}
+        for record in source_archive_records:
+            relative = record.get("path")
+            digest = record.get("sha256")
+            parts = pathlib.PurePosixPath(relative or "").parts
+            if (
+                not relative
+                or pathlib.PurePosixPath(relative).is_absolute()
+                or any(part in ("", ".", "..") for part in parts)
+                or "\\" in relative
+                or ":" in relative
+                or relative in source_archives
+                or not re.fullmatch(r"[0-9a-f]{64}", digest or "")
+            ):
+                raise ValueError("Invalid or duplicate runtime source archive mapping")
+            source_archives[relative] = digest
+        if source_archives.get(package.get("sourceArchivePath")) != declared_components[source_coordinate]["sha256"]:
+            raise ValueError("Runtime source archive hash differs from its curated component identity")
+        runtime_packages[name] = {
+            "runtimeSourceArtifact": source_coordinate,
+            "runtimeSourceArtifactSha256": declared_components[source_coordinate]["sha256"],
+            "runtimeSourceCommit": declared_components[source_coordinate]["upstreamCommit"],
+            "linkedComponents": linked_components,
+            "sourceArchives": [
+                {"path": path, "sha256": digest}
+                for path, digest in sorted(source_archives.items())
+            ],
+            "sourceArchiveFiles": source_archives,
+            "componentHashes": {
+                coordinate: declared_components[coordinate]["sha256"]
+                for coordinate in [source_coordinate, *linked_components]
+            },
+            "componentCommits": {
+                coordinate: declared_components[coordinate]["upstreamCommit"]
+                for coordinate in [source_coordinate, *linked_components]
+            },
+        }
+    return runtime_packages
 
 
 def build_bundles(project_root, source_materials, notice_evidence, output_directory, recipient_candidate=False):
@@ -211,7 +320,6 @@ def build_bundles(project_root, source_materials, notice_evidence, output_direct
         raise ValueError("Required project legal documents are missing or linked")
 
     source_files = _files_under(source_materials)
-    package_notice_files = _notice_evidence_files(notice_evidence, _sha256(required_project_files[0]))
     if not any(name.startswith("archives/") for name, _ in source_files):
         raise ValueError("Source evidence archive directory is empty")
     if not any(name == "source-delivery.md" for name, _ in source_files):
@@ -219,7 +327,18 @@ def build_bundles(project_root, source_materials, notice_evidence, output_direct
 
     legal_root = project_root / "docs/licensing/third-party"
     legal_files = _files_under(legal_root)
-    _verify_curated_materials(legal_root, legal_files)
+    runtime_packages = _verify_curated_materials(legal_root, legal_files)
+    source_files_by_name = dict(source_files)
+    for package in runtime_packages.values():
+        for relative, digest in package["sourceArchiveFiles"].items():
+            source = source_files_by_name.get(relative)
+            if source is None or _sha256(source) != digest:
+                raise ValueError(f"Pinned runtime source archive is missing or changed: {relative}")
+    package_notice_files = _notice_evidence_files(
+        notice_evidence,
+        _sha256(required_project_files[0]),
+        runtime_packages,
+    )
     legal_bundle_files = [
         ("LICENSE", required_project_files[0]),
         ("licensing/README.md", required_project_files[1]),

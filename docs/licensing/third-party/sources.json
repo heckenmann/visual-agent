@@ -8,7 +8,8 @@
       "upstreamCommit": "f986838bbbf4941d2edcd5298b18c9936d1b7359",
       "materialPaths": ["h2-2.5.252/LICENSE.txt", "h2-2.5.252/license.html", "h2-2.5.252/H2-DISCLAIMER.txt", "h2-2.5.252/SOURCE-AVAILABILITY.txt"],
       "reviewStatus": "unreviewed",
-      "remaining": ["Confirm that the exact public Maven Central source URL and included version-specific notice are a sufficient recipient source route for the final release; otherwise include the verified source JAR in the published corresponding-source archive"]
+      "reviewNotes": "The exact H2 2.5.252 source JAR is included in the generated corresponding-sources candidate alongside the version-specific license, disclaimer, and source-availability material. The candidate archive is not yet a reviewed final asset.",
+      "remaining": ["Confirm that the exact H2 source JAR and license/disclaimer materials remain in the final hash-reviewed corresponding-sources archive and recipient package"]
     },
     {
       "sourceArtifacts": {
@@ -19,7 +20,8 @@
       "upstreamCommit": "a9ee8019ee183e076ff5477957dbf90c4b04dd92",
       "materialPaths": ["logback-1.6.6/LICENSE.txt", "logback-1.6.6/EPL-2.0.txt", "logback-1.6.6/SOURCE-AVAILABILITY.txt"],
       "reviewStatus": "unreviewed",
-      "remaining": ["Review whether the exact-version Maven Central links and included source notice satisfy recipient source availability for the final distribution", "Binary redistribution conditions review"]
+      "reviewNotes": "The exact logback-classic and logback-core 1.6.6 source JARs are included in the generated corresponding-sources candidate together with the EPL-2.0 text and version-specific source-availability notice. The candidate archive is not yet a reviewed final asset.",
+      "remaining": ["Review EPL-2.0 binary redistribution conditions and confirm both exact source JARs, license, and notices remain in the final hash-reviewed release materials"]
     },
     {
       "sourceArtifacts": {
@@ -329,9 +331,9 @@
       "upstreamCommit": "5adf3aad06658c44de48ba2fddf9819685230e5f",
       "materialPaths": ["animal-sniffer-1.27/LICENSE"],
       "reviewStatus": "unreviewed",
-      "reviewNotes": "The original project license and versioned parent POM are from the exact Animal Sniffer 1.27 release tag; that POM selects MIT. The generated Gradle report also lists Apache-2.0, which is not present in that tagged parent POM and must be reconciled.",
+      "reviewNotes": "The exact Maven Central annotation POM inherits animal-sniffer-parent 1.27, whose versioned upstream POM declares MIT only (https://repo.maven.apache.org/maven2/org/codehaus/mojo/animal-sniffer-annotations/1.27/animal-sniffer-annotations-1.27.pom; https://repo.maven.apache.org/maven2/org/codehaus/mojo/animal-sniffer-parent/1.27/animal-sniffer-parent-1.27.pom; upstream tag https://github.com/mojohaus/animal-sniffer/tree/animal-sniffer-1.27). The additional Apache-2.0 entry in the generated report is not supported by the published artifact POM; MIT is selected. The exact MIT text is retained. Final recipient-package attribution still needs the exact release review.",
       "remaining": [
-        "Reconcile the Gradle report's extra Apache-2.0 entry against the exact published annotation POM and verify final package attribution."
+        "Verify the exact MIT attribution is present in every final recipient package and covered by the reviewed release-asset hashes."
       ]
     },
     {
@@ -371,9 +373,9 @@
       "upstreamCommit": "e1f096ce6e9f6de64921ea8b437676f146798185",
       "materialPaths": ["asm-9.11.1/LICENSE.txt"],
       "reviewStatus": "unreviewed",
-      "reviewNotes": "The original license text is from the exact ASM 9.11.1 GitLab release tag; the exact cached asm-9.11.1 POM names BSD-3-Clause. The Gradle report records duplicate and additional alternatives, which must be reconciled with that artifact POM.",
+      "reviewNotes": "The exact Maven Central asm-9.11.1 POM declares only BSD-3-Clause and links the official ASM license; the official license page confirms the 3-Clause BSD conditions (https://repo.maven.apache.org/maven2/org/ow2/asm/asm/9.11.1/asm-9.11.1.pom; https://asm.ow2.io/license.html). The generated Gradle report's duplicate/additional license entries are not supported by this exact artifact POM. The original BSD-3-Clause text is retained from the exact ASM 9.11.1 upstream release. Final recipient-package attribution still needs the exact release review.",
       "remaining": [
-        "Reconcile the generated report's additional license entries with the exact published asm POM and verify source attribution in the final package."
+        "Verify the exact BSD-3-Clause attribution is present in every final recipient package and covered by the reviewed release-asset hashes."
       ]
     },
     {
@@ -455,6 +457,78 @@
       "reviewNotes": "The original MIT No Attribution license is from the exact Reactive Streams 1.0.4 release tag. The source artifact hash matches all four platform inventories.",
       "remaining": [
         "Verify the exact artifact's notice needs and inclusion in each final recipient package."
+      ]
+    },
+    {
+      "sourceArtifacts": {
+        "io.grpc:grpc-api:1.85.1": "b133a5b6ec44b7c7ca8d099668835fcd908889b44651fc3ccc872f2945418fef",
+        "io.grpc:grpc-context:1.85.1": "c9fc6f4998c523a379c41be72920e8b90d92d61712119e1eea76d480b961cdef",
+        "io.grpc:grpc-core:1.85.1": "b2ca55540b5b8195f682fa1379fd9685de66f1099400283c8b560ee35b2868ed",
+        "io.grpc:grpc-inprocess:1.85.1": "e18e6eb3732cc1714f5998289089bce2f20c6a812bc28dd23997656bb0297abc",
+        "io.grpc:grpc-netty-shaded:1.85.1": "c9fc6f4998c523a379c41be72920e8b90d92d61712119e1eea76d480b961cdef",
+        "io.grpc:grpc-protobuf:1.85.1": "c9555a34a48965653cc82c58981c42d014e22ebfbc182fc8b7bb9c65ba7c664c",
+        "io.grpc:grpc-protobuf-lite:1.85.1": "c5fde9f733333a73bed4db66584dcec55229aae19f2e117bc575b7b8f006ca4c",
+        "io.grpc:grpc-stub:1.85.1": "45a3106339b5368b489f71c2e83109c76e542eb0c02d1456911aec957fd22c1b",
+        "io.grpc:grpc-util:1.85.1": "c81bd167e989f0f4d93d0e260ad45e9bff2720a205d35a2d7df66c84864c08cf"
+      },
+      "proposedLicense": "Apache-2.0",
+      "upstreamCommit": "54c634aed4b5c78a29d0fa51d9282e9538722543",
+      "materialPaths": ["grpc-java-1.85.1/NOTICE.txt"],
+      "reviewStatus": "unreviewed",
+      "reviewNotes": "The exact grpc-java v1.85.1 root NOTICE is absent from the published source JARs and from the grpc-netty-shaded JAR's narrower NOTICE. The upstream file identifies modified OkHttp, Envoy, protoc-gen-validate, and UDPA portions. The exact release tag resolves to the pinned commit; the same NOTICE is included as a hash-checked supplement for every gRPC module in all six candidate platform inventories.",
+      "remaining": [
+        "Review the root NOTICE's attribution scope against the exact gRPC modules and verify inclusion in the final hash-reviewed recipient packages."
+      ]
+    },
+    {
+      "sourceArtifacts": {
+        "io.netty:netty-buffer:4.2.20.Final": "36c1869f58c24167180546acb933749bbe92391834eca219d3a155a719d21f26",
+        "io.netty:netty-codec-base:4.2.20.Final": "4524e76d427e3caa2d64d1793c50790b9d37d135881d157b8d96509cc0eb8330",
+        "io.netty:netty-codec-classes-quic:4.2.20.Final": "e7a91026734a915f95cc798c3d07f876f1f1c9a8e4856899fd3c08faa12091d5",
+        "io.netty:netty-codec-compression:4.2.20.Final": "179e9deb63e784017d3e8e0d294d03a738da46ad740bbf62ec38dc3d7e0636c7",
+        "io.netty:netty-codec-dns:4.2.20.Final": "b54caaeba00dcdf83a1cbe523671931e4f687e3b4f51cbc895205c4bfe1c7cdc",
+        "io.netty:netty-codec-http:4.2.20.Final": "940bb861827decaf8d194740b14611b788142171ea5b0c89fdc05b07dd2f9914",
+        "io.netty:netty-codec-http2:4.2.20.Final": "8f5a23fe5ea32b0b45aad73af1e19a563d8176588a8a0c938c78332726ca1594",
+        "io.netty:netty-codec-http3:4.2.20.Final": "c4db8f649069376e75681e33ddd06f14512940478e25f01321df1059d9f4d93e",
+        "io.netty:netty-codec-socks:4.2.20.Final": "a2867a1eff6b8079c6335f833d1c87c4dff788464d43b70b721cd1249fb2f639",
+        "io.netty:netty-common:4.2.20.Final": "e43ff1befac9e534dfd1ce99db6dc74d1317fde27b3e786371e471c69e4d9f88",
+        "io.netty:netty-handler:4.2.20.Final": "b86221a443145d7a3ef2fbf202aab4bb1857e9662c64cf85ba1c5ba835019fd0",
+        "io.netty:netty-handler-proxy:4.2.20.Final": "ac96a23a6446ec46439748b2484c5e334168bb906c6dab5ca7ef2c4cdf195529",
+        "io.netty:netty-resolver:4.2.20.Final": "d9e1a998ceabda6453668e34345f5f1c9633046a3394d7deff5441370b105142",
+        "io.netty:netty-resolver-dns:4.2.20.Final": "55daba64bac2ee9f98a942bcc703956ec17ce3b3a86366f432f1ba476381298e",
+        "io.netty:netty-resolver-dns-classes-macos:4.2.20.Final": "39eb8bc9607b85ecd052b0d1ca39c49d4df1995aebe3632530f9dcc4bb09c677",
+        "io.netty:netty-transport:4.2.20.Final": "43dc1a7f6b3fb6b84da079983e5d30ee4792d1bf0a6d96a6e633671495675ad3",
+        "io.netty:netty-transport-classes-epoll:4.2.20.Final": "30dc6f46131329ee396da4d243f47f3f3ed3f05fac11acfcce2d017a3a20daa4",
+        "io.netty:netty-transport-native-epoll:4.2.20.Final": "87f12312ff8c078ad7f98383ac116cb383cf77001933f0e6908da4ed05b8572a",
+        "io.netty:netty-transport-native-unix-common:4.2.20.Final": "3d9906bff4df25e298c237f91761015b480dac0406a77faf96f931a34dfe77c6"
+      },
+      "proposedLicense": "Apache-2.0",
+      "upstreamCommit": "4fb6a5f308382b4bee1bff3ef80b45ea8b35166d",
+      "materialPaths": ["netty-4.2.20.Final/NOTICE.txt"],
+      "reviewStatus": "unreviewed",
+      "reviewNotes": "The exact Netty 4.2.20.Final root NOTICE is retained unchanged and hash-bound to the 20 source artifacts present in the six candidate platform inventories. The macOS resolver artifact contains a native .jnilib; the packaged HTTP/3 module has no embedded Quiche or BoringSSL native binaries.",
+      "remaining": [
+        "Review which root NOTICE attributions apply to the exact packaged modules and native payloads, including whether the macOS DNS binary contains code derived from dnsinfo.h",
+        "Verify the NOTICE is included in the final hash-reviewed recipient packages and determine whether any separately applicable third-party license texts are needed"
+      ]
+    },
+    {
+      "sourceArtifacts": {
+        "io.netty:netty-resolver-dns-native-macos:4.2.20.Final": "98a33e5adbbe58cb084ed4ca61350fa0a6311f4f8e54bc8cd823a402d0609c42"
+      },
+      "proposedLicense": "Apache-2.0",
+      "upstreamCommit": "4fb6a5f308382b4bee1bff3ef80b45ea8b35166d",
+      "materialPaths": [
+        "netty-4.2.20.Final/NOTICE.txt",
+        "netty-4.2.20.Final/LICENSE.dnsinfo.txt",
+        "netty-4.2.20.Final/APSL-2.0.txt"
+      ],
+      "reviewStatus": "unreviewed",
+      "reviewNotes": "The published source JAR contains dnsinfo.h with an Apple APSL-2.0 notice and netty_resolver_dns_macos.c includes that header. Netty's public discussion does not resolve whether this affects the compiled native artifact. The full APSL text is provisionally retained from SPDX license-list-data at a pinned commit; no license-scope conclusion is asserted.",
+      "remaining": [
+        "Obtain an authoritative determination whether the native resolver binary is subject to APSL-2.0, Apache-2.0, or both; the public Netty discussion is inconclusive",
+        "If APSL applies, independently confirm that the corresponding source, license copy, and executable-source-availability notice are complete and delivered with the exact macOS package",
+        "Verify all materials in the final hash-reviewed macOS recipient packages"
       ]
     }
   ],
@@ -581,6 +655,67 @@
       "reviewStatus": "reviewed",
       "reviewNotes": "The packaged PDFBox JAR contains the expected font SHA-256 and the complete Red Hat copyright notice, Reserved Font Name, and OFL 1.1 text. OFL 1.1 permits bundling the font with software, requires its copyright/license information to accompany distributed font files, and prohibits selling the font by itself. No project modification or standalone font distribution is intended. The source archive is retained as provenance; this asset review does not approve the complete release package or its source-delivery bundle.",
       "remaining": []
+    }
+  ],
+  "runtimePackages": [
+    {
+      "package": "linux-appimage",
+      "runtimeSourceArtifact": "AppImage:type2-runtime:20251108",
+      "sourceArchivePath": "archives/appimage-runtime/type2-runtime-dd6cebed.tar.gz",
+      "sourceArchives": [
+        {
+          "path": "archives/appimage-runtime/type2-runtime-dd6cebed.tar.gz",
+          "sha256": "f5fec23be76e50e2445ed2d018bac49b367490fc483c62c4637e99ec705d27ba"
+        },
+        {
+          "path": "archives/appimage-runtime/fuse-3.15.0.tar.xz",
+          "sha256": "70589cfd5e1cff7ccd6ac91c86c01be340b227285c5e200baa284e401eea2ca0"
+        },
+        {
+          "path": "archives/appimage-runtime/squashfuse-0.5.2.tar.gz",
+          "sha256": "db0238c5981dabbd80ee09ae15387f390091668ca060a7bc38047912491443d3"
+        },
+        {
+          "path": "archives/appimage-runtime/musl-1.2.5.tar.gz",
+          "sha256": "a9a118bbe84d8764da0ea0d28b3ab3fae8477fc7e4085d90102b8596fc7c75e4"
+        },
+        {
+          "path": "archives/appimage-runtime/alpine-musl-package.tar.gz",
+          "sha256": "f7bc8cb0515d1145aaf5fa8bb9227dfc1c6cbd22c842134323ad8491024a43e5"
+        },
+        {
+          "path": "archives/appimage-runtime/mimalloc-2.1.7.tar.gz",
+          "sha256": "0eed39319f139afde8515010ff59baf24de9e47ea316a315398e8027d198202d"
+        },
+        {
+          "path": "archives/appimage-runtime/alpine-mimalloc-package.tar.gz",
+          "sha256": "6f4f50fca873868e754053c828d8336a531dbca365c678dc75db8111873d87e1"
+        },
+        {
+          "path": "archives/appimage-runtime/zstd-1.5.6.tar.gz",
+          "sha256": "30f35f71c1203369dc979ecde0400ffea93c27391bfd2ac5a9715d2173d92ff7"
+        },
+        {
+          "path": "archives/appimage-runtime/alpine-zstd-package.tar.gz",
+          "sha256": "cdc49cb68d5358eefcc83955bf285ce50fbcf6b223b271ef71e1008402c201f0"
+        },
+        {
+          "path": "archives/appimage-runtime/zlib-1.3.1.tar.gz",
+          "sha256": "9a93b2b7dfdac77ceba5a558a580e74667dd6fede4585b91eefb60f03b72df23"
+        },
+        {
+          "path": "archives/appimage-runtime/alpine-zlib-package.tar.gz",
+          "sha256": "acccb0c0907bf68dca717477ecda79b42bab87a1126c45b4dd0b59d721282284"
+        }
+      ],
+      "linkedComponents": [
+        "AppImage:libfuse:3.15.0",
+        "AppImage:squashfuse:0.5.2",
+        "AppImage:musl:1.2.5",
+        "mimalloc2:2.1.7-r0",
+        "zstd:1.5.6",
+        "zlib:1.3.1"
+      ]
     }
   ],
   "materials": [
@@ -841,7 +976,7 @@
     },
     {
       "path": "libfuse-3.15.0/SOURCE-AND-RELINK.txt",
-      "sha256": "e3e69474d27bf73d1331d96518381bf733884740a0779af913f4e93067d65d8d",
+      "sha256": "88b7c3e345ebe451c3e22bd9dc4f753bb86218c9090b58686aec4a5db44b499d",
       "url": "https://github.com/AppImage/type2-runtime/blob/dd6cebedcbddde9c82f89b011e8e1d40b6e43868/BUILD.md"
     },
     {
@@ -918,6 +1053,26 @@
       "path": "reactive-streams-1.0.4/LICENSE",
       "sha256": "96a3b2d45af72054d0676e8eb9a944a096812a7f8ff1b71bd82dadbc60ce0444",
       "url": "https://raw.githubusercontent.com/reactive-streams/reactive-streams-jvm/944163a4b2477a2bebaaada86b0ba910b6302f2f/LICENSE"
+    },
+    {
+      "path": "grpc-java-1.85.1/NOTICE.txt",
+      "sha256": "d891421cec918666dce9dc4516dad6a76557d12203fec121662efff365e72d63",
+      "url": "https://raw.githubusercontent.com/grpc/grpc-java/54c634aed4b5c78a29d0fa51d9282e9538722543/NOTICE.txt"
+    },
+    {
+      "path": "netty-4.2.20.Final/NOTICE.txt",
+      "sha256": "1775b0d91666fcb82493a5198f761b59a6d4d050bae6a4d26ecc377354068571",
+      "url": "https://raw.githubusercontent.com/netty/netty/4fb6a5f308382b4bee1bff3ef80b45ea8b35166d/NOTICE.txt"
+    },
+    {
+      "path": "netty-4.2.20.Final/LICENSE.dnsinfo.txt",
+      "sha256": "f0bdf5682bf317b1f85c80ed32cb4c7bf77b5a231dee485aa92d983673b7c58f",
+      "url": "https://raw.githubusercontent.com/netty/netty/4fb6a5f308382b4bee1bff3ef80b45ea8b35166d/license/LICENSE.dnsinfo.txt"
+    },
+    {
+      "path": "netty-4.2.20.Final/APSL-2.0.txt",
+      "sha256": "2d0c12edaaf8d31fec6796fef99291b12e833b6bef28100975120a53d209e06d",
+      "url": "https://raw.githubusercontent.com/spdx/license-list-data/31846481de7ea17d92f2f46fad76abe58b2e9bb0/text/APSL-2.0.txt"
     }
   ]
 }

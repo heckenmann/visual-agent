@@ -49,7 +49,7 @@ class SupplementalNoticesTest(unittest.TestCase):
         result = self.load()
         self.assertEqual({"example:lib:1"}, result.keys())
         self.assertEqual(self.content, result["example:lib:1"]["materials"][0]["content"])
-        self.assertEqual("a" * 64, result["example:lib:1"]["expectedSourceSha256"])
+        self.assertEqual("a" * 64, result["example:lib:1"]["sourceArtifactSha256"])
 
     def test_changed_legal_text_is_rejected(self):
         self.material.write_bytes(b"changed")
@@ -96,7 +96,7 @@ class SupplementalNoticesTest(unittest.TestCase):
     def test_repository_snapshots_match_the_recorded_hashes(self):
         registry = pathlib.Path(__file__).parents[1] / "docs/licensing/third-party/sources.json"
         components = load_supplements(registry)
-        self.assertEqual(64, len(components))
+        self.assertEqual(93, len(components))
         self.assertEqual("MPL-2.0", components["com.h2database:h2:2.5.252"]["proposedLicense"])
         self.assertEqual("EPL-2.0", components["ch.qos.logback:logback-core:1.6.6"]["proposedLicense"])
         self.assertEqual("Apache-2.0", components["net.java.dev.jna:jna:5.19.1"]["proposedLicense"])
@@ -105,7 +105,7 @@ class SupplementalNoticesTest(unittest.TestCase):
         self.assertEqual("f1b3db8ecd39d5b3a6eff4d5641b176c7f914dfb", icu["upstreamCommit"])
         self.assertEqual(
             "02f9e8a76ed2f8fa80d53054ca4632c7058354010df27c8f4e7e7443543f7e1e",
-            icu["expectedSourceSha256"],
+            icu["sourceArtifactSha256"],
         )
         self.assertIn(b"UNICODE LICENSE V3", icu["materials"][0]["content"])
         upl = components["org.graalvm.polyglot:polyglot:25.4.4.1.1"]
@@ -157,7 +157,7 @@ class SupplementalNoticesTest(unittest.TestCase):
         mimalloc = components["mimalloc2:2.1.7-r0"]
         self.assertEqual("MIT", mimalloc["proposedLicense"])
         self.assertEqual("0eed39319f139afde8515010ff59baf24de9e47ea316a315398e8027d198202d",
-                         mimalloc["expectedSourceSha256"])
+                         mimalloc["sourceArtifactSha256"])
         self.assertTrue(mimalloc["materials"][0]["content"].startswith(b"MIT License\n"))
         self.assertIn("runtime string identifies only upstream 2.1.7", " ".join(mimalloc["remaining"]))
         self.assertIn("mimalloc2 2.1.7-r0 and its package patch", " ".join(mimalloc["remaining"]))
@@ -174,7 +174,7 @@ class SupplementalNoticesTest(unittest.TestCase):
         runtime = components["AppImage:type2-runtime:20251108"]
         self.assertEqual("MIT", runtime["proposedLicense"])
         self.assertEqual("f5fec23be76e50e2445ed2d018bac49b367490fc483c62c4637e99ec705d27ba",
-                         runtime["expectedSourceSha256"])
+                         runtime["sourceArtifactSha256"])
         self.assertIn(b"statically linked code", runtime["materials"][0]["content"])
         self.assertIn("embeds the pinned upstream source commit", " ".join(runtime["remaining"]))
         fuse = components["AppImage:libfuse:3.15.0"]
@@ -199,7 +199,7 @@ class SupplementalNoticesTest(unittest.TestCase):
         )
         self.assertEqual(
             "81c71eea20f3c272c69d9d6ba3ed392f3651562150f3a4f34401004fcb403821",
-            components["org.graalvm.js:js-isolate-darwin-aarch64:25.4.4.1.1"]["expectedSourceSha256"],
+            components["org.graalvm.js:js-isolate-darwin-aarch64:25.4.4.1.1"]["sourceArtifactSha256"],
         )
         self.assertIn(b"re-signing an embedded macOS library", graal["materials"][0]["content"])
         self.assertTrue(any("unmodified-Program condition" in item for item in graal["remaining"]))
@@ -260,6 +260,87 @@ class SupplementalNoticesTest(unittest.TestCase):
                         "piex", "dng_sdk", "d3d12allocator"):
             self.assertIn(library, remaining)
         self.assertFalse(json.loads(registry.read_text())["redistributionApproved"])
+
+    def test_grpc_root_notice_covers_every_published_module(self):
+        root = pathlib.Path(__file__).parents[1]
+        registry_path = root / "docs/licensing/third-party/sources.json"
+        registry = json.loads(registry_path.read_text())
+        expected = {
+            "io.grpc:grpc-api:1.85.1",
+            "io.grpc:grpc-context:1.85.1",
+            "io.grpc:grpc-core:1.85.1",
+            "io.grpc:grpc-inprocess:1.85.1",
+            "io.grpc:grpc-netty-shaded:1.85.1",
+            "io.grpc:grpc-protobuf:1.85.1",
+            "io.grpc:grpc-protobuf-lite:1.85.1",
+            "io.grpc:grpc-stub:1.85.1",
+            "io.grpc:grpc-util:1.85.1",
+        }
+        components = load_supplements(registry_path)
+        self.assertTrue(expected.issubset(components))
+        notice_path = "grpc-java-1.85.1/NOTICE.txt"
+        notice_hash = hashlib.sha256((registry_path.parent / notice_path).read_bytes()).hexdigest()
+        material = next(item for item in registry["materials"] if item["path"] == notice_path)
+        self.assertEqual(notice_hash, material["sha256"])
+        self.assertIn("54c634aed4b5c78a29d0fa51d9282e9538722543", material["url"])
+        for coordinate in expected:
+            with self.subTest(coordinate=coordinate):
+                component = components[coordinate]
+                content = component["materials"][0]["content"]
+                self.assertEqual(notice_hash, hashlib.sha256(content).hexdigest())
+                for attribution in (b"OkHttp", b"Envoy", b"protoc-gen-validate", b"udpa"):
+                    self.assertIn(attribution, content)
+                self.assertTrue(component["remaining"])
+        self.assertFalse(registry["redistributionApproved"])
+
+    def test_netty_root_notice_covers_every_published_module(self):
+        root = pathlib.Path(__file__).parents[1]
+        registry_path = root / "docs/licensing/third-party/sources.json"
+        registry = json.loads(registry_path.read_text())
+        expected = {
+            "io.netty:netty-buffer:4.2.20.Final",
+            "io.netty:netty-codec-base:4.2.20.Final",
+            "io.netty:netty-codec-classes-quic:4.2.20.Final",
+            "io.netty:netty-codec-compression:4.2.20.Final",
+            "io.netty:netty-codec-dns:4.2.20.Final",
+            "io.netty:netty-codec-http:4.2.20.Final",
+            "io.netty:netty-codec-http2:4.2.20.Final",
+            "io.netty:netty-codec-http3:4.2.20.Final",
+            "io.netty:netty-codec-socks:4.2.20.Final",
+            "io.netty:netty-common:4.2.20.Final",
+            "io.netty:netty-handler:4.2.20.Final",
+            "io.netty:netty-handler-proxy:4.2.20.Final",
+            "io.netty:netty-resolver:4.2.20.Final",
+            "io.netty:netty-resolver-dns:4.2.20.Final",
+            "io.netty:netty-resolver-dns-classes-macos:4.2.20.Final",
+            "io.netty:netty-resolver-dns-native-macos:4.2.20.Final",
+            "io.netty:netty-transport:4.2.20.Final",
+            "io.netty:netty-transport-classes-epoll:4.2.20.Final",
+            "io.netty:netty-transport-native-epoll:4.2.20.Final",
+            "io.netty:netty-transport-native-unix-common:4.2.20.Final",
+        }
+        components = load_supplements(registry_path)
+        self.assertTrue(expected.issubset(components))
+        notice_path = "netty-4.2.20.Final/NOTICE.txt"
+        notice_hash = hashlib.sha256((registry_path.parent / notice_path).read_bytes()).hexdigest()
+        material = next(item for item in registry["materials"] if item["path"] == notice_path)
+        self.assertEqual(notice_hash, material["sha256"])
+        self.assertIn("4fb6a5f308382b4bee1bff3ef80b45ea8b35166d", material["url"])
+        for coordinate in expected:
+            with self.subTest(coordinate=coordinate):
+                component = components[coordinate]
+                content = component["materials"][0]["content"]
+                self.assertEqual(notice_hash, hashlib.sha256(content).hexdigest())
+                self.assertIn(b"The Netty Project", content)
+                self.assertIn(b"dnsinfo.h", content)
+                self.assertIn(b"Quiche", content)
+                self.assertTrue(component["remaining"])
+        resolver = components["io.netty:netty-resolver-dns-native-macos:4.2.20.Final"]
+        self.assertEqual(3, len(resolver["materials"]))
+        self.assertIn(b"Apple Public Source License", resolver["materials"][1]["content"])
+        self.assertIn(b"APPLE PUBLIC SOURCE LICENSE", resolver["materials"][2]["content"])
+        self.assertTrue(any("authoritative determination" in item for item in resolver["remaining"]))
+        self.assertFalse(registry["redistributionApproved"])
 
     def test_skia_dependency_notices_and_required_credits_are_retained(self):
         root = pathlib.Path(__file__).parents[1]
@@ -360,7 +441,7 @@ class SupplementalNoticesTest(unittest.TestCase):
         self.assertIn("prohibits selling the font by itself", review_notes)
         self.assertIn("does not approve the complete release package", review_notes)
         component = load_supplements(root / "docs/licensing/third-party/sources.json")
-        self.assertEqual(64, len(component))
+        self.assertEqual(93, len(component))
         license_file = root / "docs/licensing/third-party/liberation-fonts-2.1.5/LICENSE"
         self.assertEqual(asset["licenseMaterialPath"],
                          "liberation-fonts-2.1.5/LICENSE")
@@ -392,7 +473,7 @@ class SupplementalNoticesTest(unittest.TestCase):
         package, inventory = self.prepare_package()
         artifact_hash = "02f9e8a76ed2f8fa80d53054ca4632c7058354010df27c8f4e7e7443543f7e1e"
         inventory.write_text(
-            "packagePath,coordinate,packageSha256,sourceSha256\n"
+            "packagePath,coordinate,packageSha256,resolvedArtifactSha256\n"
             f"lib.jar,org.graalvm.shadowed:icu4j:25.4.4.1.1,{NOTICES.sha256(package / 'lib.jar')},{artifact_hash}\n"
         )
         self.license_report.write_text(
@@ -424,7 +505,7 @@ class SupplementalNoticesTest(unittest.TestCase):
         package, inventory = self.prepare_package()
         artifact_hash = "cbacc2628fd5f99dbcebff7d398bcddde43ea15ebadc873d1da4454c718727d8"
         inventory.write_text(
-            "packagePath,coordinate,packageSha256,sourceSha256\n"
+            "packagePath,coordinate,packageSha256,resolvedArtifactSha256\n"
             f"lib.jar,org.graalvm.polyglot:polyglot:25.4.4.1.1,{NOTICES.sha256(package / 'lib.jar')},{artifact_hash}\n"
         )
         self.license_report.write_text(
@@ -453,6 +534,111 @@ class SupplementalNoticesTest(unittest.TestCase):
         self.assertTrue(component["supplement"]["remaining"])
         self.assertFalse(report["redistributionApproved"])
 
+    def test_collector_includes_grpc_root_notice_for_exact_artifact(self):
+        package, inventory = self.prepare_package()
+        source_hash = "b133a5b6ec44b7c7ca8d099668835fcd908889b44651fc3ccc872f2945418fef"
+        inventory.write_text(
+            "packagePath,coordinate,packageSha256,resolvedArtifactSha256\n"
+            f"lib.jar,io.grpc:grpc-api:1.85.1,{NOTICES.sha256(package / 'lib.jar')},{source_hash}\n"
+        )
+        self.license_report.write_text(
+            '{"dependencies":[{"moduleName":"io.grpc:grpc-api",'
+            '"moduleVersion":"1.85.1","moduleUrls":[],"moduleLicenses":['
+            '{"moduleLicense":"Apache-2.0",'
+            '"moduleLicenseUrl":"https://www.apache.org/licenses/LICENSE-2.0.txt"}]}]}'
+        )
+        registry = pathlib.Path(__file__).parents[1] / "docs/licensing/third-party/sources.json"
+        output = self.root / "grpc-collected"
+        report = NOTICES.collect(
+            package,
+            inventory,
+            output,
+            self.license_report,
+            self.project_license,
+            registry,
+        )
+        component = report["components"][0]
+        notice = component["supplement"]["materials"][0]
+        expected = registry.parent / "grpc-java-1.85.1/NOTICE.txt"
+        self.assertEqual(expected.read_bytes(), (output / notice["path"]).read_bytes())
+        self.assertEqual("no-detected-notice", component["noticeStatus"])
+        self.assertEqual("unreviewed", component["reviewStatus"])
+        self.assertIn("Envoy", (output / notice["path"]).read_text())
+        self.assertFalse(report["redistributionApproved"])
+
+    def test_collector_includes_netty_root_notice_for_exact_artifact(self):
+        package, inventory = self.prepare_package()
+        source_hash = "36c1869f58c24167180546acb933749bbe92391834eca219d3a155a719d21f26"
+        inventory.write_text(
+            "packagePath,coordinate,packageSha256,resolvedArtifactSha256\n"
+            f"lib.jar,io.netty:netty-buffer:4.2.20.Final,{NOTICES.sha256(package / 'lib.jar')},{source_hash}\n"
+        )
+        self.license_report.write_text(
+            '{"dependencies":[{"moduleName":"io.netty:netty-buffer",'
+            '"moduleVersion":"4.2.20.Final","moduleUrls":[],"moduleLicenses":['
+            '{"moduleLicense":"Apache-2.0",'
+            '"moduleLicenseUrl":"https://www.apache.org/licenses/LICENSE-2.0.txt"}]}]}'
+        )
+        registry = pathlib.Path(__file__).parents[1] / "docs/licensing/third-party/sources.json"
+        output = self.root / "netty-collected"
+        report = NOTICES.collect(
+            package,
+            inventory,
+            output,
+            self.license_report,
+            self.project_license,
+            registry,
+        )
+        component = report["components"][0]
+        notice = component["supplement"]["materials"][0]
+        expected = registry.parent / "netty-4.2.20.Final/NOTICE.txt"
+        self.assertEqual(expected.read_bytes(), (output / notice["path"]).read_bytes())
+        self.assertEqual("no-detected-notice", component["noticeStatus"])
+        self.assertEqual("unreviewed", component["reviewStatus"])
+        self.assertIn("dnsinfo.h", (output / notice["path"]).read_text())
+        self.assertFalse(report["redistributionApproved"])
+
+    def test_collector_includes_mac_dns_apple_source_evidence(self):
+        package, inventory = self.prepare_package()
+        source_hash = "98a33e5adbbe58cb084ed4ca61350fa0a6311f4f8e54bc8cd823a402d0609c42"
+        inventory.write_text(
+            "packagePath,coordinate,packageSha256,resolvedArtifactSha256\n"
+            f"lib.jar,io.netty:netty-resolver-dns-native-macos:4.2.20.Final,"
+            f"{NOTICES.sha256(package / 'lib.jar')},{source_hash}\n"
+        )
+        self.license_report.write_text(
+            '{"dependencies":[{"moduleName":"io.netty:netty-resolver-dns-native-macos",'
+            '"moduleVersion":"4.2.20.Final","moduleUrls":[],"moduleLicenses":['
+            '{"moduleLicense":"Apache-2.0",'
+            '"moduleLicenseUrl":"https://www.apache.org/licenses/LICENSE-2.0.txt"}]}]}'
+        )
+        registry = pathlib.Path(__file__).parents[1] / "docs/licensing/third-party/sources.json"
+        output = self.root / "netty-macos-dns-collected"
+        report = NOTICES.collect(
+            package,
+            inventory,
+            output,
+            self.license_report,
+            self.project_license,
+            registry,
+        )
+        component = report["components"][0]
+        collected = component["supplement"]["materials"]
+        self.assertEqual(3, len(collected))
+        self.assertTrue(any(item["path"].endswith("LICENSE.dnsinfo.txt") for item in collected))
+        self.assertTrue(any(item["path"].endswith("APSL-2.0.txt") for item in collected))
+        source_materials = load_supplements(registry)[
+            "io.netty:netty-resolver-dns-native-macos:4.2.20.Final"
+        ]["materials"]
+        expected_content = {material["sha256"]: material["content"] for material in source_materials}
+        for material in collected:
+            self.assertEqual(
+                expected_content[material["sha256"]],
+                (output / material["path"]).read_bytes(),
+            )
+        self.assertEqual("unreviewed", component["reviewStatus"])
+        self.assertFalse(report["redistributionApproved"])
+
     def prepare_package(self):
         package = self.root / "package"
         package.mkdir()
@@ -464,7 +650,10 @@ class SupplementalNoticesTest(unittest.TestCase):
             jar.writestr("library.class", b"synthetic bytecode")
         digest = NOTICES.sha256(archive)
         inventory = self.root / "inventory.csv"
-        inventory.write_text("packagePath,coordinate,packageSha256,sourceSha256\nlib.jar,example:lib:1," + digest + "," + "d" * 64 + "\n")
+        inventory.write_text(
+            "packagePath,coordinate,packageSha256,resolvedArtifactSha256\n"
+            "lib.jar,example:lib:1," + digest + "," + "e" * 64 + "\n"
+        )
         self.license_report = self.root / "licenses-all.json"
         self.license_report.write_text(
             '{"dependencies":[{"moduleName":"example:lib","moduleVersion":"1",'
@@ -485,26 +674,24 @@ class SupplementalNoticesTest(unittest.TestCase):
         self.assertEqual("no-detected-notice", component["noticeStatus"])
         self.assertEqual("unreviewed", component["reviewStatus"])
         self.assertFalse(report["redistributionApproved"])
-        self.assertNotEqual(component["packageSha256"], component["supplement"]["sourceSha256"])
+        self.assertEqual("e" * 64, component["resolvedArtifactSha256"])
+        self.assertEqual("d" * 64, component["supplement"]["sourceArtifactSha256"])
+        self.assertNotEqual(
+            component["resolvedArtifactSha256"],
+            component["supplement"]["sourceArtifactSha256"],
+        )
         material = component["supplement"]["materials"][0]
         self.assertEqual(self.content, (output / material["path"]).read_bytes())
         self.assertEqual(["Source review"], component["supplement"]["remaining"])
 
-    def test_collector_rejects_supplement_for_different_artifact_bytes(self):
-        package, inventory = self.prepare_package()
-        self.data["components"][0]["sourceArtifacts"]["example:lib:1"] = "c" * 64
-        self.load()
-        output = self.root / "collected"
-        with self.assertRaisesRegex(ValueError, "exact source artifact"):
-            NOTICES.collect(package, inventory, output, self.license_report, self.project_license, self.registry)
-        self.assertFalse((output / "manifest.json").exists())
-
-    def test_source_identity_is_required_when_using_supplements(self):
+    def test_collector_rejects_inventory_without_resolved_artifact_hash(self):
         package, inventory = self.prepare_package()
         lines = inventory.read_text().splitlines()
         inventory.write_text("\n".join(line.rsplit(",", 1)[0] for line in lines) + "\n")
-        with self.assertRaisesRegex(ValueError, "exact source artifact"):
-            NOTICES.collect(package, inventory, self.root / "collected", self.license_report, self.project_license, self.registry)
+        output = self.root / "collected"
+        with self.assertRaisesRegex(ValueError, "resolved artifact hash"):
+            NOTICES.collect(package, inventory, output, self.license_report, self.project_license, self.registry)
+        self.assertFalse((output / "manifest.json").exists())
 
 
 if __name__ == "__main__":
