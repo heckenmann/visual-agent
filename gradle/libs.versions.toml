@@ -57,7 +57,6 @@ spring-security-oauth2-jose = { module = "org.springframework.security:spring-se
 spring-data-r2dbc = { module = "org.springframework.data:spring-data-r2dbc" }
 spring-r2dbc = { module = "org.springframework:spring-r2dbc" }
 spring-tx = { module = "org.springframework:spring-tx" }
-netty-resolver-dns-native-macos = { module = "io.netty:netty-resolver-dns-native-macos" }
 spring-ai-bom = { module = "org.springframework.ai:spring-ai-bom", version.ref = "spring-ai" }
 spring-ai-model = { module = "org.springframework.ai:spring-ai-model" }
 spring-ai-ollama = { module = "org.springframework.ai:spring-ai-ollama" }

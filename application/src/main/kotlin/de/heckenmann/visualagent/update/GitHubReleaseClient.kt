@@ -1,22 +1,20 @@
 package de.heckenmann.visualagent.update
 
 import de.heckenmann.visualagent.agent.provider.ServerTrustManagerProvider
-import de.heckenmann.visualagent.agent.provider.resolveTrustManager
-import io.netty.channel.ChannelOption
-import io.netty.handler.ssl.SslContextBuilder
+import de.heckenmann.visualagent.agent.provider.resolveSslContext
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import org.springframework.core.io.buffer.DataBuffer
 import org.springframework.http.MediaType
-import org.springframework.http.client.reactive.ReactorClientHttpConnector
+import org.springframework.http.client.reactive.JdkClientHttpConnector
 import org.springframework.stereotype.Component
 import org.springframework.web.reactive.function.client.WebClient
 import org.springframework.web.util.UriUtils
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
-import reactor.netty.http.client.HttpClient
 import java.io.IOException
+import java.net.http.HttpClient
 import java.nio.charset.StandardCharsets
 import java.time.Duration
 
@@ -123,18 +121,14 @@ internal class GitHubReleaseHttpClient(
         fun defaultWebClient(serverTrustManagerProvider: ServerTrustManagerProvider?): WebClient {
             val httpClient =
                 HttpClient
-                    .create()
-                    .followRedirect(true)
-                    .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, CONNECT_TIMEOUT_MILLIS)
-                    .responseTimeout(Duration.ofSeconds(10))
-                    .secure { spec ->
-                        spec.sslContext(
-                            SslContextBuilder.forClient().trustManager(serverTrustManagerProvider.resolveTrustManager()).build(),
-                        )
-                    }
+                    .newBuilder()
+                    .followRedirects(HttpClient.Redirect.NORMAL)
+                    .connectTimeout(Duration.ofMillis(CONNECT_TIMEOUT_MILLIS.toLong()))
+                    .sslContext(serverTrustManagerProvider.resolveSslContext())
+                    .build()
             return WebClient
                 .builder()
-                .clientConnector(ReactorClientHttpConnector(httpClient))
+                .clientConnector(JdkClientHttpConnector(httpClient).apply { setReadTimeout(Duration.ofSeconds(10)) })
                 .build()
         }
 

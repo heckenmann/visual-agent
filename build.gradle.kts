@@ -388,7 +388,7 @@ tasks.register("verifyPackages") {
     dependsOn(
         ":application:verifyExecutableJar",
         ":desktop:verifyExecutableJar",
-        ":desktop:verifyMacOsNativeDnsResolver",
+        ":desktop:verifyMacOsNativeDnsResolverAbsent",
         ":desktop:verifyNativeDistributionLauncher",
     )
 }
