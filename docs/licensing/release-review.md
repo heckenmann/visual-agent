@@ -33,6 +33,28 @@ or organization that has not performed it.
   for this candidate. This is evidence that the archived inputs match those
   reported build revisions, not a qualified conclusion that LGPL-2.1 section
   6(a)'s static-link relinking/source delivery is sufficient.
+- The current PR head `0f95daaeecd8be9bccc89f51488d5802c64c26c2` also passed
+  the four-platform [license inventory workflow](https://github.com/heckenmann/visual-agent/actions/runs/43294540149).
+  Its Linux, Windows x64, macOS ARM64, and macOS x64 manifests contain 261
+  component records each. Each reports 136 records with retained notices,
+  125 as `no-detected-notice`, all 261 component review statuses as
+  `unreviewed`, runtime legal review as `unreviewed`, and
+  `redistributionApproved: false`. The manifest SHA-256 values are Linux
+  `080b2f3268d4f9724a6748da337ec5e21eebe6331440aaecdfb999ea908b038c`,
+  Windows x64 `733f2aa889022f83c38924a598f171bf2de041d73f3cd92751e8e5084ce7575f`,
+  macOS ARM64 `ec19eaaab94ac5ef4b0c46b5b7f6162c6f7767b2f1228b0a71eb5d39f0a18d66`,
+  and macOS x64 `2ca3a7204338b761e92ad7bde382bb101c6ba1f0465a0c3eaec7934ceb4371e0`.
+  All four artifacts embed identical `sources.json` bytes with SHA-256
+  `0e247649e18e0368b43a8f06b9b7cf82a85f684a2f6cf6f2cc241f8aa82c4500`,
+  matching the registry in this commit. `no-detected-notice` is an inventory
+  observation, not a finding that a component lacks a required notice.
+- The same current PR head passed its Gradle tests, release workflow contracts,
+  package-and-launch check, and Windows smoke process contract in [workflow
+  run 43294540166](https://github.com/heckenmann/visual-agent/actions/runs/43294540166).
+  The only source changes since the full package/smoke candidate at
+  `0ad834255a825fa7b4d7c7edee5962fd9a3fcd63` are this review document, the
+  legal-material registry, and its regression tests; no application or package
+  build inputs changed.
 - The package/smoke success and source-archive match establish technical
   evidence for this non-versioned candidate only. They do not establish
   complete legal coverage, qualified review, final release-asset hashes,
