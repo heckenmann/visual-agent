@@ -391,7 +391,7 @@ unknown names fail without modifying the agent.
 Main-agent tool set (`agentToolConfigService.mainAgentTools()`):
 `agent:list`, `agent:show`, `agent:create`, `agent:update`, `agent:delete`,
 `agent:log`, `todos`, `workspace:file`,
-`workspace:download`, `memory`, `skills`, and `javascript:execute`.
+`workspace:download`, `memory`, and `skills`. JavaScript execution is temporarily unavailable pending a compatible untrusted-code sandbox.
 
 Self-model selection uses `model:selection` (provider function `model_selection`). Main-agent calls
 update the active Conversation selection and publish the catalog's existing change notification.
@@ -415,10 +415,13 @@ that returns "not configured"), `search` (placeholder that returns
 The `skills` tool is main-agent-only by default; sub-agents require an explicit
 role or agent override. Skill content is stored in the database and is never
 automatically injected into prompts.
-`javascript:execute` is available to the default role templates for complex
-deterministic multi-tool filtering, aggregation, and large CSV, string, or
-Markdown assembly. Execution errors are returned to the model as compact,
-actionable categories so it can correct the script or arguments.
+`javascript:execute` is not exposed to any model request, including agents with
+previously persisted per-agent grants. Global enablement is rejected until a
+runtime supporting Graal's `UNTRUSTED` policy is available and verified. The
+current JDK 27/GraalJS combination cannot initialize the required isolate; its
+`CONSTRAINED` fallback is documented by Graal for trusted, potentially buggy
+code, while model-supplied scripts are untrusted. Re-enable this tool only after
+the sandbox and its resource limits are verified against the packaged runtime.
 
 ### Sandboxed JavaScript tool execution
 
@@ -430,8 +433,13 @@ only provider function names, not internal tool IDs. Calls are delegated through
 the normal allowlist, lifecycle events, cancellation, and tool safeguards.
 The context denies host classes, arbitrary host objects, IO, native access, process
 creation, networking, and polyglot access. Result, timeout, tool-call,
-concurrency, logging, guest-memory (on isolate-capable Graal runtimes), bounded workspace reads, and recursion limits are enforced before the final
+concurrency, logging, bounded workspace reads, and recursion limits are enforced before the final
 return value is sent to the model; script source length is not capped.
+The current packaged JDK 27 and GraalJS 25.5 combination cannot initialize the
+required `UNTRUSTED` isolate. The implementation has a constrained fallback for
+local compatibility tests, but the model-facing tool is globally gated and
+cannot be re-enabled through persisted configuration. Do not treat the fallback
+as an untrusted-code security boundary or as a hard guest-memory limit.
 Intermediate tool responses stay inside the guest runtime. The tool may load a
 workspace-relative JavaScript file through the hardened, byte-bounded workspace boundary and execute
 it in the same sandbox; absolute paths and traversal components are rejected.

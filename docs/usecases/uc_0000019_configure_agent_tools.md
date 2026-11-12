@@ -62,6 +62,9 @@ delegates its result to the selected model when that model calls the tool.
   tools always identify their host scope separately.
 - Server log diagnostics remain main-agent-only and globally disabled until explicitly enabled; they
   cannot read arbitrary log files and return only bounded, redacted in-memory events.
+- JavaScript execution is force-disabled for every agent until the packaged runtime can enforce a
+  verified `UNTRUSTED` sandbox. Existing per-agent grants and global tool settings cannot override
+  this release gate.
 
 ## Task-contract integration
 

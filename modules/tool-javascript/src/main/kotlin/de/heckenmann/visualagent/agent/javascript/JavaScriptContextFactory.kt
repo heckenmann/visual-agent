@@ -6,56 +6,11 @@ import org.graalvm.polyglot.PolyglotAccess
 import org.graalvm.polyglot.SandboxPolicy
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
-import java.util.concurrent.atomic.AtomicReference
 
-/** Creates Graal contexts with the strictest sandbox supported by the runtime. */
-internal class JavaScriptContextFactory(
-    private val preferIsolate: Boolean = true,
-) {
-    private val untrustedSandboxSupported = AtomicReference<Boolean?>(null)
-
+/** Creates Graal contexts with the host-restricted sandbox supported by the packaged runtime. */
+internal class JavaScriptContextFactory {
     /** Create a context and expose only the request-scoped bridge objects. */
-    fun create(
-        bridge: JavaScriptToolBridge,
-        limits: JavaScriptExecutionLimits,
-    ): Context {
-        if (preferIsolate && untrustedSandboxSupported.get() != false) {
-            runCatching { newUntrustedContext(bridge, limits) }
-                .onSuccess {
-                    untrustedSandboxSupported.set(true)
-                    return it
-                }.onFailure {
-                    // Keep the constrained host-access boundary if the native
-                    // isolate is unavailable or cannot be initialized.
-                    untrustedSandboxSupported.set(false)
-                }
-        }
-        return newConstrainedContext(bridge)
-    }
-
-    private fun newUntrustedContext(
-        bridge: JavaScriptToolBridge,
-        limits: JavaScriptExecutionLimits,
-    ): Context =
-        Context
-            .newBuilder("js")
-            .sandbox(SandboxPolicy.UNTRUSTED)
-            .`in`(ByteArrayInputStream(ByteArray(0)))
-            .`out`(ByteArrayOutputStream())
-            .err(ByteArrayOutputStream())
-            .allowHostAccess(HostAccess.UNTRUSTED)
-            .allowPolyglotAccess(PolyglotAccess.NONE)
-            .option("engine.MaxIsolateMemory", "${limits.maxIsolateMemoryBytes}B")
-            .option("sandbox.MaxHeapMemory", "${limits.maxGuestHeapBytes}B")
-            .option("sandbox.MaxCPUTime", "${limits.timeoutMillis}ms")
-            .option("sandbox.MaxStatements", MAX_STATEMENTS.toString())
-            .option("sandbox.MaxStackFrames", MAX_STACK_FRAMES.toString())
-            .option("sandbox.MaxThreads", "1")
-            .option("sandbox.MaxASTDepth", MAX_AST_DEPTH.toString())
-            .option("sandbox.MaxOutputStreamSize", "10KB")
-            .option("sandbox.MaxErrorStreamSize", "10KB")
-            .build()
-            .also { context -> installBindings(context, bridge) }
+    fun create(bridge: JavaScriptToolBridge): Context = newConstrainedContext(bridge)
 
     private fun newConstrainedContext(bridge: JavaScriptToolBridge): Context =
         Context
@@ -83,14 +38,5 @@ internal class JavaScriptContextFactory(
         context.getBindings("js").putMember("tools", bridge.toolsObject())
         context.getBindings("js").putMember("workspace", bridge.workspaceObject())
         context.getBindings("js").putMember("console", bridge.consoleObject())
-    }
-
-    private companion object {
-        // CPU time is the request-scoped execution bound. Keep the mandatory
-        // statement limit effectively unbounded so faster GraalJS releases do
-        // not turn normal timeout failures into premature statement-limit errors.
-        const val MAX_STATEMENTS = Long.MAX_VALUE
-        const val MAX_STACK_FRAMES = 128
-        const val MAX_AST_DEPTH = 128
     }
 }

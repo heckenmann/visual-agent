@@ -5,6 +5,7 @@ import de.heckenmann.visualagent.agent.config.SubAgentToolConfig
 import de.heckenmann.visualagent.knowledge.PreferenceStore
 import de.heckenmann.visualagent.knowledge.SubAgentConfigStore
 import org.junit.jupiter.api.Test
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -41,6 +42,34 @@ class AgentToolConfigServiceTest {
         assertFalse("agent:assign-all-todos" in tools)
         assertFalse("file:write" in tools)
         assertFalse("terminal" in tools)
+    }
+
+    @Test
+    fun `JavaScript execution is unavailable to every agent until an untrusted sandbox is verified`() {
+        val service = AgentToolConfigService(MapSubAgentConfigStore())
+        val javascriptTool = ToolId("javascript:execute")
+        val researcher =
+            SubAgent(
+                id = "researcher",
+                name = "Researcher",
+                role = "Research",
+                config = AgentConfig.fromTemplate("researcher"),
+            )
+        val explicitlyConfigured =
+            SubAgent(
+                id = "custom",
+                name = "Custom",
+                role = "Custom",
+                config = AgentConfig(tools = listOf(javascriptTool.value)),
+            )
+
+        assertFalse(service.isToolGloballyEnabled(javascriptTool.value))
+        assertFalse(javascriptTool in service.mainAgentTools())
+        assertFalse(javascriptTool in service.toolsFor(researcher))
+        assertFalse(javascriptTool in service.toolsFor(explicitlyConfigured))
+        assertFailsWith<IllegalArgumentException> {
+            service.setToolGloballyEnabled(javascriptTool.value, enabled = true)
+        }
     }
 
     @Test

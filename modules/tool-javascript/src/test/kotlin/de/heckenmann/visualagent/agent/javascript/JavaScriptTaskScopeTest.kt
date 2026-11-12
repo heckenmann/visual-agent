@@ -37,7 +37,7 @@ class JavaScriptTaskScopeTest {
             TaskToolAccess(TaskPolicy(actions = mapOf("workspace:file" to listOf("readText")), resources = listOf("input")), {
                 setOf("workspace:file", "javascript:execute")
             }, { true })
-        GraalJavaScriptExecutionService({ ToolRegistry(emptyList(), ToolEventBus()) }, writer, preferIsolate = false).use { service ->
+        GraalJavaScriptExecutionService({ ToolRegistry(emptyList(), ToolEventBus()) }, writer).use { service ->
             fun execute(source: String) =
                 service.execute(
                     JavaScriptExecutionRequest(

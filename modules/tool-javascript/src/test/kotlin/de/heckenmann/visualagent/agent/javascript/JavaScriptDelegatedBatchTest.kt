@@ -23,29 +23,21 @@ class JavaScriptDelegatedBatchTest {
         val children = ToolRegistry(listOf(batch), ToolEventBus())
         val help = ToolHelpTool { children }
         val registry = ToolRegistry(listOf(batch, help), ToolEventBus())
-        for (isolate in listOf(false, true)) {
-            GraalJavaScriptExecutionService(
-                { registry },
-                JavaScriptWorkspaceWriter {
-                    _,
-                    _,
-                    ->
-                    error("Unused")
-                },
-                preferIsolate = isolate,
-            ).use {
-                val result =
-                    it.execute(
-                        JavaScriptExecutionRequest(
-                            "return tools.call('tool_help',{action:'call',name:'tools_batch',arguments:{calls:[]}}).success;",
-                            setOf("tool:help", "tools:batch"),
-                            requestContext = mapOf("enabledTools" to setOf("tool:help", "tools:batch")),
-                            limits = JavaScriptExecutionLimits(maxToolCalls = 1),
-                        ),
-                    )
-                assertEquals(false, result.value)
-                assertEquals(0, starts.get())
-            }
+        GraalJavaScriptExecutionService(
+            { registry },
+            JavaScriptWorkspaceWriter { _, _ -> error("Unused") },
+        ).use {
+            val result =
+                it.execute(
+                    JavaScriptExecutionRequest(
+                        "return tools.call('tool_help',{action:'call',name:'tools_batch',arguments:{calls:[]}}).success;",
+                        setOf("tool:help", "tools:batch"),
+                        requestContext = mapOf("enabledTools" to setOf("tool:help", "tools:batch")),
+                        limits = JavaScriptExecutionLimits(maxToolCalls = 1),
+                    ),
+                )
+            assertEquals(false, result.value)
+            assertEquals(0, starts.get())
         }
     }
 

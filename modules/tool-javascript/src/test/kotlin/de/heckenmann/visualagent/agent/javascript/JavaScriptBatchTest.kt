@@ -188,25 +188,22 @@ class JavaScriptBatchTest {
                     .ToolBatchExecutor(children)
             }
         val registry = ToolRegistry(listOf(child, batch), ToolEventBus())
-        for (preferIsolate in listOf(false, true)) {
-            GraalJavaScriptExecutionService(
-                { registry },
-                JavaScriptWorkspaceWriter { _, _ -> error("Unused") },
-                preferIsolate = preferIsolate,
-            ).use { service ->
-                val error =
-                    assertFailsWith<JavaScriptExecutionException> {
-                        service.execute(
-                            JavaScriptExecutionRequest(
-                                "return tools.call('tools_batch',{calls:[{id:'one',tool:'read',arguments:{}},{id:'two',tool:'read',arguments:{}}]});",
-                                setOf("read", "tools:batch"),
-                                limits = JavaScriptExecutionLimits(maxToolCalls = 1),
-                            ),
-                        )
-                    }
-                assertEquals(JavaScriptErrorCategory.TOOL_ACCESS, error.category)
-                assertEquals(0, starts.get())
-            }
+        GraalJavaScriptExecutionService(
+            { registry },
+            JavaScriptWorkspaceWriter { _, _ -> error("Unused") },
+        ).use { service ->
+            val error =
+                assertFailsWith<JavaScriptExecutionException> {
+                    service.execute(
+                        JavaScriptExecutionRequest(
+                            "return tools.call('tools_batch',{calls:[{id:'one',tool:'read',arguments:{}},{id:'two',tool:'read',arguments:{}}]});",
+                            setOf("read", "tools:batch"),
+                            limits = JavaScriptExecutionLimits(maxToolCalls = 1),
+                        ),
+                    )
+                }
+            assertEquals(JavaScriptErrorCategory.TOOL_ACCESS, error.category)
+            assertEquals(0, starts.get())
         }
     }
 
@@ -235,18 +232,9 @@ class JavaScriptBatchTest {
                 }
             }
         val registry = ToolRegistry(tools, ToolEventBus())
-        for (preferIsolate in listOf(false, true)) {
-            starts.set(0)
-            GraalJavaScriptExecutionService(
-                { registry },
-                JavaScriptWorkspaceWriter {
-                    _,
-                    _,
-                    ->
-                    error("Unused")
-                },
-                preferIsolate = preferIsolate,
-            ).use { block(it, starts) }
-        }
+        GraalJavaScriptExecutionService(
+            { registry },
+            JavaScriptWorkspaceWriter { _, _ -> error("Unused") },
+        ).use { block(it, starts) }
     }
 }

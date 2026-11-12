@@ -19,29 +19,20 @@ class JavaScriptBatchRetryTest {
     fun `caught argument failure leaves room for corrected retry`() {
         val starts = AtomicInteger()
         val registry = ToolRegistry(listOf(testTool("read", starts)), ToolEventBus())
-        for (isolate in listOf(false, true)) {
-            starts.set(0)
-            GraalJavaScriptExecutionService(
-                { registry },
-                JavaScriptWorkspaceWriter {
-                    _,
-                    _,
-                    ->
-                    error("Unused")
-                },
-                preferIsolate = isolate,
-            ).use {
-                val result =
-                    it.execute(
-                        JavaScriptExecutionRequest(
-                            "try { await tools.callMany([{id:'bad',name:'read',arguments:{bad:true}}]); } catch(e) {} return (await tools.callMany([{id:'ok',name:'read',arguments:{}}]))[0].success;",
-                            setOf("read"),
-                            limits = JavaScriptExecutionLimits(maxResultCharacters = 65536),
-                        ),
-                    )
-                assertEquals(true, result.value)
-                assertEquals(2, starts.get())
-            }
+        GraalJavaScriptExecutionService(
+            { registry },
+            JavaScriptWorkspaceWriter { _, _ -> error("Unused") },
+        ).use {
+            val result =
+                it.execute(
+                    JavaScriptExecutionRequest(
+                        "try { await tools.callMany([{id:'bad',name:'read',arguments:{bad:true}}]); } catch(e) {} return (await tools.callMany([{id:'ok',name:'read',arguments:{}}]))[0].success;",
+                        setOf("read"),
+                        limits = JavaScriptExecutionLimits(maxResultCharacters = 65536),
+                    ),
+                )
+            assertEquals(true, result.value)
+            assertEquals(2, starts.get())
         }
     }
 
