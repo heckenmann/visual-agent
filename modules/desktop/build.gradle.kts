@@ -846,17 +846,29 @@ val packageAppImage =
                 appImageOutput.get().asFile,
             )
         }
-        doLast {
-            val runtimeBytes = appImageRuntime.get().asFile.readBytes()
-            val packagedRuntimePrefix =
-                Files.newInputStream(appImageOutput.get().asFile.toPath()).use { input ->
-                    input.readNBytes(runtimeBytes.size)
-                }
-            check(packagedRuntimePrefix.contentEquals(runtimeBytes)) {
-                "The AppImage does not contain the runtime built from the retained source archive."
-            }
-        }
     }
+
+tasks.register<Exec>("verifyAppImageRuntimeInPackage") {
+    group = "verification"
+    description = "Verifies the AppImage embeds the runtime built from retained source materials."
+    dependsOn(packageAppImage)
+    val verificationScript = rootProject.layout.projectDirectory.file("scripts/verify_appimage_runtime_embedded.py")
+    inputs.file(appImageRuntime)
+    inputs.file(appImageOutput)
+    inputs.file(verificationScript)
+    onlyIf {
+        System.getProperty("os.name", "").contains("linux", ignoreCase = true) &&
+            System.getProperty("os.arch", "").equals("amd64", ignoreCase = true)
+    }
+    doFirst {
+        commandLine(
+            "python3",
+            verificationScript.asFile,
+            appImageRuntime.get().asFile,
+            appImageOutput.get().asFile,
+        )
+    }
+}
 
 private fun downloadVerifiedFile(
     url: String,

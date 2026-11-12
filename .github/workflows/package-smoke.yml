@@ -120,7 +120,7 @@ jobs:
             collect_notice_evidence: true
           - platform: linux-appimage
             runner: ubuntu-latest
-            task: packageAppImage
+            task: verifyAppImageRuntimeInPackage
             extension: AppImage
             install_rpm: false
             collect_notice_evidence: true
