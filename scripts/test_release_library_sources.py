@@ -211,15 +211,18 @@ class LibrarySourceMaterialsTest(unittest.TestCase):
         workflow = (ROOT / ".github/workflows/package-smoke.yml").read_text()
         verifier = (ROOT / "scripts/verify-appimage-runtime-build.sh").read_text()
         desktop_build = (ROOT / "modules/desktop/build.gradle.kts").read_text()
+        embedded_verifier = (ROOT / "scripts/verify_appimage_runtime_embedded.py").read_text()
         self.assertIn('tasks.register<Exec>("buildAppImageRuntime")', desktop_build)
         self.assertIn("dependsOn(downloadAppImageTool, buildAppImageRuntime, prepareAppImage)", desktop_build)
-        self.assertIn("input.readNBytes(runtimeBytes.size)", desktop_build)
-        self.assertIn("packagedRuntimePrefix.contentEquals(runtimeBytes)", desktop_build)
+        self.assertIn('tasks.register<Exec>("verifyAppImageRuntimeInPackage")', desktop_build)
+        self.assertIn("dependsOn(packageAppImage)", desktop_build)
+        self.assertIn(".digest_md5", embedded_verifier)
+        self.assertIn("runtime differs outside appimagetool's MD5 section", embedded_verifier)
         self.assertIn("install -m 755 \"$runtime\" \"$output_runtime\"", verifier)
         self.assertIn("build-with-docker.sh", verifier)
         self.assertIn("readelf -l", verifier)
         self.assertIn("--appimage-help", verifier)
-        self.assertIn("task: packageAppImage", workflow)
+        self.assertIn("task: verifyAppImageRuntimeInPackage", workflow)
 
     def test_appimage_runtime_verifier_copies_verified_output_to_package_path(self):
         archive = OUTPUT / "archives/appimage-runtime/type2-runtime-dd6cebed.tar.gz"

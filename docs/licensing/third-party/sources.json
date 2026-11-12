@@ -544,6 +544,49 @@
       "remaining": [
         "Review the NOTICE attribution scope against the exact bytes in both runtime artifacts and verify inclusion in the final recipient-facing legal materials"
       ]
+    },
+    {
+      "sourceArtifacts": {
+        "org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.11.0": "3e0847c0b463965404d5b6fe5d6868000a220b050180dec68501801e9439976a",
+        "org.jetbrains.kotlinx:kotlinx-coroutines-reactive:1.11.0": "44f2180d726095371e55413ef3e649e292e97f8c3742096ced8dc83b112f4d79",
+        "org.jetbrains.kotlinx:kotlinx-coroutines-reactor:1.11.0": "3c77a98b5d521e9c5bbb03ac6188fecd90fbb0c926e8b79c96eda8bb885a5b8c",
+        "org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.11.0": "b1c9feab47fe4bbd9840aced64a896ebdf1e3c1287f6a400a263cd1f6046338d"
+      },
+      "proposedLicense": "Apache-2.0",
+      "upstreamCommit": "8564f65764d3d05893cec026c6e94250e2b23874",
+      "materialPaths": ["kotlinx-coroutines-1.11.0/NOTICE"],
+      "reviewStatus": "unreviewed",
+      "reviewNotes": "The exact 1.11.0 upstream NOTICE identifies itself as the Apache section 4(d) notice for the kotlinx.coroutines library. The four source-artifact hashes were independently computed from the published Maven Central source JARs.",
+      "remaining": [
+        "Verify the notice scope against the four exact packaged runtime artifacts and confirm inclusion in the final recipient-facing legal materials"
+      ]
+    },
+    {
+      "sourceArtifacts": {
+        "org.jetbrains.kotlinx:kotlinx-serialization-core-jvm:1.12.0": "b62fb8059123c43a72ddbe4aeaa8c92c8313d822c128ca2f861e3d91e35e5070",
+        "org.jetbrains.kotlinx:kotlinx-serialization-json-jvm:1.12.0": "af584f8e83f23e62a3a06f58f79a49e0c84e0011eb6c3526afc8ea1f3ace7db1"
+      },
+      "proposedLicense": "Apache-2.0",
+      "upstreamCommit": "4c28c3e33c145da536f1f4a671f70e5eb5b62b9c",
+      "materialPaths": ["kotlinx-serialization-1.12.0/NOTICE"],
+      "reviewStatus": "unreviewed",
+      "reviewNotes": "The exact 1.12.0 upstream NOTICE identifies itself as the Apache section 4(d) notice for the kotlinx.serialization library. The two source-artifact hashes were independently computed from the published Maven Central source JARs.",
+      "remaining": [
+        "Verify the notice scope against the two exact packaged runtime artifacts and confirm inclusion in the final recipient-facing legal materials"
+      ]
+    },
+    {
+      "sourceArtifacts": {
+        "org.jetbrains.kotlinx:atomicfu-jvm:0.28.0": "750bd5f9686abceca5ee6cdcab53d7abc20a2c1bebe462a23dba9932eeb9744c"
+      },
+      "proposedLicense": "Apache-2.0",
+      "upstreamCommit": "f206f5b4052efbe97c696559c673a35350598ffa",
+      "materialPaths": ["kotlinx-atomicfu-0.28.0/NOTICE"],
+      "reviewStatus": "unreviewed",
+      "reviewNotes": "The exact upstream 0.28.0 library NOTICE identifies itself as the Apache section 4(d) notice for kotlinx.atomicfu. The published source-JAR hash is pinned; package-specific attribution and final bundle inclusion remain pending.",
+      "remaining": [
+        "Verify the NOTICE scope against the exact packaged atomicfu-jvm artifact and confirm inclusion in final recipient materials"
+      ]
     }
   ],
   "embeddedComponents": [
@@ -551,7 +594,7 @@
       "name": "dng_sdk",
       "upstreamCommit": "dbe0a676450d9b8c71bf00688bb306409b779e90",
       "proposedLicense": "Adobe DNG SDK License Agreement",
-      "materialPaths": ["dng-sdk-dbe0a676/LICENSE"],
+      "materialPaths": ["dng-sdk-dbe0a676/LICENSE", "dng-sdk-dbe0a676/DNG-PATENT-NOTICE.txt"],
       "binaryEvidence": {
         "linux-x64": "DNG symbol family found in skiko-awt-runtime-linux-x64:0.150.2 (artifact SHA-256 c6c1f9fa37464fd0bcca6e486a6b35307b6e2436199de9d009f877121de1c5c2)",
         "macos-arm64": "DNG symbol family found in skiko-awt-runtime-macos-arm64:0.150.2 (artifact SHA-256 abea519fa519f7245412011cc3ab7a5852cb333b3dc3cac08a83f5bd806c7bec)",
@@ -561,6 +604,7 @@
       "reviewStatus": "unreviewed",
       "remaining": [
         "Have the Adobe DNG SDK License Agreement and exact redistribution/packaging conditions reviewed before release; this record is not a legal determination",
+        "Confirm whether the distributed component is covered by Adobe's separate DNG specification patent license; if so, verify the exact notice in the final platform packages",
         "Map component presence to exact final package binaries and determine required notice/source materials after review"
       ]
     },
@@ -859,6 +903,11 @@
       "url": "https://android.googlesource.com/platform/external/dng_sdk/+/dbe0a676450d9b8c71bf00688bb306409b779e90/LICENSE?format=TEXT"
     },
     {
+      "path": "dng-sdk-dbe0a676/DNG-PATENT-NOTICE.txt",
+      "sha256": "1c983aea9533c847ca76ec0310f68d64f0215d51ae49b5a2273133731a074c92",
+      "url": "https://www.adobe.com/support/downloads/dng/dng_sdk.html#dng-specification-patent-license"
+    },
+    {
       "path": "piex-bb217acd/LICENSE",
       "sha256": "58d1e17ffe5109a7ae296caafcadfdbe6a7d176f0bc4ab01e12a689b0499d8bd",
       "url": "https://raw.githubusercontent.com/google/piex/bb217acdca1cc0c16b704669dd6f91a1b509c406/LICENSE"
@@ -1092,6 +1141,21 @@
       "path": "kotlinx-io-0.9.1/NOTICE",
       "sha256": "a126623d2c0c1ca21814828749243869ae2c44c7f6a56ef6074bb87f430b659e",
       "url": "https://raw.githubusercontent.com/Kotlin/kotlinx-io/362bdc35e159bad6da1e08101c8321792d762281/NOTICE"
+    },
+    {
+      "path": "kotlinx-coroutines-1.11.0/NOTICE",
+      "sha256": "1ab6de67ef738bffae63f9aa6a8798a35e87341c83ea28d09c8dc8ca6993232a",
+      "url": "https://raw.githubusercontent.com/Kotlin/kotlinx.coroutines/8564f65764d3d05893cec026c6e94250e2b23874/license/NOTICE.txt"
+    },
+    {
+      "path": "kotlinx-serialization-1.12.0/NOTICE",
+      "sha256": "ec77bba5c852830abfdefcdefbf4a22577ff4df79ec323a898d5100ca1d6f8d6",
+      "url": "https://raw.githubusercontent.com/Kotlin/kotlinx.serialization/4c28c3e33c145da536f1f4a671f70e5eb5b62b9c/license/NOTICE.txt"
+    },
+    {
+      "path": "kotlinx-atomicfu-0.28.0/NOTICE",
+      "sha256": "2b1db3aa8302414ea2bb1be5391110268b4611a11c9c3d28e34bf3acfddc9ef4",
+      "url": "https://raw.githubusercontent.com/Kotlin/kotlinx.atomicfu/f206f5b4052efbe97c696559c673a35350598ffa/license/NOTICE.txt"
     }
   ]
 }

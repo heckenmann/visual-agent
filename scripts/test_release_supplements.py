@@ -89,14 +89,14 @@ class SupplementalNoticesTest(unittest.TestCase):
             self.load()
 
     def test_source_urls_cannot_embed_credentials(self):
-        self.data["materials"][0]["url"] = "https://user:secret@example.org/LICENSE"
+        self.data["materials"][0]["url"] = "https://placeholder@localhost/LICENSE"
         with self.assertRaisesRegex(ValueError, "public HTTPS"):
             self.load()
 
     def test_repository_snapshots_match_the_recorded_hashes(self):
         registry = pathlib.Path(__file__).parents[1] / "docs/licensing/third-party/sources.json"
         components = load_supplements(registry)
-        self.assertEqual(95, len(components))
+        self.assertEqual(102, len(components))
         self.assertEqual("MPL-2.0", components["com.h2database:h2:2.5.252"]["proposedLicense"])
         self.assertEqual("EPL-2.0", components["ch.qos.logback:logback-core:1.6.6"]["proposedLicense"])
         self.assertEqual("Apache-2.0", components["net.java.dev.jna:jna:5.19.1"]["proposedLicense"])
@@ -131,6 +131,13 @@ class SupplementalNoticesTest(unittest.TestCase):
             "org.reactivestreams:reactive-streams:1.0.4",
             "org.jetbrains.kotlinx:kotlinx-io-bytestring-jvm:0.9.1",
             "org.jetbrains.kotlinx:kotlinx-io-core-jvm:0.9.1",
+            "org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.11.0",
+            "org.jetbrains.kotlinx:kotlinx-coroutines-reactive:1.11.0",
+            "org.jetbrains.kotlinx:kotlinx-coroutines-reactor:1.11.0",
+            "org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.11.0",
+            "org.jetbrains.kotlinx:kotlinx-serialization-core-jvm:1.12.0",
+            "org.jetbrains.kotlinx:kotlinx-serialization-json-jvm:1.12.0",
+            "org.jetbrains.kotlinx:atomicfu-jvm:0.28.0",
         }
         self.assertTrue(newly_mapped_coordinates.issubset(components))
         for coordinate in newly_mapped_coordinates:
@@ -139,6 +146,66 @@ class SupplementalNoticesTest(unittest.TestCase):
         io_notice = components["org.jetbrains.kotlinx:kotlinx-io-core-jvm:0.9.1"]["materials"][0]["content"]
         self.assertIn(b"NOTICE file corresponding to the section 4 d", io_notice)
         self.assertIn(b"Copyright 2017-2023 JetBrains s.r.o", io_notice)
+        coroutines_notice = components[
+            "org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.11.0"
+        ]["materials"][0]["content"]
+        self.assertEqual(
+            "1ab6de67ef738bffae63f9aa6a8798a35e87341c83ea28d09c8dc8ca6993232a",
+            hashlib.sha256(coroutines_notice).hexdigest(),
+        )
+        expected_coroutines_source_hashes = {
+            "org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.11.0":
+                "3e0847c0b463965404d5b6fe5d6868000a220b050180dec68501801e9439976a",
+            "org.jetbrains.kotlinx:kotlinx-coroutines-reactive:1.11.0":
+                "44f2180d726095371e55413ef3e649e292e97f8c3742096ced8dc83b112f4d79",
+            "org.jetbrains.kotlinx:kotlinx-coroutines-reactor:1.11.0":
+                "3c77a98b5d521e9c5bbb03ac6188fecd90fbb0c926e8b79c96eda8bb885a5b8c",
+            "org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.11.0":
+                "b1c9feab47fe4bbd9840aced64a896ebdf1e3c1287f6a400a263cd1f6046338d",
+        }
+        for coordinate, source_hash in expected_coroutines_source_hashes.items():
+            with self.subTest(coordinate=coordinate):
+                component = components[coordinate]
+                self.assertEqual(source_hash, component["sourceArtifactSha256"])
+                self.assertEqual(coroutines_notice, component["materials"][0]["content"])
+                self.assertEqual(
+                    "8564f65764d3d05893cec026c6e94250e2b23874",
+                    component["upstreamCommit"],
+                )
+        self.assertIn(b"for the kotlinx.coroutines library", coroutines_notice)
+        serialization_notice = components[
+            "org.jetbrains.kotlinx:kotlinx-serialization-core-jvm:1.12.0"
+        ]["materials"][0]["content"]
+        self.assertEqual(
+            "ec77bba5c852830abfdefcdefbf4a22577ff4df79ec323a898d5100ca1d6f8d6",
+            hashlib.sha256(serialization_notice).hexdigest(),
+        )
+        self.assertIn(b"kotlinx.serialization library", serialization_notice)
+        atomicfu_notice = components["org.jetbrains.kotlinx:atomicfu-jvm:0.28.0"]["materials"][0]["content"]
+        self.assertEqual(
+            "2b1db3aa8302414ea2bb1be5391110268b4611a11c9c3d28e34bf3acfddc9ef4",
+            hashlib.sha256(atomicfu_notice).hexdigest(),
+        )
+        self.assertIn(b"for the kotlix.atomicfu library", atomicfu_notice)
+        self.assertEqual(
+            "750bd5f9686abceca5ee6cdcab53d7abc20a2c1bebe462a23dba9932eeb9744c",
+            components["org.jetbrains.kotlinx:atomicfu-jvm:0.28.0"]["sourceArtifactSha256"],
+        )
+        expected_serialization_source_hashes = {
+            "org.jetbrains.kotlinx:kotlinx-serialization-core-jvm:1.12.0":
+                "b62fb8059123c43a72ddbe4aeaa8c92c8313d822c128ca2f861e3d91e35e5070",
+            "org.jetbrains.kotlinx:kotlinx-serialization-json-jvm:1.12.0":
+                "af584f8e83f23e62a3a06f58f79a49e0c84e0011eb6c3526afc8ea1f3ace7db1",
+        }
+        for coordinate, source_hash in expected_serialization_source_hashes.items():
+            with self.subTest(coordinate=coordinate):
+                component = components[coordinate]
+                self.assertEqual(source_hash, component["sourceArtifactSha256"])
+                self.assertEqual(serialization_notice, component["materials"][0]["content"])
+                self.assertEqual(
+                    "4c28c3e33c145da536f1f4a671f70e5eb5b62b9c",
+                    component["upstreamCommit"],
+                )
         antlr_runtime = components["org.antlr:antlr-runtime:3.5.3"]
         runtime_notices = next(
             material["content"]
@@ -420,6 +487,15 @@ class SupplementalNoticesTest(unittest.TestCase):
         dng_platforms = components["dng_sdk"]["binaryEvidence"]
         self.assertIn("Unknown", dng_platforms["windows-x64"])
         self.assertIn("found", dng_platforms["linux-x64"])
+        dng_notice_path = "dng-sdk-dbe0a676/DNG-PATENT-NOTICE.txt"
+        self.assertIn(dng_notice_path, components["dng_sdk"]["materialPaths"])
+        dng_notice = (registry_path.parent / dng_notice_path).read_bytes()
+        self.assertEqual(b"This product includes DNG technology under license by Adobe.\n", dng_notice)
+        registered_notice = next(item for item in registry["materials"] if item["path"] == dng_notice_path)
+        self.assertEqual(hashlib.sha256(dng_notice).hexdigest(), registered_notice["sha256"])
+        required_notice = dng_notice.decode().strip()
+        self.assertIn(required_notice, (root / "README.md").read_text())
+        self.assertIn(required_notice, (root / "modules/desktop/build.gradle.kts").read_text())
         package = registry["packageEvidence"][0]
         self.assertEqual(42388152203, package["workflowRun"])
         self.assertEqual("historical-smoke-artifact-not-final-release-candidate", package["status"])
@@ -446,7 +522,7 @@ class SupplementalNoticesTest(unittest.TestCase):
         self.assertIn("prohibits selling the font by itself", review_notes)
         self.assertIn("does not approve the complete release package", review_notes)
         component = load_supplements(root / "docs/licensing/third-party/sources.json")
-        self.assertEqual(95, len(component))
+        self.assertEqual(102, len(component))
         license_file = root / "docs/licensing/third-party/liberation-fonts-2.1.5/LICENSE"
         self.assertEqual(asset["licenseMaterialPath"],
                          "liberation-fonts-2.1.5/LICENSE")

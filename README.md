@@ -14,6 +14,11 @@ own licenses; see the [dependency and distribution license audit](docs/dependenc
 for the current inventory, outstanding notice obligations, and binary-release limitations. The
 packaged third-party license texts are also available in the application's About panel.
 
+The bundled Skiko native renderer includes Adobe DNG technology. Its required
+notice is:
+
+> This product includes DNG technology under license by Adobe.
+
 ## Download and Run
 
 Binary downloads are temporarily unavailable while the beta release packages and their

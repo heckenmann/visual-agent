@@ -81,6 +81,8 @@ val desktopDispatcherProbeClasspath = files(sourceSets.main.get().runtimeClasspa
 
 // Resolve sources from the selected runtime graph, not independently selected versions.
 // This is a partial evidence set; JDK/native source obligations remain open in #410.
+// Adobe's DNG specification patent license requires this notice in source and documentation:
+// This product includes DNG technology under license by Adobe.
 val requiredSourceModules =
     setOf(
         "com.h2database:h2",

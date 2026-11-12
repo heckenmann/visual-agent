@@ -15,6 +15,17 @@ or organization that has not performed it.
 - Final package and archive hashes have not yet been reviewed. The approval
   registry remains unchanged until that review succeeds.
 
+## Existing GitHub Pre-release
+
+Checked on 2026-11-12, the public [`v0.1.0` pre-release](https://github.com/heckenmann/visual-agent/releases/tag/v0.1.0)
+has no attached release assets. Its tag points to source commit
+`355c256ed493a4a8e8acaa38e53b298d66c7c7f5`. Therefore that GitHub release
+currently offers no installer, executable JAR, legal bundle, or corresponding-
+source archive for download. This observation does not establish whether anyone
+obtained binaries through another channel or an expired CI artifact, and it is
+not a redistribution approval. Any future binary release still requires the
+exact-artifact review and approval described in `README.md` in this directory.
+
 The branch was rebased onto newer dependencies before this review. In
 particular, GraalJS is now `25.5.5.0.3`, while the retained Graal supplements
 identify `25.4.4.1.1`. The older artifact hashes cannot approve the new graph.
@@ -46,6 +57,43 @@ upstream license and NOTICE scope still require component-level review. The
 other no-detected entries have supplements, but those records also remain
 explicitly unreviewed.
 
+#### Unmapped Notice Candidates: Upstream Revision Triage
+
+For Linux inventory workflow
+[`43137911416`](https://github.com/heckenmann/visual-agent/actions/runs/43137911416),
+the 66 components without a package-detected notice or coordinate-matched
+supplement were compared with the exact-version Maven POMs. POMs were retrieved
+for 58 coordinates; these expose 42 distinct SCM URL/tag pairs. Eight entries
+had no usable SCM reference in the queried Maven Central POM, including an
+AndroidX artifact hosted outside that repository and records with no SCM element.
+Most returned SCM elements do not declare a release tag.
+
+This is a source-location index, not a NOTICE review: a POM's SCM URL does not
+prove the release revision or whether a repository-root NOTICE applies to the
+packaged artifact. The shared Apache-2.0 text is already retained, but the
+conditional attribution scope still needs verification against the exact
+upstream release materials. Resolve the 42 repository groups at evidenced
+release revisions, and investigate the eight missing SCM references from their
+official artifact sources; do not infer a tag or mark these candidates reviewed
+from POM metadata alone.
+
+As a first exact-tag pass, the version-matching source trees for
+[Spring AI `v2.1.0-RC2`](https://github.com/spring-projects/spring-ai/tree/1bd756c58d3cad64e8f5870dc929622837ac2236),
+[Touchlab Stately `2.1.0`](https://github.com/touchlab/Stately/tree/6ae0eb15df77dc4e44a2e1b6707afd5702cf0298),
+[MobileByteLabs KmpToolkit `v3.5.37`](https://github.com/MobileByteLabs/KmpToolkit/tree/ea9fc99eb01df97948f5bfdc765e225dc2c1063a),
+and [multiplatform-markdown-renderer `v0.46.0`](https://github.com/mikepenz/multiplatform-markdown-renderer/tree/f3437710ca1d9f1ca73b5b71072aebe6c53a5887)
+contain no file whose name begins with `NOTICE`. The full trees were available
+for these refs. The
+[Compose Multiplatform `v1.12.2` tree](https://github.com/JetBrains/compose-multiplatform/tree/ab304f2538657d9f7077bdb40797f5db618b4c84)
+contains only `examples/imageviewer/NOTICE.md`; it is sample-specific, not a
+root notice for the packaged library modules. The Kotlin `v2.4.21` root
+directory has no NOTICE file, although GitHub marks its recursive tree response
+truncated, so this establishes root absence only. The exact kotlinx.coroutines,
+kotlinx.serialization, and kotlinx.atomicfu trees each contain
+`license/NOTICE.txt`; those library notices are retained by the local source
+registry, but the current CI inventories predate those additions. These checks narrow notice triage only;
+they do not establish artifact-to-tag identity or complete license clearance.
+
 The same manifests include 241-243 bundled-JDK legal files per platform; the
 runtime legal section is also `unreviewed`. The Linux provenance report records
 Zulu `27.0.1.0.3+1`, its exact source and packaged module lists, and hashes for
@@ -54,6 +102,42 @@ packaging and provenance capture only. They do not resolve the outstanding
 Apache NOTICE, GraalJS signing, Skia/ANGLE, AppImage source/relink, JDK-module,
 and final recipient-archive reviews described below. No approval registry
 entry or release tag was changed.
+
+The PR was subsequently rebased to `fa627c62fc8416d959779707adc7a7ca2a7f906f`.
+The regular PR checks and four-platform inventory workflow pass for that head,
+but the separate non-publishing package run
+[`43145746309`](https://github.com/heckenmann/visual-agent/actions/runs/43145746309)
+failed only in the Linux AppImage job. `appimagetool` successfully assembled
+the package, then the old verifier rejected its runtime because the tool writes
+the generated 16-byte `.digest_md5` ELF section into the embedded runtime.
+The other native package jobs succeeded, but their smoke jobs were skipped when
+the matrix failed; this run therefore does not provide a complete package-smoke
+candidate.
+
+The run did upload notice manifests for Linux DEB, Linux RPM, Windows, macOS
+ARM64, and macOS x64. Their manifests contain 263 components each except
+macOS x64 (261); every component and runtime-legal section is `unreviewed`, and
+every manifest has `redistributionApproved: false`. Each has 136 retained
+component notices and 127 without a package-detected notice, except macOS x64
+with 125. No AppImage notice manifest was uploaded. These are useful exact
+package inventories, but the five manifests do not replace the missing AppImage
+evidence or establish release clearance.
+
+A local correction now verifies the packaged runtime against the retained
+source-built runtime while permitting only that documented digest-section
+rewrite. It also checks the ELF section layout, the zero-filled placeholder and
+that the digest field changed, all remaining runtime-prefix bytes, and the
+AppImage Type 2 marker. The release-script suite passes 169 tests locally, and
+the Gradle task wiring has been checked with a dry run. These local changes are
+uncommitted and have not been tested by the Linux package workflow. A new CI
+package run is still needed before updating package-bound legal evidence; no
+redistribution approval is recorded.
+
+The current local source registry has 38 dependency records and three embedded
+component records, all marked `unreviewed`. Its two package-evidence records are
+explicitly historical smoke artifacts, and its AppImage runtime source list is
+not yet bound to a newly built package hash. Therefore neither the passing
+inventory jobs nor the local fix establish final recipient-package completeness.
 
 ### Kotlinx IO 0.9.1 Upstream NOTICE Evidence
 
@@ -74,6 +158,77 @@ supplement under the corresponding actual package hashes.
 This closes the prior evidence-collection gap for those two coordinates only.
 The NOTICE attribution scope and inclusion in the final recipient-facing legal
 archive remain unreviewed; redistribution approval remains false.
+
+### Kotlinx Coroutines 1.11.0 Upstream NOTICE Evidence
+
+The exact upstream tag `1.11.0` resolves to commit
+`8564f65764d3d05893cec026c6e94250e2b23874`. Its
+[`license/NOTICE.txt`](https://raw.githubusercontent.com/Kotlin/kotlinx.coroutines/8564f65764d3d05893cec026c6e94250e2b23874/license/NOTICE.txt)
+identifies itself as the Apache section 4(d) notice for the kotlinx.coroutines
+library. The original text is retained at
+`docs/licensing/third-party/kotlinx-coroutines-1.11.0/NOTICE` with SHA-256
+`1ab6de67ef738bffae63f9aa6a8798a35e87341c83ea28d09c8dc8ca6993232a`.
+The four published source JARs are mapped by their exact SHA-256 values in
+`sources.json`; the Linux candidate package inventory identifies the same four
+runtime coordinates with no embedded notices.
+
+This is a targeted notice-evidence correction, not final review. The existing
+four-platform manifests predate this addition; the next inventory run must
+confirm each exact package hash receives the notice. Attribution scope and final
+recipient-facing archive inclusion remain unreviewed.
+
+### Kotlinx Serialization 1.12.0 Upstream NOTICE Evidence
+
+The exact upstream tag `v1.12.0` resolves to commit
+`4c28c3e33c145da536f1f4a671f70e5eb5b62b9c`. Its
+[`license/NOTICE.txt`](https://raw.githubusercontent.com/Kotlin/kotlinx.serialization/4c28c3e33c145da536f1f4a671f70e5eb5b62b9c/license/NOTICE.txt)
+identifies itself as the Apache section 4(d) notice for the
+kotlinx.serialization library. Its original text, including the upstream
+header's `kotlix.serialization` spelling, is retained unchanged at
+`docs/licensing/third-party/kotlinx-serialization-1.12.0/NOTICE` with SHA-256
+`ec77bba5c852830abfdefcdefbf4a22577ff4df79ec323a898d5100ca1d6f8d6`.
+The Linux inventory for PR head `fa627c62` identifies both JVM runtime
+coordinates without embedded notices. Their published source-JAR hashes are
+mapped in `sources.json`.
+
+This targeted correction has not yet been run through a new four-platform
+inventory. Package-specific attribution scope and inclusion in final recipient
+materials remain unreviewed.
+
+### Kotlinx Atomicfu 0.28.0 Upstream NOTICE Evidence
+
+The exact upstream tag resolves to commit
+`f206f5b4052efbe97c696559c673a35350598ffa`. Its
+[`license/NOTICE.txt`](https://raw.githubusercontent.com/Kotlin/kotlinx.atomicfu/f206f5b4052efbe97c696559c673a35350598ffa/license/NOTICE.txt)
+identifies itself as the Apache section 4(d) notice for kotlinx.atomicfu. The
+original file is retained unchanged at
+`docs/licensing/third-party/kotlinx-atomicfu-0.28.0/NOTICE` with SHA-256
+`2b1db3aa8302414ea2bb1be5391110268b4611a11c9c3d28e34bf3acfddc9ef4`; its
+upstream spelling errors are preserved rather than silently corrected. The
+published `atomicfu-jvm:0.28.0` source JAR hash is pinned in `sources.json`.
+
+The current Linux candidate inventory did not identify an embedded notice for
+this coordinate. The exact source/tag relationship, package-specific
+attribution scope, and final recipient archive inclusion remain unreviewed;
+four-platform inventory evidence is still required.
+
+### Local Package Verification After Rebase (2026-11-12)
+
+On the rebased local worktree, `python3 -m unittest discover -s scripts -p
+'test_release_*.py'` passes all 169 tests. The full Gradle gate
+(`ktlintCheck check test`) and `verifyPackages` also pass. The two executable
+JARs and the generated macOS app resources contain the original Kotlinx
+coroutines, serialization, and atomicfu NOTICE bytes at the registry-pinned
+hashes; the Kotlinx IO notice is present as well. This verifies local JAR and
+macOS package inclusion only. The AppImage package job is Linux-only and was
+not exercised by the macOS `verifyPackages` task.
+
+The local worktree changes are not present in PR #533. PR run `43145746309`
+still reflects the prior code and fails because its old AppImage verifier
+rejects appimagetool's generated `.digest_md5` section. The local replacement
+has not yet been validated by the Linux package workflow, and none of these
+technical checks changes any of the 38 unreviewed component records or grants
+redistribution clearance.
 
 ### Verified Graal Evidence Gap and Local Correction
 
@@ -275,6 +430,29 @@ corresponding-source requirement. Final review still verifies original notices
 in the actual packages containing the DNG code; an unknown Windows symbol
 table must not be treated as proof of absence.
 
+Adobe's current [DNG SDK and specification page](https://www.adobe.com/support/downloads/dng/dng_sdk.html#dng-specification-patent-license)
+also publishes a separate patent license for compliant implementations of the
+DNG specification. It grants a limited patent license for implementations
+that read or write DNG files and requires this notice to be displayed
+prominently in source code and documentation: `This product includes DNG
+technology under license by Adobe.` The retained SDK agreement begins with an
+Adobe DNG acknowledgment, but that alone does not prove that the separate
+patent-license placement requirement is satisfied in the project's source and
+recipient-facing documentation. Confirm whether the redistributed native
+component is a covered compliant implementation and verify the required notice
+placement before release. This is separate from the SDK's redistribution
+permission and its commercial-product indemnity clause.
+
+The exact patent-license notice is now also present in the root README, beside
+the Skiko dependency in the desktop build source, and in the hash-pinned
+`DNG-PATENT-NOTICE.txt` recipient material. The local `verifyPackages` run
+confirmed the curated legal files in the executable JARs and macOS native
+package, and the supplement regression test checks the exact notice and its
+source/documentation placements. This closes the local notice-placement task;
+it does not decide whether this embedded component is a covered compliant
+implementation, establish Windows/Linux final-candidate inclusion, or grant
+redistribution clearance.
+
 ### AppImage libfuse: LGPL-2.1 Section 6(a)
 
 The [retained libfuse LGPL text](third-party/libfuse-3.15.0/LGPL2.txt) permits
@@ -317,9 +495,16 @@ The current local packaging correction replaces the previously downloaded
 prebuilt runtime with a runtime built from the retained source archive by the
 same Gradle task that packages the AppImage. The verifier checks the output and
 copies that exact file into the package task's declared input; after packaging,
-the task compares the AppImage's runtime prefix byte-for-byte with that file.
-The packaging wrapper stamps the runtime with the short commit from the exact
-source archive using the version format from the pinned upstream release
+the verifier compares the AppImage's runtime prefix with that file. AppImage's
+`appimagetool` writes its generated 16-byte `.digest_md5` ELF section into the
+runtime prefix after embedding it. The comparison therefore permits changes
+only in that reserved section, verifies that the source section was an empty
+placeholder and that appimagetool filled it, and requires every other prefix
+byte and the Type 2 marker to match exactly. The
+[pinned upstream appimagetool implementation](https://github.com/AppImage/appimagetool/blob/8c8c91f762b412a19f4e8d2c4b35afb98f2d7c81/src/appimagetool.c)
+documents and performs this digest write. The packaging wrapper stamps the
+runtime with the short commit from the exact source archive using the version
+format from the pinned upstream release
 workflow, then verifies the reported version. The package-notice collector now
 records the final AppImage hash, runtime prefix hash and size, source archive
 hash and commit, and original license texts for the mapped runtime and static

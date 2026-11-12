@@ -168,7 +168,7 @@ that one generic license text covers all resolved dependencies.
 
 The selected desktop runtime graph currently includes Oracle's non-community
 GraalJS isolate artifact (for example,
-`org.graalvm.js:js-isolate-darwin-aarch64:25.4.4.1.1`) alongside GraalJS and
+`org.graalvm.js:js-isolate-darwin-aarch64:25.5.5.0.3`) alongside GraalJS and
 Truffle components whose metadata reports UPL and ICU licensing. The upstream
 [GraalJS licensing notes](https://github.com/oracle/graaljs#license) distinguish
 community UPL artifacts from non-community GFTC artifacts and identify isolate
@@ -179,12 +179,13 @@ artifact and its use in the beta must be checked against the complete terms; a
 noncommercial project description alone is not a clearance decision.
 
 The curated package materials now include
-`third-party/graaljs-25.4.4.1.1/GFTC-TERMS-REFERENCE.md`, which points recipients
+`third-party/graaljs-25.5.5.0.3/GFTC-TERMS-REFERENCE.md`, which points recipients
 to Oracle's complete terms and summarizes the relevant review conditions. It is
 not the agreement text and does not satisfy release clearance by itself. The
 supplement registry binds this reference to the exact Linux x64, macOS ARM64,
-and Windows x64 isolate JAR hashes; macOS x64 has no isolate JAR in the audited
-package inventory.
+and Windows x64 isolate JAR hashes for version `25.5.5.0.3`; macOS x64 has no
+isolate JAR in the audited package inventory. Older `25.4.4.1.1` records remain
+historical evidence and do not identify the current selected graph.
 
 The local macOS inventory records distinct original-artifact and packaged-JAR
 hashes for the isolate artifact. The transformation is now identified: Compose
