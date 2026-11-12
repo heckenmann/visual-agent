@@ -8,13 +8,17 @@ or organization that has not performed it.
 
 ## Current Candidate (Non-Publishing)
 
-- Source: `62896caf507abd29a8f992d1ce5dd65b59e6f655` (PR #533, rebased on the
-  current `master` at workflow dispatch).
+- Source: `598366e803e8559640d6f8a20ed5a75449fc2bd2` (PR #533, rebased on the
+  current `master`).
 - Release version input: none. This is not a versioned release candidate.
-- The non-versioned [full package and smoke workflow](https://github.com/heckenmann/visual-agent/actions/runs/43187339406)
-  completed successfully for this exact source. All ten package variants and
-  all eleven platform/container smoke jobs passed. The workflow received no
-  release-tag input and did not publish a release or create/move a tag.
+- The non-versioned [full package and smoke workflow](https://github.com/heckenmann/visual-agent/actions/runs/43255800118)
+  completed successfully for this exact source (final rerun attempt 5). All ten
+  package variants and their platform/container smoke jobs passed across the
+  same-source reruns. Some macOS ARM64 package/smoke jobs were initially
+  cancelled while waiting for hosted runners; rerunning them completed
+  successfully. The
+  workflow received no release-tag input and did not publish a release or
+  create/move a tag.
 - The six package-notice inventories contain 263 components each for Linux
   AppImage, DEB, RPM, Windows, and macOS ARM64, and 261 for macOS x64. Across
   all six, 1,576 component records and all six bundled-runtime sections remain
@@ -23,15 +27,20 @@ or organization that has not performed it.
   notice in the package on five platforms, and 125 on macOS x64. This is a
   review queue, not evidence that every such component lacks a required notice.
   `netty-resolver-dns-native-macos` is absent from all six inventories.
-- The generated recipient-candidate archives were downloaded and verified
-  locally. `visual-agent-legal.zip` SHA-256 is
-  `550f1cf873e59be5084794a73067d96cda1446a07101986a7bb293e14e263609`; its
-  internal manifest covers 4,404 files. `visual-agent-corresponding-sources.zip`
-  SHA-256 is
+- The exact AppImage build log installs `zlib-static 1.4-r0` and
+  `musl-dev 1.2.5-r12`; the corresponding package-notice artifact instead
+  contains the zlib 1.3.1 license material. The run's
+  `visual-agent-corresponding-sources.zip` has SHA-256
   `d911aa648006492230d8ff4df8bbf61292e6c7119ad989a57715bc40268fe40f`; its
-  internal manifest covers 97 files, including the exact-version Zulu source
-  package and AppImage runtime sources. Every listed file matched its digest.
-  These integrity checks do not establish legal completeness or approval.
+  97-file manifest was verified, but the archive contains zlib 1.3.1 and
+  Alpine package sources that do not match the runtime build's zlib 1.4-r0 and
+  musl 1.2.5-r12 inputs. It cannot yet be treated as matching the AppImage.
+  Local uncommitted source-registry corrections do not change this candidate
+  and have not been built or inventoried by CI.
+- The six inventories set `redistributionApproved` to `false`, and every
+  component remains `unreviewed`. The successful build, package and smoke jobs
+  establish technical packaging only; they do not establish legal completeness,
+  corresponding-source sufficiency or redistribution approval.
 - The approval registry remains unchanged and no release is cleared. The
   candidate archives are not a substitute for component-level review,
   confirming source/relink sufficiency, or approval of exact final release
@@ -240,21 +249,31 @@ four-platform inventory evidence is still required.
 
 ### Local Package Verification After Rebase (2026-11-12)
 
-On the rebased local worktree, `python3 -m unittest discover -s scripts -p
-'test_release_*.py'` passes all 169 tests. The full Gradle gate
-(`ktlintCheck check test`) and `verifyPackages` also pass. The two executable
-JARs and the generated macOS app resources contain the original Kotlinx
-coroutines, serialization, and atomicfu NOTICE bytes at the registry-pinned
-hashes; the Kotlinx IO notice is present as well. This verifies local JAR and
-macOS package inclusion only. The AppImage package job is Linux-only and was
-not exercised by the macOS `verifyPackages` task.
+On the rebased local worktree, all 169 release-script tests, the full Gradle
+gate (`ktlintCheck check test`), and `verifyPackages` passed. The generated
+macOS app contains the zlib 1.4 license with the exact curated SHA-256
+`e32ff4e00d9d94930537635291da39e7e612703334bf6fde8c7f1686fe8a45a2`.
+`verifyPackages` validates the two executable JARs and the local macOS
+distribution only; it does not build or validate a Linux AppImage.
 
-The local worktree changes are not present in PR #533. PR run `43145746309`
-still reflects the prior code and fails because its old AppImage verifier
-rejects appimagetool's generated `.digest_md5` section. The local replacement
-has not yet been validated by the Linux package workflow, and none of these
-technical checks changes any of the 38 unreviewed component records or grants
-redistribution clearance.
+The current local `prepareLibrarySourceMaterials` task also passes. Its
+generated AppImage source-material directory contains musl 1.2.5 with the
+Alpine musl-dev 1.2.5-r12 recipe, and zlib 1.4 with the Alpine zlib-static
+1.4-r0 recipe, all matching their pinned SHA-256 values in `sources.json`. The
+libfuse `SOURCE-AND-RELINK.txt` is present. This verifies source retrieval and
+manifest integrity, not correspondence to a newly built AppImage or
+sufficiency under LGPL-2.1 section 6(a).
+
+PR #533's pushed head is `598366e803e8559640d6f8a20ed5a75449fc2bd2`. Its
+four-platform inventory workflow `43194021811` is green, but inspection of the
+uploaded `packaged-artifacts.csv` files shows that this pushed source still
+ships `js-isolate` on Linux x64, macOS ARM64, and Windows x64; macOS x64 has no
+such artifact. A local build made after the uncommitted dependency removal has
+no isolate on macOS ARM64, but the other platforms have not been built from
+that source state. Thus the old GFTC/macOS-signing question remains applicable
+to the pushed PR candidate and is only conditionally removed by the local
+change. All 38 component records remain unreviewed and the release registry
+still grants no redistribution clearance.
 
 ### Verified Graal Evidence Gap and Local Correction
 
@@ -262,18 +281,20 @@ The Linux notice manifest from inventory workflow `42649987764` contains 14
 Graal `25.5.5.0.3` artifacts. Each has `no-detected-notice` and no matching
 supplement. This is a concrete missing-material mapping, not a conclusion based
 only on a POM license name. The corresponding Linux, macOS ARM64, and Windows
-inventories provide the original JAR hashes; the macOS isolate's packaged hash
-differs from its original hash, so its signing review remains necessary.
+inventories provide the original JAR hashes; the current PR #533 inventory
+still contains the isolate on Linux, macOS ARM64, and Windows, but not macOS
+x64.
 
-The local registry now also retains the 16 current-version coordinates across
-those platforms, without deleting the historical records. The current official
-Graal release's UPL text is byte-identical to the retained original; its SHA-256
-is recorded in the new entry, avoiding a duplicate license file. The current
-shadowed ICU source JAR has SHA-256
+The local registry retains the 16 coordinates observed in that historical
+candidate across those platforms, without deleting earlier records. The
+official Graal release's UPL text is byte-identical to the retained original;
+its SHA-256 is recorded in the new entry, avoiding a duplicate license file.
+The shadowed ICU source JAR from that candidate has SHA-256
 `485f54aaa23f47224ae0fe8c12c622314dfb46a0ca93f5c3d7e2683281c612d6`;
 `VersionInfo.java` identifies ICU 78.2 and Unicode 17.0, matching the retained
 original ICU license. A version-specific GFTC reference covers the three
-isolate platform coordinates without asserting that macOS re-signing is allowed.
+historical isolate platform coordinates without asserting that macOS re-signing
+is allowed.
 
 The language implementation separately retains its own original
 `LICENSE_GRAALJS` and `THIRD_PARTY_LICENSE_GRAALJS.txt` from the exact upstream
@@ -281,13 +302,60 @@ release commit. These contain Oracle, Lucent, V8, Unicode, and other applicable
 notices that a generic SDK UPL copy cannot replace. Its exact-version source
 archive is now included through the existing Gradle runtime source-variant
 collector, with recipient instructions and hash recorded in
-`source-delivery.md`. This does not imply that the native isolate is UPL-licensed.
+`source-delivery.md`. This does not imply that the historical native isolate was
+UPL-licensed.
 
 The catalog-version regression test and supplemental-material integrity tests
-pass for these corrections. These local changes are not yet in the candidate
-identified above. Therefore that candidate cannot be approved as if it already
-contained them; final package verification must use the subsequent corrected
-source commit and its own exact artifact hashes.
+pass for those evidence updates. They are not themselves a license approval.
+
+### JDK 27 Isolate Failure And Runtime Exclusion
+
+A direct runtime probe on the required JDK 27 reproduced
+`NoSuchMethodError: jdk.internal.access.JavaLangAccess.addEnableNativeAccess`
+when creating GraalJS `SandboxPolicy.UNTRUSTED` contexts with the selected
+25.5.5.0.3 platform isolate. The service had caught that startup failure and
+continued with `SandboxPolicy.CONSTRAINED`, so ordinary service tests did not
+prove that the isolate was working. The current local change removes the
+platform isolate dependency and uses the same constrained host-access policy
+explicitly. This also removes the isolate's GFTC/macOS-signing question from the
+new runtime graph, but release-candidate package inventories must be regenerated
+to confirm the exclusion in every final artifact.
+
+The official GraalVM embedding guide documents Community Edition isolate
+artifacts (`*-isolate-community`) separately from Oracle's GFTC isolate
+artifacts. The exact macOS ARM64 Community artifact for GraalJS 25.5.5.0.3 is
+published with MIT and UPL-1.0 metadata. I tested that artifact with the same
+`UNTRUSTED` sandbox options on Temurin 27+35 and Zulu 27.0.1+9; both fail during
+isolate startup with the same `JavaLangAccess.addEnableNativeAccess(Module)`
+linkage error. The same test returns 42 on Temurin 25.0.3. Maven Central lists
+25.5.5.0.3 as the latest version of this platform artifact as of 2026-11-12.
+This isolates the current failure to JDK 27 compatibility rather than the
+GFTC-versus-Community artifact choice. Switching to the Community variant alone
+would not restore the quotas while retaining the project's JDK 27 runtime.
+The documented `engine.IsolateMode=external` option was also tested on Zulu
+27.0.1+9 and fails with the same linkage error before the external worker starts.
+
+References: [GraalVM embedding guide](https://www.graalvm.org/latest/reference-manual/embed-languages/),
+[macOS ARM64 Community artifact POM](https://repo.maven.apache.org/maven2/org/graalvm/js/js-isolate-darwin-aarch64-community/25.5.5.0.3/js-isolate-darwin-aarch64-community-25.5.5.0.3.pom).
+
+This is also a security release blocker, not only a lost-quota limitation.
+GraalVM's `SandboxPolicy` API describes `CONSTRAINED` as intended for trusted,
+potentially buggy applications and explicitly says that untrusted code is not
+supported under any policy other than `UNTRUSTED`. Since the JavaScript tool
+executes model-supplied scripts, the constrained JDK 27 fallback must not be
+treated as an equivalent sandbox or approved for release as the current
+model-facing execution path. Keep the feature unavailable for untrusted scripts
+until a compatible `UNTRUSTED` runtime or a separately reviewed process boundary
+is implemented and verified. Do not weaken the JDK 27 requirement implicitly.
+
+Reference: [GraalVM SandboxPolicy API](https://www.graalvm.org/25.0/javadoc/sdk/org/graalvm/polyglot/SandboxPolicy.html).
+
+The constrained policy denies host classes, filesystem and network APIs,
+process creation, native access, and polyglot access. The service retains its
+outer timeout/cancellation behavior, but Graal's isolate-only guest-memory and
+CPU quotas are no longer available. No separate-process resource boundary is
+implemented. This runtime choice is not an overall redistribution approval;
+other component, source-delivery, notice, and package-review items remain open.
 
 ## Component Decisions
 
@@ -457,39 +525,49 @@ in the actual packages containing the DNG code; an unknown Windows symbol
 table must not be treated as proof of absence.
 
 Adobe's current [DNG SDK and specification page](https://www.adobe.com/support/downloads/dng/dng_sdk.html#dng-specification-patent-license)
-also publishes a separate patent license for compliant implementations of the
-DNG specification. It grants a limited patent license for implementations
-that read or write DNG files and requires this notice to be displayed
-prominently in source code and documentation: `This product includes DNG
-technology under license by Adobe.` The retained SDK agreement begins with an
-Adobe DNG acknowledgment, but that alone does not prove that the separate
-patent-license placement requirement is satisfied in the project's source and
-recipient-facing documentation. Confirm whether the redistributed native
-component is a covered compliant implementation and verify the required notice
-placement before release. This is separate from the SDK's redistribution
-permission and its commercial-product indemnity clause.
+publishes a separate royalty-free patent grant for software that reads or writes
+DNG-compliant files. The exact Skia revision bundled through Skiko contains
+`SkRawCodec`, which uses Adobe's SDK to parse and validate DNG files and render
+their raw image data ([pinned source](https://github.com/google/skia/blob/a3f509bf52564dc8b27940bebe599d77ac0c4ae3/src/codec/SkRawCodec.cpp)).
+Visual Agent calls Skia's encoded-image decoder for canvas image content, so
+this is a reachable product image-decoding path, not merely unused code found
+inside a library. This establishes that the product has a reachable DNG-reading
+path. Whether that implementation meets the patent grant's eligibility terms
+and the effect of its conditions, including notice and revocation, still needs
+qualified review.
 
-The exact patent-license notice is now also present in the root README, beside
-the Skiko dependency in the desktop build source, and in the hash-pinned
-`DNG-PATENT-NOTICE.txt` recipient material. The local `verifyPackages` run
-confirmed the curated legal files in the executable JARs and macOS native
-package, and the supplement regression test checks the exact notice and its
-source/documentation placements. This closes the local notice-placement task;
-it does not decide whether this embedded component is a covered compliant
-implementation, establish Windows/Linux final-candidate inclusion, or grant
-redistribution clearance.
+The patent license requires the notice `This product includes DNG technology
+under license by Adobe.` to appear prominently in source code and documentation.
+The notice is in the root README, beside the decoder call in the UI source, and
+in the hash-pinned recipient material. Tests verify those source/documentation
+placements. Final recipient archives and package coverage still need exact
+version/hash review. This patent grant is separate from the DNG SDK's copyright
+license and its commercial-product indemnity clause; no final clearance is
+claimed from the source-level evidence alone.
+
+The notice is also kept beside the Skiko dependency in the desktop build source.
+The local `verifyPackages` run confirmed curated legal files in the executable
+JARs and macOS native package; the supplement regression test checks the exact
+notice in the project README, UI decoder source, build source, and hash-pinned
+material. This closes the local notice-placement task, but not final recipient
+archive/package hash review or the exact Windows/Linux candidate mapping.
 
 The exact [Skiko `v0.150.2` build configuration](https://github.com/JetBrains/skiko/blob/v0.150.2/skiko/build.gradle.kts)
-statically links `piex` and `dng_sdk` for native targets and macOS JVM targets.
+statically links `piex` and `dng_sdk` for native targets and macOS JVM targets;
+the Windows JVM target adds `d3d12allocator` but does not explicitly add either
+DNG library.
 The corresponding [Skia `m150-a3f509bf52` raw-codec target](https://github.com/JetBrains/skia/blob/m150-a3f509bf52/BUILD.gn#L1572-L1586)
 is enabled only when `skia_use_dng_sdk`, `skia_use_libjpeg_turbo_decode`, and
-`skia_use_piex` are all enabled. The current symbol inspection detects DNG
-symbols in Linux x64 and both macOS runtime artifacts, while the stripped
-Windows payload remains inconclusive. This establishes a concrete implementation
-path and presence evidence, but the available release configuration does not
-record all three GN values for each exact binary. Keep the DNG patent notice in
-source and recipient documentation; do not treat the conditional build rule as
-proof that the final Windows artifact contains or omits the decoder.
+`skia_use_piex` are all enabled. Inspection of the hash-pinned Linux x64 and
+both macOS runtime artifacts detects DNG-specific symbols. The Windows MSI's
+Skiko DLL matches the Maven runtime artifact at SHA-256
+`eebad490c2828198e86e641cbd44958617867ce70f893b21852f07d0be099c0a`; a string
+scan found no DNG-specific identifiers, only Adobe APP14 JPEG strings. Because
+the Windows binary is stripped and string scans cannot prove absence, exact DNG
+presence in the Windows release payload remains unresolved. Keep the DNG patent
+notice in source and recipient documentation; do not treat the conditional
+build rule or missing strings as proof that the final Windows artifact contains
+or omits the decoder.
 
 ### AppImage libfuse: LGPL-2.1 Section 6(a)
 
@@ -526,8 +604,9 @@ complete corresponding source. Preserve those provenance limitations honestly.
 **Final verification:** confirm the recipient source archive actually contains
 the complete described inputs and notices, and that it accompanies the exact
 AppImage being reviewed. Check the prominent libfuse notice in the legal
-materials. The baseline workflow failed before those final archives could be
-assembled, so delivery is not yet proven and no AppImage release is approved.
+materials. The initial baseline workflow failed before those final archives
+could be assembled; a later non-publishing candidate run is documented below.
+No AppImage release is approved.
 
 The current local packaging correction replaces the previously downloaded
 prebuilt runtime with a runtime built from the retained source archive by the
@@ -546,18 +625,70 @@ format from the pinned upstream release
 workflow, then verifies the reported version. The package-notice collector now
 records the final AppImage hash, runtime prefix hash and size, source archive
 hash and commit, and original license texts for the mapped runtime and static
-components; all remain explicitly unreviewed. Gradle dry-run and local evidence
-tests confirm the task wiring and evidence checks, but no Linux/Docker package
-candidate has yet verified the resulting AppImage. The
-upstream Dockerfile still uses unpinned Alpine package revisions;
-recipient-ready source/relink delivery, exact package review, and LGPL
-obligation review remain open.
+components; all remain explicitly unreviewed. The earlier statement that no
+Linux package candidate existed is superseded: non-publishing workflow
+[`43187339406`](https://github.com/heckenmann/visual-agent/actions/runs/43187339406)
+built the AppImage and passed its container smoke test. Its runtime-provenance
+artifact records the source and packaged module lists and matching keytool
+hashes. This confirms a technical package candidate, not the completeness of
+the corresponding-source/relink materials or license clearance. The upstream
+Dockerfile still uses unpinned Alpine package revisions; recipient source/relink
+review, exact final-package review, and the LGPL obligation review remain open.
 
 The local prepared source-material directory contains all eleven archives
-declared for this runtime; each archive's SHA-256 matches the registry. No
-source-built Linux runtime or final AppImage package is present in this macOS
-workspace, so the new package-bound manifest and final AppImage hash still need
-to be produced by the Linux package workflow.
+declared for this runtime; each archive's SHA-256 matches the registry. The
+source-built Linux runtime and AppImage package exist as artifacts of workflow
+`43187339406`, not in this macOS workspace. Their existence does not settle
+whether the candidate's materials are sufficient to modify and relink the
+embedded LGPL library; that remains part of the recipient-source review.
+
+#### Candidate Alpine Inputs Found in the Retained CI Log
+
+Unlike the expired upstream 2025 build log, the AppImage job log for candidate
+workflow [`43187339406`](https://github.com/heckenmann/visual-agent/actions/runs/43187339406)
+is still available. BuildKit recorded the base image as
+`alpine:3.21@sha256:bc21487101ae47172509130ee1092cc273a831968d64b617776d1f69c81e42ab`.
+The `apk add` output records `musl-dev 1.2.5-r12`, `mimalloc2 2.1.7-r0`,
+`zstd-static 1.5.6-r2`, and `zlib-static 1.4-r0`; the runtime build command
+statically links `-lzstd -lz -lfuse3 -lmimalloc` and uses the Alpine musl
+toolchain. The official Alpine v3.21 package records identify musl recipe
+commit `5245849e14d213abe18d589b4b80d65793327940` and zlib recipe commit
+`d3332621d44c2c4cf52e52217b16674db190212c`. Their full recipe snapshots and
+the official zlib 1.4 source archive are now pinned in the local source
+catalogue.
+
+This exposed a real mismatch in the earlier candidate: its downloaded
+`visual-agent-corresponding-sources.zip` contains zlib 1.3.1 and the musl r9
+recipe, not the zlib 1.4 and musl r12 sources/recipe reported by its build log.
+The local catalogue correction does not repair that already-produced archive.
+A new package-and-source candidate must be built and downloaded, then its
+artifact hashes and internal manifests rechecked before it can be considered.
+The log records package versions but not APK archive hashes; the exact static
+object mapping and whether all retained sources are sufficient for recipient
+relinking still require review. This evidence is technical, not redistribution
+approval.
+
+#### Direct Candidate Source-Archive Inspection (2026-11-12)
+
+I downloaded `visual-agent-corresponding-sources.zip` from the same non-publishing
+workflow `43187339406` and verified its SHA-256 against the recorded candidate
+hash `d911aa648006492230d8ff4df8bbf61292e6c7119ad989a57715bc40268fe40f`.
+The archive contains 98 entries: 97 payload files, each listed in
+`MANIFEST.sha256`, plus the manifest itself. All 97 payload hashes match. All
+eleven AppImage source archives declared by the source registry at commit
+`62896caf` are present under `source-materials/archives/appimage-runtime/` and
+match that historical registry's hashes. The archive also includes the
+recipient `SOURCE-AND-RELINK.txt` and no `REVIEW-ONLY.txt` marker. The retained
+AppImage build log subsequently revealed that two of those pinned candidate
+inputs are stale: zlib 1.3.1 and Alpine musl recipe r9 do not match the actual
+zlib-static 1.4-r0 and musl-dev 1.2.5-r12 installed for that package build.
+
+This confirms the archive's internal integrity, not source completeness against
+the candidate's actual static runtime inputs. A new package-and-source candidate
+using the corrected source catalogue is required. Even after that rebuild, a
+qualified reviewer must determine whether the exact package/source pair
+satisfies every LGPL-2.1 section 6(a) condition; it has not been published or
+bound to a versioned release tag or final release asset hash.
 
 ### Zulu OpenJDK Portions: Vendor Offer Pass-Through
 
@@ -865,28 +996,52 @@ re-signing. A changed packaged hash alone proves changed bytes, not whether
 the contractual unmodified condition is satisfied. Do not infer permission or
 a prohibition solely from that hash.
 
-The exact macOS packaging transformation is now confirmed locally. The
-Compose Multiplatform 1.12.2 `AbstractJPackageTask` uses its
-`MacJarSignFileCopyingProcessor` when preparing macOS JAR inputs
-([pinned upstream implementation](https://github.com/JetBrains/compose-multiplatform/blob/v1.12.2/gradle-plugins/compose/src/main/kotlin/org/jetbrains/compose/desktop/application/tasks/AbstractJPackageTask.kt)).
-In the generated arm64 `.app`, the embedded
-`libpolyglotisolate.dylib` has an ad-hoc signature and SHA-256
-`583c51584c7a5f3480a6d5bbd2791ddbe1518be6e797d5fdac539e2b542c4be7`; the
-original Maven JAR's same entry has SHA-256
-`ae42b10cd620aa83630f12e2d2394f8bbca5c0a5043cd444569dd4ca7c2b18f9`. The
-packaged JAR itself is also not byte-identical to the Maven artifact. This is
-evidence of a real native-library signing transformation, not merely an outer
-bundle signature. These hashes are from a local development package, not the
-final release candidate.
+The exact macOS packaging transformation is confirmed both in the pinned
+Compose Multiplatform 1.12.2 implementation and in the non-publishing package
+workflow. Its `AbstractJPackageTask` uses `MacJarSignFileCopyingProcessor` for
+macOS JAR inputs; this processor invokes the macOS signer on embedded dylibs
+([file-copy processor](https://github.com/JetBrains/compose-multiplatform/blob/v1.12.2/gradle-plugins/compose/src/main/kotlin/org/jetbrains/compose/desktop/application/internal/files/MacJarSignFileCopyingProcessor.kt),
+[signer](https://github.com/JetBrains/compose-multiplatform/blob/v1.12.2/gradle-plugins/compose/src/main/kotlin/org/jetbrains/compose/desktop/application/internal/MacSigner.kt)).
+When no developer identity is configured, the plugin still applies an ad-hoc
+signature. Oracle's [GFTC](https://www.oracle.com/downloads/licenses/graal-free-license.html)
+permits redistribution of the unmodified Program without associated fees and
+prohibits removing proprietary-rights markings; it does not expressly address
+this signature transformation.
 
-The narrow unresolved clarification is therefore whether the applicable GFTC
-permits the Compose packager's ad-hoc re-signing of the native code embedded in
-`org.graalvm.js:js-isolate-darwin-aarch64:25.5.5.0.3`, where the executable
-sections and distribution terms otherwise remain unchanged. The official
-GFTC does not expressly answer this. Obtain an applicable Oracle clarification
-or qualified assessment, and verify the same transformation in the final
-candidate, before recording this component's clearance. No inquiry has been
-submitted on the maintainer's behalf.
+The macOS ARM64 DMG from package workflow
+[`43187339406`](https://github.com/heckenmann/visual-agent/actions/runs/43187339406),
+for source `62896caf507abd29a8f992d1ce5dd65b59e6f655`, was downloaded and
+inspected. Its SHA-256 is
+`4093af1f94000ee07cf693143d002b7db72b2cfd7147e9dfc1a06f2b774e7e8f`. The
+GFTC JAR inside it has SHA-256
+`9a435f63d781eec60cfcad490422df681aacbb815f1e7a83997b519efb7a87c9`; the
+matching package-inventory row records `b5caf26dfcfa07fa34072a303bd5384127b59d2850ddb1af5113b82eca66996c`,
+and the resolved Maven JAR hash is
+`41bdbf425dc998ebb6a6061eff9fa1e42ae4a762b980bffd98e4bda7e793f015`. A
+direct comparison of the Maven JAR and the DMG's nested JAR found nine file
+entries in each: only `META-INF/resources/engine/js-isolate-darwin-aarch64/libvm/libpolyglotisolate.dylib`
+changed; no entry was added or removed. Thus the actual native payload is
+re-signed, not just the outer app bundle, while the JAR entry set is otherwise
+preserved. This proves the technical transformation, not whether it satisfies
+GFTC's unmodified-Program condition.
+
+The narrow unresolved clarification is whether the applicable GFTC permits
+the Compose packager's ad-hoc re-signing of the native code embedded in
+`org.graalvm.js:js-isolate-darwin-aarch64:25.5.5.0.3`. The official terms do not
+expressly answer this. Obtain an applicable Oracle clarification or qualified
+assessment, then verify and bind the same transformation to the final
+versioned candidate before recording this component's clearance. No inquiry
+has been submitted on the maintainer's behalf; redistribution approval remains
+false.
+
+The documented Compose property `compose.desktop.mac.sign=false` is not a
+workaround for this transformation. A local `:desktop:createDistributable`
+run with that property still produced a macOS app-image JAR whose embedded
+isolate library was changed from the resolved Maven JAR. The property controls
+the package-signing configuration; the pinned plugin still runs its macOS JAR
+copying processor and ad-hoc signs embedded dylibs on Apple Silicon. This
+recheck confirms there is no supported Gradle flag in the current setup that
+preserves this GFTC payload byte-for-byte.
 
 1. Inspect all candidate package groups and legal/source archives, not only
    application tests or the earlier platform inventories.

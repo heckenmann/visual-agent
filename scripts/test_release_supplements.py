@@ -238,11 +238,13 @@ class SupplementalNoticesTest(unittest.TestCase):
         self.assertTrue(zstd["materials"][0]["content"].startswith(b"BSD License\n"))
         self.assertIn("zstd-static 1.5.6-r2", " ".join(zstd["remaining"]))
         self.assertIn("which declared license option applies", " ".join(zstd["remaining"]))
-        zlib = components["zlib:1.3.1"]
+        zlib = components["zlib:1.4"]
         self.assertEqual("Zlib", zlib["proposedLicense"])
-        self.assertIn(b"Jean-loup Gailly", zlib["materials"][0]["content"])
-        self.assertIn("zlib-static 1.3.1-r2", " ".join(zlib["remaining"]))
-        self.assertIn("exact build inputs", " ".join(zlib["remaining"]))
+        self.assertEqual(
+            "e32ff4e00d9d94930537635291da39e7e612703334bf6fde8c7f1686fe8a45a2",
+            hashlib.sha256(zlib["materials"][0]["content"]).hexdigest(),
+        )
+        self.assertIn("zlib-static 1.4-r0", " ".join(zlib["remaining"]))
         runtime = components["AppImage:type2-runtime:20251108"]
         self.assertEqual("MIT", runtime["proposedLicense"])
         self.assertEqual("f5fec23be76e50e2445ed2d018bac49b367490fc483c62c4637e99ec705d27ba",
@@ -291,8 +293,7 @@ class SupplementalNoticesTest(unittest.TestCase):
         modules = (
             "org.graalvm.js:js-language", "org.graalvm.polyglot:polyglot",
             "org.graalvm.regex:regex", "org.graalvm.sdk:collections",
-            "org.graalvm.sdk:jniutils", "org.graalvm.sdk:nativebridge",
-            "org.graalvm.sdk:nativeimage", "org.graalvm.sdk:word",
+            "org.graalvm.sdk:jniutils", "org.graalvm.sdk:nativeimage", "org.graalvm.sdk:word",
             "org.graalvm.shadowed:xz", "org.graalvm.truffle:truffle-api",
             "org.graalvm.truffle:truffle-compiler", "org.graalvm.truffle:truffle-runtime",
         )
@@ -312,12 +313,8 @@ class SupplementalNoticesTest(unittest.TestCase):
         source_notice = next(item for item in language["materials"]
                              if item["path"].endswith("SOURCE-AVAILABILITY.txt"))
         self.assertIn(f"js-language-{version}-sources.jar".encode(), source_notice["content"])
-        for platform in ("linux-amd64", "darwin-aarch64", "windows-amd64"):
-            with self.subTest(platform=platform, version=version):
-                component = components[f"org.graalvm.js:js-isolate-{platform}:{version}"]
-                self.assertEqual("GraalVM Free Terms and Conditions (GFTC)", component["proposedLicense"])
-                self.assertIn(version.encode(), component["materials"][0]["content"])
-                self.assertTrue(component["remaining"])
+        build_file = (root / "modules/tool-javascript/build.gradle.kts").read_text()
+        self.assertNotIn("js-isolate-", build_file)
 
     def test_skiko_retains_original_notice_without_clearing_native_dependencies(self):
         root = pathlib.Path(__file__).parents[1]
@@ -486,6 +483,8 @@ class SupplementalNoticesTest(unittest.TestCase):
                     self.assertEqual(material["sha256"], hashlib.sha256(content).hexdigest())
         dng_platforms = components["dng_sdk"]["binaryEvidence"]
         self.assertIn("Unknown", dng_platforms["windows-x64"])
+        self.assertIn("eebad490c2828198e86e641cbd44958617867ce70f893b21852f07d0be099c0a", dng_platforms["windows-x64"])
+        self.assertIn("string scan found no DNG-specific identifiers", dng_platforms["windows-x64"])
         self.assertIn("found", dng_platforms["linux-x64"])
         dng_notice_path = "dng-sdk-dbe0a676/DNG-PATENT-NOTICE.txt"
         self.assertIn(dng_notice_path, components["dng_sdk"]["materialPaths"])
@@ -496,6 +495,10 @@ class SupplementalNoticesTest(unittest.TestCase):
         required_notice = dng_notice.decode().strip()
         self.assertIn(required_notice, (root / "README.md").read_text())
         self.assertIn(required_notice, (root / "modules/desktop/build.gradle.kts").read_text())
+        self.assertIn(
+            required_notice,
+            (root / "modules/ui/src/main/kotlin/de/heckenmann/visualagent/ui/canvas/ComposeCanvasFigureViews.kt").read_text(),
+        )
         package = registry["packageEvidence"][0]
         self.assertEqual(42388152203, package["workflowRun"])
         self.assertEqual("historical-smoke-artifact-not-final-release-candidate", package["status"])

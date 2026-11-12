@@ -206,7 +206,7 @@ class PackagedNoticesTest(unittest.TestCase):
                 "AppImage:musl:1.2.5",
                 "mimalloc2:2.1.7-r0",
                 "zstd:1.5.6",
-                "zlib:1.3.1",
+                "zlib:1.4",
             },
             {"AppImage:type2-runtime:20251108", *appimage["linkedComponentEvidence"]},
         )

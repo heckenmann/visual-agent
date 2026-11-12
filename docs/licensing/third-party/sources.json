@@ -161,10 +161,10 @@
       "upstreamCommit": "dd265d542fad72d0e7e1ae4032ef7c040911e700",
       "materialPaths": ["graaljs-25.5.5.0.3/GFTC-TERMS-REFERENCE.md"],
       "reviewStatus": "unreviewed",
-      "reviewNotes": "Source artifact hashes were observed in the Linux x64, macOS ARM64, and Windows x64 inventories of workflow 42649987764 at source commit 4163037e6b17d4d973f425726ab31208e017b881. These are original Maven JAR hashes, not signed package hashes or release approval.",
+      "reviewNotes": "Source artifact hashes and the macOS ad-hoc re-signing transformation were verified for the historical package candidate in workflow 43187339406 at source commit 62896caf507abd29a8f992d1ce5dd65b59e6f655. A new local macOS package built after removing the explicit js-isolate runtime dependency contains no js-isolate artifact, but the other three platform inventories have not been regenerated from this source state. Preserve the historical transformation evidence, then use fresh four-platform inventories to establish whether any GFTC artifact remains in the release candidate. This is package evidence, not legal approval.",
       "remaining": [
-        "Verify the GFTC unmodified-Program condition for the exact macOS library signing transformation",
-        "Verify Oracle terms access, proprietary-rights markings, and separately licensed technology in final recipient packages"
+        "Regenerate all platform inventories from the final release source and confirm whether any GFTC artifact remains; if present, review the exact binary and transformations against the GFTC",
+        "For any GFTC artifacts in the final candidate, verify recipient access to the complete Oracle terms, proprietary-rights markings, and separately licensed technology"
       ]
     },
     {
@@ -247,15 +247,15 @@
     },
     {
       "sourceArtifacts": {
-        "zlib:1.3.1": "9a93b2b7dfdac77ceba5a558a580e74667dd6fede4585b91eefb60f03b72df23"
+        "zlib:1.4": "02dd159783677a749c04adbdd02b55b8a2bcc7e054f51b76b549199a916ad584"
       },
       "proposedLicense": "Zlib",
-      "upstreamCommit": "51b7f2abdade71cd9bb0e7a373ef2610ec6f9daf",
-      "materialPaths": ["zlib-1.3.1/LICENSE"],
+      "upstreamCommit": "dd9d5c2d62b52e8acb0e678de5768087eedce914",
+      "materialPaths": ["zlib-1.4/LICENSE"],
       "reviewStatus": "unreviewed",
       "remaining": [
-        "The hash-pinned Alpine aports snapshot contains zlib-static 1.3.1-r2, but the runtime string identifies only upstream 1.3.1; because the original build log expired, verify whether this recipe produced the linked object and its exact build inputs",
-        "Review the applicable Alpine source recipe and linked build inputs"
+        "Bind the locally verified zlib 1.4 source and Alpine zlib-static 1.4-r0 recipe to a newly built AppImage and corresponding-source archive; the earlier workflow archive remains mismatched",
+        "Review the applicable Zlib notice and final recipient-facing source/relink material"
       ]
     },
     {
@@ -279,10 +279,10 @@
       "upstreamCommit": "6d08472ea47db895748d5ca7d3daf032c3fefcf8",
       "materialPaths": ["libfuse-3.15.0/LICENSE", "libfuse-3.15.0/LGPL2.txt", "libfuse-3.15.0/SOURCE-AND-RELINK.txt"],
       "reviewStatus": "unreviewed",
-      "reviewNotes": "The recipient guide selects the LGPL-2.1 section 6(a) source-and-relink route. Workflow 42651138364 built the retained runtime recipe with its mount.c patch applied to libfuse; the source archive, patch, and static-link recipe are retained. Final archive delivery and exact package review remain required.",
+      "reviewNotes": "The recipient guide describes the LGPL-2.1 section 6(a) source-and-relink route. Workflow 42651138364 built the retained runtime recipe with its mount.c patch applied to libfuse. Non-publishing workflow 43187339406 built and smoke-tested an AppImage candidate; its corresponding-source archive is internally hash-valid, but the build log records zlib-static 1.4-r0 and musl-dev 1.2.5-r12 while that archive contains zlib 1.3.1 and the Alpine musl r9 recipe. The current local source-material task now retrieves checksum-pinned zlib 1.4 and Alpine zlib-static 1.4-r0, plus Alpine musl 1.2.5-r12; the archived APKBUILD files confirm those package versions. A new non-publishing package/source workflow is still required to bind these corrected inputs to an AppImage candidate and its corresponding-source archive. This technical evidence does not establish that the materials legally suffice for relinking. Final recipient archive/package review and qualified obligation review remain open.",
       "remaining": [
-        "The runtime/debug pair identifies libfuse 3.15.0 and the embedded source commit includes the build script and local mount.c patch; confirm the retained source/build material is sufficient to relink the exact distributed runtime",
-        "Complete and validate the LGPL static-link relinking/source delivery for recipients"
+        "Have a qualified reviewer confirm that the exact candidate source archive and build inputs satisfy the LGPL-2.1 section 6(a) static-link relinking/source-and-relink requirements for the packaged runtime",
+        "Bind recipient delivery and the completed review to the exact final AppImage and corresponding-source archive hashes"
       ]
     },
     {
@@ -307,7 +307,8 @@
       "materialPaths": ["musl-1.2.5/COPYRIGHT"],
       "reviewStatus": "unreviewed",
       "remaining": [
-        "The hash-pinned Alpine aports snapshot contains musl 1.2.5-r9 and its patch set, while the matching debug companion identifies upstream 1.2.5; because the original build log expired, verify whether this recipe produced the linked object and which patches/build inputs apply"
+        "Bind the locally verified musl 1.2.5 source and Alpine musl-dev 1.2.5-r12 recipe/patches to a newly built AppImage and corresponding-source archive; the earlier workflow archive contains the r9 recipe",
+        "Review the applicable MIT notice and final recipient-facing source/relink material"
       ]
     },
     {
@@ -599,14 +600,14 @@
         "linux-x64": "DNG symbol family found in skiko-awt-runtime-linux-x64:0.150.2 (artifact SHA-256 c6c1f9fa37464fd0bcca6e486a6b35307b6e2436199de9d009f877121de1c5c2)",
         "macos-arm64": "DNG symbol family found in skiko-awt-runtime-macos-arm64:0.150.2 (artifact SHA-256 abea519fa519f7245412011cc3ab7a5852cb333b3dc3cac08a83f5bd806c7bec)",
         "macos-x64": "DNG symbol family found in skiko-awt-runtime-macos-x64:0.150.2 (artifact SHA-256 f77b1f3a76e94daba2676780e37807697d51d300e31cacc43699709f3ccdff96)",
-        "windows-x64": "Unknown: the exact MSI-contained DLL matches the Maven DLL hash, but its symbol table is stripped; no positive or negative component conclusion"
+        "windows-x64": "Unknown: the exact MSI-contained DLL matches skiko-awt-runtime-windows-x64:0.150.2 (artifact SHA-256 eebad490c2828198e86e641cbd44958617867ce70f893b21852f07d0be099c0a). A string scan found no DNG-specific identifiers (only Adobe APP14 JPEG strings); the pinned Skiko Windows JVM target does not explicitly add piex or dng_sdk, but the shared Skia configuration could still include them. Neither the stripped symbols nor the string scan prove absence."
       },
       "reviewStatus": "unreviewed",
-      "reviewNotes": "The exact pinned Adobe SDK agreement was checked: section 1 permits use and redistribution without royalties, section 2 requires preserving notices in human-readable form, and section 5 adds indemnification for distribution in a commercial product. The maintainer confirmed the current distribution is noncommercial; revisit section 5 if that changes. Adobe separately grants a patent license for compliant DNG readers/writers and requires a prominent source/documentation notice. The exact notice is retained and present in README and the desktop build source; local package tests verify bundled legal resources. This is an AI-assisted engineering review, not legal advice or final package approval. Linux and macOS runtime binaries contain DNG symbols; Windows remains unknown because its symbol table is stripped.",
+      "reviewNotes": "The exact pinned Adobe SDK agreement was checked: section 1 permits use and redistribution without royalties, section 2 requires preserving notices, and section 5 adds indemnification for distribution in a commercial product. The maintainer confirmed the current distribution is noncommercial; revisit section 5 if that changes. The pinned Skia SkRawCodec parses, validates, and renders DNG files using Adobe's SDK, and Visual Agent reaches Skia's encoded-image decoder for canvas images. Adobe's separate DNG patent grant refers to compliant readers and sets conditions including a prominent source/documentation notice. The exact notice is in the README, beside the UI decoder call and in the hash-pinned recipient material; tests verify source/documentation placement. Linux x64 and both macOS runtime binaries contain DNG-specific symbols. The Windows runtime has no DNG-specific strings in the inspected binary, but its stripped symbols and the limits of string scanning prevent a conclusion that the component is absent. This technical review is not a qualified legal opinion or final redistribution approval.",
       "remaining": [
-        "Determine whether the embedded implementation is a compliant implementation that reads or writes DNG files and therefore relies on Adobe's separate specification patent license; retain evidence for that determination",
         "Map DNG presence to the exact binaries in every versioned release package; Windows binary inspection is currently inconclusive because symbols are stripped",
-        "Verify the exact notice is present and prominent in the final recipient-facing documentation and legal materials for every package containing the implementation"
+        "Verify the exact notice remains prominent in the final recipient-facing documentation and legal materials for every package containing the implementation",
+        "Review the pinned binary/source mapping and the separate DNG patent grant conditions before recording qualified redistribution clearance"
       ]
     },
     {
@@ -740,7 +741,7 @@
         },
         {
           "path": "archives/appimage-runtime/alpine-musl-package.tar.gz",
-          "sha256": "f7bc8cb0515d1145aaf5fa8bb9227dfc1c6cbd22c842134323ad8491024a43e5"
+          "sha256": "e63fe34178270d2d8cc74f1bab303ec1868150606e66f6da2c16221e6ec86034"
         },
         {
           "path": "archives/appimage-runtime/mimalloc-2.1.7.tar.gz",
@@ -759,12 +760,12 @@
           "sha256": "cdc49cb68d5358eefcc83955bf285ce50fbcf6b223b271ef71e1008402c201f0"
         },
         {
-          "path": "archives/appimage-runtime/zlib-1.3.1.tar.gz",
-          "sha256": "9a93b2b7dfdac77ceba5a558a580e74667dd6fede4585b91eefb60f03b72df23"
+          "path": "archives/appimage-runtime/zlib-1.4.tar.gz",
+          "sha256": "02dd159783677a749c04adbdd02b55b8a2bcc7e054f51b76b549199a916ad584"
         },
         {
           "path": "archives/appimage-runtime/alpine-zlib-package.tar.gz",
-          "sha256": "acccb0c0907bf68dca717477ecda79b42bab87a1126c45b4dd0b59d721282284"
+          "sha256": "050415c464375727d855a14abb0cdf2d549bda3b32ddc3c0017256e552b3ec09"
         }
       ],
       "linkedComponents": [
@@ -773,7 +774,7 @@
         "AppImage:musl:1.2.5",
         "mimalloc2:2.1.7-r0",
         "zstd:1.5.6",
-        "zlib:1.3.1"
+        "zlib:1.4"
       ]
     }
   ],
@@ -945,7 +946,7 @@
     },
     {
       "path": "graaljs-25.5.5.0.3/GFTC-TERMS-REFERENCE.md",
-      "sha256": "ab902580ebdbbc0d8eef291d251db1a6c986a79fb734ccd00493b4e61c92ba37",
+      "sha256": "88202724d5d546f7ec66eaa62a24423bf34b9a75b04be1c4cd033269e4aeff11",
       "url": "https://www.oracle.com/downloads/licenses/graal-free-license.html"
     },
     {
@@ -1024,9 +1025,9 @@
       "url": "https://raw.githubusercontent.com/facebook/zstd/794ea1b0afca0f020f4e57b6732332231fb23c70/LICENSE"
     },
     {
-      "path": "zlib-1.3.1/LICENSE",
-      "sha256": "845efc77857d485d91fb3e0b884aaa929368c717ae8186b66fe1ed2495753243",
-      "url": "https://raw.githubusercontent.com/madler/zlib/51b7f2abdade71cd9bb0e7a373ef2610ec6f9daf/LICENSE"
+      "path": "zlib-1.4/LICENSE",
+      "sha256": "e32ff4e00d9d94930537635291da39e7e612703334bf6fde8c7f1686fe8a45a2",
+      "url": "https://raw.githubusercontent.com/madler/zlib/dd9d5c2d62b52e8acb0e678de5768087eedce914/LICENSE"
     },
     {
       "path": "appimage-runtime-20251108/LICENSE",

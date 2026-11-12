@@ -75,20 +75,20 @@ class LibrarySourceMaterialsTest(unittest.TestCase):
                 name = "zstd-1.5.6.tar.gz"
             elif parsed_url.hostname == "github.com" and parsed_url.path.startswith("/alpinelinux/aports/archive/"):
                 name = {
-                    "efd4d5df7be0ea48d98512671f676fc5ceb14899.tar.gz": "alpine-musl-package.tar.gz",
+                    "5245849e14d213abe18d589b4b80d65793327940.tar.gz": "alpine-musl-package.tar.gz",
                     "5a1a5dc3216a69e3cd66a57ee07cb5ef01b8be39.tar.gz": "alpine-mimalloc-package.tar.gz",
                     "5c2ddf18f193dafdd25ae7391d96c7e30766eecd.tar.gz": "alpine-zstd-package.tar.gz",
-                    "4c2722e7ecc1c5e3ba882429044a101497121223.tar.gz": "alpine-zlib-package.tar.gz",
+                    "d3332621d44c2c4cf52e52217b16674db190212c.tar.gz": "alpine-zlib-package.tar.gz",
                 }.get(name, name)
             path = archives / name
             self.assertEqual(expected_hash, hashlib.sha256(path.read_bytes()).hexdigest())
             with tarfile.open(path, "r:*") as archive:
                 members = archive.getmembers()
                 recipe_archives = {
-                    "alpine-musl-package.tar.gz": ("/main/musl/APKBUILD", "1.2.5", "9"),
+                    "alpine-musl-package.tar.gz": ("/main/musl/APKBUILD", "1.2.5", "12"),
                     "alpine-mimalloc-package.tar.gz": ("/community/mimalloc2/APKBUILD", "2.1.7", "0"),
                     "alpine-zstd-package.tar.gz": ("/main/zstd/APKBUILD", "1.5.6", "2"),
-                    "alpine-zlib-package.tar.gz": ("/main/zlib/APKBUILD", "1.3.1", "2"),
+                    "alpine-zlib-package.tar.gz": ("/main/zlib/APKBUILD", "1.4", "0"),
                 }
                 if name in recipe_archives:
                     recipe_suffix, expected_version, expected_pkgrel = recipe_archives[name]

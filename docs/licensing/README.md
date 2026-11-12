@@ -166,46 +166,42 @@ that one generic license text covers all resolved dependencies.
 
 ### GraalJS Runtime Terms And Packaging
 
-The selected desktop runtime graph currently includes Oracle's non-community
-GraalJS isolate artifact (for example,
-`org.graalvm.js:js-isolate-darwin-aarch64:25.5.5.0.3`) alongside GraalJS and
-Truffle components whose metadata reports UPL and ICU licensing. The upstream
-[GraalJS licensing notes](https://github.com/oracle/graaljs#license) distinguish
-community UPL artifacts from non-community GFTC artifacts and identify isolate
-artifacts as GFTC-only. Oracle's [GFTC terms](https://www.oracle.com/downloads/licenses/graal-free-license.html)
-allow redistribution without fees but require redistribution of the unmodified
-Program and prohibit removing proprietary-rights markings. The exact received
-artifact and its use in the beta must be checked against the complete terms; a
-noncommercial project description alone is not a clearance decision.
+The current runtime configuration uses the regular GraalJS 25.5.5.0.3 language
+and SDK artifacts and no longer requests platform `js-isolate-*` artifacts. On
+the required JDK 27, direct `SandboxPolicy.UNTRUSTED` startup failed with
+`JavaLangAccess.addEnableNativeAccess(Module)`. The previous context factory
+silently fell back to `SandboxPolicy.CONSTRAINED`, so passing service tests did
+not demonstrate isolate operation. The isolate binaries were therefore removed
+from the configured runtime rather than continuing to package an unusable
+GFTC-identified component.
 
-The curated package materials now include
-`third-party/graaljs-25.5.5.0.3/GFTC-TERMS-REFERENCE.md`, which points recipients
-to Oracle's complete terms and summarizes the relevant review conditions. It is
-not the agreement text and does not satisfy release clearance by itself. The
-supplement registry binds this reference to the exact Linux x64, macOS ARM64,
-and Windows x64 isolate JAR hashes for version `25.5.5.0.3`; macOS x64 has no
-isolate JAR in the audited package inventory. Older `25.4.4.1.1` records remain
-historical evidence and do not identify the current selected graph.
+GraalVM also publishes Community Edition isolate artifacts with MIT/UPL
+metadata, distinct from the GFTC artifacts. The exact 25.5.5.0.3 macOS ARM64
+Community artifact works with the project's former `UNTRUSTED` configuration
+on JDK 25.0.3, but fails to start on both tested JDK 27 distributions with the
+same `JavaLangAccess.addEnableNativeAccess(Module)` linkage error. Consequently,
+changing only the artifact suffix does not restore isolate resource quotas on
+the required JDK 27. See the detailed reproducible evidence and official
+references in `release-review.md`. Graal's documented external isolate mode
+also failed before worker startup on Zulu 27.0.1+9.
 
-The local macOS inventory records distinct original-artifact and packaged-JAR
-hashes for the isolate artifact. The transformation is now identified: Compose
-Desktop Gradle Plugin 1.12.2's `MacJarSignFileCopyingProcessor` re-signs every
-embedded `.dylib` when it copies a JAR. Its macOS ARM64 no-certificate signer
-removes the existing signature and adds an ad-hoc runtime signature. In the
-inspected GraalJS library, the Mach-O UUID is unchanged and both source and
-packaged signatures validate; the code-signature data shrank from 1,256,544 to
-314,400 bytes. This explains the changed binary hash and size, but is not a legal
-determination that the GFTC's unmodified-program condition permits this
-redistribution transformation. Confirm that point for the exact artifact and
-delivery, and retain required notices. The upstream UPL community artifacts
-were evaluated as an alternative, but direct `SandboxPolicy.UNTRUSTED` startup
-of the macOS ARM64 community artifact failed on the required JDK 27 with both
-GraalJS 25.4.4.1.1 and 25.5.5.0.3 due to
-`JavaLangAccess.addEnableNativeAccess(Module)` linkage incompatibility. The
-GraalVM 25.5 release is based on JDK 25 and does not document JDK 27 support.
-The application factory's constrained fallback had hidden this failure from
-service-level tests. No dependency change was retained, and no redistribution
-approval is recorded.
+This fallback is not cleared for model-generated scripts: GraalVM documents
+`CONSTRAINED` for trusted, potentially buggy guest code and states that
+untrusted code is supported only with `UNTRUSTED`. The current JDK 27 runtime
+cannot start that policy. Do not treat the current JavaScript execution path as
+release-ready until a compatible untrusted-code boundary is available.
+
+This choice also means the current JavaScript tool does not have Graal's
+isolate-level guest-heap or CPU quotas. It retains host-class, filesystem,
+network, native-access, process, and polyglot restrictions, and its service-level
+deadline cancels and closes timed-out contexts; this is not equivalent to a
+separate isolate or process resource boundary. If hard guest resource quotas are
+required, a JDK/Graal-compatible sandbox or process boundary must be selected and
+verified before restoring isolate dependencies. Historical GFTC artifact hashes,
+terms references, and macOS signing evidence remain in the release-review
+materials but do not describe the current dependency declaration. This runtime
+change is not legal clearance of the remaining GraalJS notices or of the complete
+release package; verify the new exact package inventories before release review.
 
 The optional supplemental registry binds additional original texts to exact Maven
 coordinates and original resolved-artifact hashes. Packaged JARs are still checked

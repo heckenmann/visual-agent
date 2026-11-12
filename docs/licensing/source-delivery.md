@@ -103,12 +103,12 @@ version/hash provenance remains in `sources.json`; it is not included in the new
 release source bundle because the corresponding native artifact is no longer a
 runtime dependency.
 
-### GraalVM UPL 1.0 Runtime Artifacts
+### Historical GraalVM UPL 1.0 Runtime Artifacts
 
-The current four-platform package inventory contains 12 distinct GraalVM
+Earlier four-platform package inventories contained 12 distinct GraalVM
 25.4.4.1.1 runtime artifact coordinates whose resolved metadata declares UPL
-1.0. `nativebridge` is absent from the macOS x64 inventory; the other recorded
-coordinates are present there. Their source-artifact hashes match the curated
+1.0. `nativebridge` was absent from the macOS x64 inventory; the other recorded
+coordinates were present there. Their source-artifact hashes match the curated
 records on each platform where they are packaged. The original `sdk/LICENSE.md`
 is retained from the exact upstream release tag `vm-25.4.4.1.1`, which resolves
 to commit `95ce1499c8c96ab7d5a6697c5b4bf42160f3b68b`, at
@@ -117,12 +117,17 @@ to commit `95ce1499c8c96ab7d5a6697c5b4bf42160f3b68b`, at
 notice collector attaches it only to the exact artifact hashes recorded in
 `third-party/sources.json`.
 
-This is evidence collection, not a license selection or approval. The
+This is historical evidence, not a license selection or approval. The
 `js-language` POM also declares MIT, and its alternative must be reviewed. The
-platform-specific `js-isolate` artifacts are separately recorded under Oracle's
-GraalVM Free Terms and Conditions (GFTC); their POM alternatives must not be
-treated as proof that UPL applies. Source-to-binary correspondence, copyright
-scope, final-package presence, and redistribution terms remain unreviewed.
+platform-specific `js-isolate` artifacts from earlier candidates are separately
+recorded under Oracle's GraalVM Free Terms and Conditions (GFTC); their POM
+alternatives must not be treated as proof that UPL applies. The current runtime
+configuration no longer requests isolate artifacts because they fail to start
+on the required JDK 27 and had been silently falling back to the constrained
+policy. New platform package inventories are still required to confirm the
+resulting runtime graph and notices. Source-to-binary correspondence, copyright
+scope, final-package presence, and redistribution terms for the current package
+remain unreviewed.
 
 ### Skiko Native Renderer and Windows ANGLE Runtime
 
@@ -289,17 +294,20 @@ recipient-ready corresponding-source package:
 | libfuse 3.15.0 | [source archive](https://github.com/libfuse/libfuse/releases/download/fuse-3.15.0/fuse-3.15.0.tar.xz) | `70589cfd5e1cff7ccd6ac91c86c01be340b227285c5e200baa284e401eea2ca0` |
 | squashfuse 0.5.2 | [source archive](https://github.com/vasi/squashfuse/archive/0.5.2.tar.gz) | `db0238c5981dabbd80ee09ae15387f390091668ca060a7bc38047912491443d3` |
 | musl 1.2.5 upstream source | [source archive](https://musl.libc.org/releases/musl-1.2.5.tar.gz) | `a9a118bbe84d8764da0ea0d28b3ab3fae8477fc7e4085d90102b8596fc7c75e4` |
-| Alpine v3.21 musl packaging recipe and patches at commit `efd4d5df7be0ea48d98512671f676fc5ceb14899` | [source archive](https://github.com/alpinelinux/aports/archive/efd4d5df7be0ea48d98512671f676fc5ceb14899.tar.gz) | `f7bc8cb0515d1145aaf5fa8bb9227dfc1c6cbd22c842134323ad8491024a43e5` |
+| Alpine v3.21 musl packaging recipe and patches at commit `5245849e14d213abe18d589b4b80d65793327940` | [source archive](https://github.com/alpinelinux/aports/archive/5245849e14d213abe18d589b4b80d65793327940.tar.gz) | `e63fe34178270d2d8cc74f1bab303ec1868150606e66f6da2c16221e6ec86034` |
 | mimalloc 2.1.7 upstream source | [source archive](https://github.com/microsoft/mimalloc/archive/refs/tags/v2.1.7.tar.gz) | `0eed39319f139afde8515010ff59baf24de9e47ea316a315398e8027d198202d` |
 | Alpine v3.21 mimalloc2 packaging recipe and patch at commit `5a1a5dc3216a69e3cd66a57ee07cb5ef01b8be39` | [source archive](https://github.com/alpinelinux/aports/archive/5a1a5dc3216a69e3cd66a57ee07cb5ef01b8be39.tar.gz) | `6f4f50fca873868e754053c828d8336a531dbca365c678dc75db8111873d87e1` |
 | zstd 1.5.6 upstream source | [source archive](https://github.com/facebook/zstd/archive/v1.5.6.tar.gz) | `30f35f71c1203369dc979ecde0400ffea93c27391bfd2ac5a9715d2173d92ff7` |
 | Alpine v3.21 zstd packaging recipe at commit `5c2ddf18f193dafdd25ae7391d96c7e30766eecd` | [source archive](https://github.com/alpinelinux/aports/archive/5c2ddf18f193dafdd25ae7391d96c7e30766eecd.tar.gz) | `cdc49cb68d5358eefcc83955bf285ce50fbcf6b223b271ef71e1008402c201f0` |
-| zlib 1.3.1 upstream source | [source archive](https://www.zlib.net/fossils/zlib-1.3.1.tar.gz) | `9a93b2b7dfdac77ceba5a558a580e74667dd6fede4585b91eefb60f03b72df23` |
-| Alpine v3.21 zlib packaging recipe at commit `4c2722e7ecc1c5e3ba882429044a101497121223` | [source archive](https://github.com/alpinelinux/aports/archive/4c2722e7ecc1c5e3ba882429044a101497121223.tar.gz) | `acccb0c0907bf68dca717477ecda79b42bab87a1126c45b4dd0b59d721282284` |
+| zlib 1.4 upstream source | [source archive](https://www.zlib.net/fossils/zlib-1.4.tar.gz) | `02dd159783677a749c04adbdd02b55b8a2bcc7e054f51b76b549199a916ad584` |
+| Alpine v3.21 zlib packaging recipe at commit `d3332621d44c2c4cf52e52217b16674db190212c` | [source archive](https://github.com/alpinelinux/aports/archive/d3332621d44c2c4cf52e52217b16674db190212c.tar.gz) | `050415c464375727d855a14abb0cdf2d549bda3b32ddc3c0017256e552b3ec09` |
 
 The GitLab archive endpoint returned HTTP 418 from GitHub-hosted runners. These
 four packaging snapshots therefore use Alpine's official GitHub mirror at the
 same pinned commits; the full commit archives are retained and checksum-pinned.
+These current-candidate snapshots replace earlier musl r9 and zlib 1.3.1
+recipe candidates; the historical AppImage release analysis below remains
+separate from the rebuilt candidate inputs.
 
 Original legal texts have also been retained from the pinned source archives:
 AppImage runtime `LICENSE`, libfuse `LICENSE` and `LGPL2.txt`, squashfuse
@@ -328,12 +336,16 @@ build, but does not prove the expired build resolved that exact APK. Therefore
 the exact musl APK bytes and the actual runtime package resolution remain
 unconfirmed. The Alpine zstd recipe and package record identify `zstd-static`
 `1.5.6-r2` (declared `BSD-3-Clause OR GPL-2.0-or-later`); the archived zlib
-package metadata identifies `zlib-static` `1.3.1-r2` (`Zlib`). Both upstream
-sources, Alpine recipes, and their original license texts are retained. These
-are candidate static-library builds, not proof of the exact objects in the
-expired runtime. Required notices and LGPL static-link relinking materials also
-remain unresolved; do not present these archives alone as complete corresponding
-source or legal clearance.
+package metadata identifies `zlib-static` `1.3.1-r2` (`Zlib`). Those versions
+describe the historical upstream runtime investigation, not the newer candidate
+build. The retained candidate build log instead records Alpine musl-dev
+`1.2.5-r12`, mimalloc2 `2.1.7-r0`, zstd-static `1.5.6-r2`, and zlib-static
+`1.4-r0`; the candidate source bundle must use the matching musl r12 and zlib
+1.4 sources/recipes. This does not retroactively make the earlier candidate
+source archive complete. The historical package records and current candidate
+inputs must not be mixed. Required notices and LGPL static-link relinking
+materials remain subject to review; do not present these archives alone as
+legal clearance.
 
 The pinned runtime source archive also contains `BUILD.md`, `src/runtime/runtime.c`,
 the static-link `src/runtime/Makefile`, the Docker build definition, the dependency
@@ -789,7 +801,7 @@ separate product change and package smoke test.
   local candidate or establish license sufficiency. None of the hash/UUID
   checks resolves the statically linked Skia/ANGLE component notices or
   corresponding-source obligations.
-- GraalJS 25.4.4.1.1 includes the non-community isolate runtime. On macOS ARM64,
+- Historical GraalJS 25.4.4.1.1 candidate included the non-community isolate runtime. On macOS ARM64,
   Compose Desktop Gradle Plugin 1.12.2 re-signs embedded dylibs while copying
   dependency JARs. The inspected isolate dylib retains its Mach-O UUID and both
   signatures validate, but the signature blob and whole-file hash change. Confirm
@@ -816,7 +828,9 @@ separate product change and package smoke test.
   condition for this channel. Any paid distribution, bundle, or service
   involving the Program requires renewed review. The macOS re-signing and final
   package proprietary-marking checks remain unresolved; no overall
-  redistribution clearance is claimed.
+  redistribution clearance is claimed. This isolate and signing investigation
+  concerns historical candidates only; current dependency configuration no
+  longer requests platform isolate binaries.
 
 ### Cross-Platform Nested Native Payloads And Notices
 
@@ -870,7 +884,7 @@ packages is not automatically populated from the inventory's hash-addressed
 notice archive. These retained-in-CI texts must still be reviewed and delivered
 to recipients through the final legal materials where applicable.
 
-The same notice manifest reports `no-detected-notice` for the platform GraalJS
+The historical notice manifest reports `no-detected-notice` for the platform GraalJS
 isolate artifacts, `truffle-api`, `netty-resolver-dns-native-macos`, and
 `netty-transport-native-epoll`. The concise dependency CSV selects UPL for the
 Graal isolate/Truffle artifacts and Apache-2.0 for the Netty components. The
@@ -886,21 +900,18 @@ The [official GraalJS license notes](https://github.com/oracle/graaljs#license)
 describe `js-isolate-community` as UPL-licensed, and the [official sandbox
 documentation](https://github.com/oracle/graal/blob/master/docs/security/polyglot-sandbox.md)
 states that community isolate artifacts support sandbox policies starting with
-GraalVM 25.1. Maven Central publishes the platform-specific community isolate
-coordinate at the pinned 25.4.4.1.1 version. Direct startup probes for the
-macOS ARM64 community artifact against the required Azul Zulu JDK 27.0.1 failed
-for both 25.4.4.1.1 and the newer 25.5.5.0.3 version with `NoSuchMethodError` for
-`JavaLangAccess.addEnableNativeAccess(Module)`: the Graal binary expects a
-`Module` return value while this JDK exposes `void`. The official
+GraalVM 25.1. Direct startup probes for the macOS ARM64 community artifact
+against the required Azul Zulu JDK 27.0.1 failed for both 25.4.4.1.1 and
+25.5.5.0.3 with `NoSuchMethodError` for
+`JavaLangAccess.addEnableNativeAccess(Module)`. The official
 [GraalVM 25.5 release notes](https://www.graalvm.org/release-notes/25.5/)
 identify 25.5.5.0.3 as based on OpenJDK 25; they do not claim JDK 27
-compatibility. The current context factory catches isolate startup failures
-and falls back to `CONSTRAINED`, so its existing service-level tests can pass
-without exercising the isolate. The community artifact is therefore not yet a
-viable release substitution on the required JDK; do not claim equivalent
-sandbox behavior based only on dependency resolution or passing fallback tests.
-Resolve Graal/JDK compatibility and add an explicit isolate-startup check before
-reconsidering this option. No product dependency was changed by these trials.
+compatibility. The previous context factory caught isolate startup failures and
+fell back to `CONSTRAINED`, so service-level tests passed without exercising an
+isolate. The current local code removes the isolate dependency and chooses the
+constrained policy explicitly. This does not provide isolate-level guest heap
+or CPU quotas. Regenerate platform inventories and verify their exact runtime
+artifacts before relying on this exclusion in a release review.
 Investigate these artifacts' upstream materials and map
 the results to the exact native payloads; do not interpret scanner
 `no-detected-notice` as proof that a notice is legally absent or unnecessary.
