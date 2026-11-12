@@ -8,44 +8,34 @@ or organization that has not performed it.
 
 ## Current Candidate (Non-Publishing)
 
-- Source: `f886c07138912645ce0e10f579c8731e49ca22c3` (PR #533, rebased on the
-  current `master`).
+- Source: `62896caf507abd29a8f992d1ce5dd65b59e6f655` (PR #533, rebased on the
+  current `master` at workflow dispatch).
 - Release version input: none. This is not a versioned release candidate.
-- Current PR CI passed: [tests, package verification, and workflow
-  contracts](https://github.com/heckenmann/visual-agent/actions/runs/43181528773)
-  and [four-platform inventories](https://github.com/heckenmann/visual-agent/actions/runs/43181528616).
-- The current package job ran `verifyPackages` and executable-JAR launch
-  checks. The separate full native-package and platform-smoke run
-  [43170724188](https://github.com/heckenmann/visual-agent/actions/runs/43170724188)
-  built all ten variants at `cc6895ff`; the only changes from that source to
-  this candidate are licensing documentation and `sources.json`. Its package
-  and smoke evidence predates the current legal-material inputs. The current
-  inventory run includes those inputs. No workflow published a release or
-  created/moved a tag.
-- Current inventories contain 263 components for Linux x64, Windows x64, and
-  macOS ARM64, and 261 for macOS x64. The optional
-  `netty-resolver-dns-native-macos` coordinate is absent on all four platforms.
-  Every component remains `unreviewed`, and every manifest sets
-  `redistributionApproved` to `false`; inventory evidence is not legal
-  clearance.
-- All four package-file inventories include the DNG patent notice and JNA
-  libffi license material. Their presence does not establish final legal
-  completeness or resolve the remaining component/source reviews.
-- The recipient-candidate archives downloaded from run `43170724188` at
-  `cc6895ff` were verified locally:
-  `visual-agent-legal.zip` SHA-256
-  `b0de65eff8476f2c1867be244af3a345c5926e1393c36924355c82a2be2ddd7b` and
-  `visual-agent-corresponding-sources.zip` SHA-256
-  `e0808ef31b47658151e94be029d203b2a49b80ae0b1b8d114273f1e541edf80b`.
-  Their internal SHA-256 manifests cover 4,404 and 97 entries respectively;
-  every listed file matched its recorded digest. These are integrity checks on
-  the earlier archive, not a final bundle for the current candidate.
-- The legal archive contains six platform inventory manifests (Linux AppImage,
-  DEB and RPM; Windows; macOS ARM64 and x64). Across these manifests, all
-  1,576 component records remain `unreviewed`; each manifest sets
-  `redistributionApproved` to `false`. This is package-integrity evidence, not
-  legal clearance. These manifests also belong to the earlier archive. The
-  approval registry remains unchanged.
+- The non-versioned [full package and smoke workflow](https://github.com/heckenmann/visual-agent/actions/runs/43187339406)
+  completed successfully for this exact source. All ten package variants and
+  all eleven platform/container smoke jobs passed. The workflow received no
+  release-tag input and did not publish a release or create/move a tag.
+- The six package-notice inventories contain 263 components each for Linux
+  AppImage, DEB, RPM, Windows, and macOS ARM64, and 261 for macOS x64. Across
+  all six, 1,576 component records and all six bundled-runtime sections remain
+  `unreviewed`; every manifest sets `redistributionApproved` to `false`.
+  Each inventory retains notices for 136 components; 127 have no detected
+  notice in the package on five platforms, and 125 on macOS x64. This is a
+  review queue, not evidence that every such component lacks a required notice.
+  `netty-resolver-dns-native-macos` is absent from all six inventories.
+- The generated recipient-candidate archives were downloaded and verified
+  locally. `visual-agent-legal.zip` SHA-256 is
+  `550f1cf873e59be5084794a73067d96cda1446a07101986a7bb293e14e263609`; its
+  internal manifest covers 4,404 files. `visual-agent-corresponding-sources.zip`
+  SHA-256 is
+  `d911aa648006492230d8ff4df8bbf61292e6c7119ad989a57715bc40268fe40f`; its
+  internal manifest covers 97 files, including the exact-version Zulu source
+  package and AppImage runtime sources. Every listed file matched its digest.
+  These integrity checks do not establish legal completeness or approval.
+- The approval registry remains unchanged and no release is cleared. The
+  candidate archives are not a substitute for component-level review,
+  confirming source/relink sufficiency, or approval of exact final release
+  package hashes.
 
 Earlier candidate and inventory records below are historical evidence for the
 specific workflow runs and source revisions they name. They must not be read
