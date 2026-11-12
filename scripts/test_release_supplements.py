@@ -96,7 +96,7 @@ class SupplementalNoticesTest(unittest.TestCase):
     def test_repository_snapshots_match_the_recorded_hashes(self):
         registry = pathlib.Path(__file__).parents[1] / "docs/licensing/third-party/sources.json"
         components = load_supplements(registry)
-        self.assertEqual(93, len(components))
+        self.assertEqual(95, len(components))
         self.assertEqual("MPL-2.0", components["com.h2database:h2:2.5.252"]["proposedLicense"])
         self.assertEqual("EPL-2.0", components["ch.qos.logback:logback-core:1.6.6"]["proposedLicense"])
         self.assertEqual("Apache-2.0", components["net.java.dev.jna:jna:5.19.1"]["proposedLicense"])
@@ -129,11 +129,16 @@ class SupplementalNoticesTest(unittest.TestCase):
             "com.knuddels:jtokkit:1.1.0",
             "com.google.protobuf:protobuf-java:4.36.2",
             "org.reactivestreams:reactive-streams:1.0.4",
+            "org.jetbrains.kotlinx:kotlinx-io-bytestring-jvm:0.9.1",
+            "org.jetbrains.kotlinx:kotlinx-io-core-jvm:0.9.1",
         }
         self.assertTrue(newly_mapped_coordinates.issubset(components))
         for coordinate in newly_mapped_coordinates:
             with self.subTest(coordinate=coordinate):
                 self.assertTrue(components[coordinate]["remaining"])
+        io_notice = components["org.jetbrains.kotlinx:kotlinx-io-core-jvm:0.9.1"]["materials"][0]["content"]
+        self.assertIn(b"NOTICE file corresponding to the section 4 d", io_notice)
+        self.assertIn(b"Copyright 2017-2023 JetBrains s.r.o", io_notice)
         antlr_runtime = components["org.antlr:antlr-runtime:3.5.3"]
         runtime_notices = next(
             material["content"]
@@ -441,7 +446,7 @@ class SupplementalNoticesTest(unittest.TestCase):
         self.assertIn("prohibits selling the font by itself", review_notes)
         self.assertIn("does not approve the complete release package", review_notes)
         component = load_supplements(root / "docs/licensing/third-party/sources.json")
-        self.assertEqual(93, len(component))
+        self.assertEqual(95, len(component))
         license_file = root / "docs/licensing/third-party/liberation-fonts-2.1.5/LICENSE"
         self.assertEqual(asset["licenseMaterialPath"],
                          "liberation-fonts-2.1.5/LICENSE")

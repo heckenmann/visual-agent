@@ -530,6 +530,20 @@
         "If APSL applies, independently confirm that the corresponding source, license copy, and executable-source-availability notice are complete and delivered with the exact macOS package",
         "Verify all materials in the final hash-reviewed macOS recipient packages"
       ]
+    },
+    {
+      "sourceArtifacts": {
+        "org.jetbrains.kotlinx:kotlinx-io-bytestring-jvm:0.9.1": "8589de0b7c476bfdd02a24641685f609ade72f5e595cf2909c168acdba7e6ba4",
+        "org.jetbrains.kotlinx:kotlinx-io-core-jvm:0.9.1": "765d8851d8ca694706931331b92386844800867e041b720f1f193dbda874d370"
+      },
+      "proposedLicense": "Apache-2.0",
+      "upstreamCommit": "362bdc35e159bad6da1e08101c8321792d762281",
+      "materialPaths": ["kotlinx-io-0.9.1/NOTICE"],
+      "reviewStatus": "unreviewed",
+      "reviewNotes": "The exact 0.9.1 upstream root NOTICE is absent from both published source JARs and packaged binaries, but exists at the exact upstream tag and is explicitly identified as an Apache License section 4(d) NOTICE for kotlinx-io. Both coordinates resolve to the same source artifact hashes on all four platforms; macOS package signing changes the packaged JAR hashes, so inventory records retain the supplement under each actual package hash.",
+      "remaining": [
+        "Review the NOTICE attribution scope against the exact bytes in both runtime artifacts and verify inclusion in the final recipient-facing legal materials"
+      ]
     }
   ],
   "embeddedComponents": [
@@ -1073,6 +1087,11 @@
       "path": "netty-4.2.20.Final/APSL-2.0.txt",
       "sha256": "2d0c12edaaf8d31fec6796fef99291b12e833b6bef28100975120a53d209e06d",
       "url": "https://raw.githubusercontent.com/spdx/license-list-data/31846481de7ea17d92f2f46fad76abe58b2e9bb0/text/APSL-2.0.txt"
+    },
+    {
+      "path": "kotlinx-io-0.9.1/NOTICE",
+      "sha256": "a126623d2c0c1ca21814828749243869ae2c44c7f6a56ef6074bb87f430b659e",
+      "url": "https://raw.githubusercontent.com/Kotlin/kotlinx-io/362bdc35e159bad6da1e08101c8321792d762281/NOTICE"
     }
   ]
 }

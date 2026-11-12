@@ -50,6 +50,26 @@ Apache NOTICE, GraalJS signing, Skia/ANGLE, AppImage source/relink, JDK-module,
 and final recipient-archive reviews described below. No approval registry
 entry or release tag was changed.
 
+### Kotlinx IO 0.9.1 Upstream NOTICE Gap
+
+The current Linux inventory run `43131824004` reports no embedded notice for
+`kotlinx-io-bytestring-jvm:0.9.1` and `kotlinx-io-core-jvm:0.9.1`. The exact
+published source JARs also contain no `NOTICE` entry. The exact upstream tag
+resolves to commit `362bdc35e159bad6da1e08101c8321792d762281`, whose root
+`NOTICE` identifies itself as the Apache License section 4(d) notice for
+kotlinx-io. Its original 486-byte content is retained at
+`docs/licensing/third-party/kotlinx-io-0.9.1/NOTICE` with SHA-256
+`a126623d2c0c1ca21814828749243869ae2c44c7f6a56ef6074bb87f430b659e` and is
+mapped to both resolved source-artifact hashes in `sources.json`. All four
+platform inventories resolve those same source hashes; macOS package signing
+changes the packaged JAR hashes, which the notice collector records separately
+for each packaged artifact.
+
+This closes the evidence-collection gap for those two coordinates only. The
+NOTICE attribution scope and final recipient-package inclusion remain
+unreviewed; redistribution approval remains false. The next inventory run must
+confirm the retained notice is carried into all exact recipient materials.
+
 ### Verified Graal Evidence Gap and Local Correction
 
 The Linux notice manifest from inventory workflow `42649987764` contains 14
