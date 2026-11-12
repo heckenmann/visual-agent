@@ -21,6 +21,35 @@ identify `25.4.4.1.1`. The older artifact hashes cannot approve the new graph.
 Spring Boot, Spring AI, and CMP Clipboard versions also changed; their actual
 selected runtime dependencies must be checked in the new package inventories.
 
+### Latest Non-Publishing Candidate Evidence (PR #533)
+
+After the rebase, PR head `18a8e8e1d41e0f8ab751abb276bb7c735084246c` passed
+the complete CI matrix: Gradle tests, package and launch, release-workflow
+contracts, CodeQL, and four platform license inventories in workflow
+[`43129039070`](https://github.com/heckenmann/visual-agent/actions/runs/43129039070).
+This is a technical candidate run for the open PR, not a versioned release
+candidate and not redistribution approval.
+
+The fresh inventory manifests contain 263 components each for Linux x64,
+Windows x64, and macOS ARM64, and 261 for macOS x64. Every component remains
+`unreviewed`, and all four manifests set `redistributionApproved` to `false`.
+The collector retained package notices for 136 components on every platform;
+127 components on Linux, Windows, and macOS ARM64 and 125 on macOS x64 have no
+notice detected in the packaged artifact. Of those, 68 per platform also have
+no curated supplement. These 68 are concrete triage items, not proof that each
+component has a missing legal notice; the applicable upstream license and
+NOTICE scope still need component-level review. The remaining no-detected
+entries have supplements, but those records also remain explicitly unreviewed.
+
+The same manifests include 241-243 bundled-JDK legal files per platform; the
+runtime legal section is also `unreviewed`. The Linux provenance report records
+Zulu `27.0.1.0.3+1`, its exact source and packaged module lists, and hashes for
+both lists. Package-generation and inventory success verify technical
+packaging and provenance capture only. They do not resolve the outstanding
+Apache NOTICE, GraalJS signing, Skia/ANGLE, AppImage source/relink, JDK-module,
+and final recipient-archive reviews described below. No approval registry
+entry or release tag was changed.
+
 ### Verified Graal Evidence Gap and Local Correction
 
 The Linux notice manifest from inventory workflow `42649987764` contains 14
