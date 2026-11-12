@@ -10,6 +10,8 @@ import sys
 import tempfile
 import unittest
 import zipfile
+from types import SimpleNamespace
+from unittest.mock import patch
 
 
 SPEC = importlib.util.spec_from_file_location("notices", pathlib.Path(__file__).with_name("collect-third-party-notices.py"))
@@ -106,12 +108,11 @@ class PackagedNoticesTest(unittest.TestCase):
         source_archive.write_bytes(b"pinned source archive")
         license_content = b"Original runtime license\n"
         license_hash = hashlib.sha256(license_content).hexdigest()
-        runtime.write_text(
-            "#!/bin/sh\nprintf '%s\\n' 'https://github.com/AppImage/type2-runtime/commit/abcdef0'\n",
-        )
-        runtime.chmod(runtime.stat().st_mode | 0o111)
-        runtime_bytes = runtime.read_bytes()
-        appimage.write_bytes(runtime_bytes + b"appimage payload")
+        runtime_bytes = bytearray(b"\x7fELF" + bytes(4) + b"AI\x02" + bytes(5) + bytes(16) + b"runtime")
+        runtime.write_bytes(runtime_bytes)
+        appimage_prefix = bytearray(runtime_bytes)
+        appimage_prefix[16:32] = bytes(range(1, 17))
+        appimage.write_bytes(appimage_prefix + b"appimage payload")
         declaration = {
             "sourceArchivePath": "archives/appimage-runtime/runtime-source.tar.gz",
             "sourceArchives": {
@@ -143,14 +144,22 @@ class PackagedNoticesTest(unittest.TestCase):
             },
         }
         output.mkdir()
-        report = NOTICES.retain_appimage_runtime(
-            appimage,
-            runtime,
-            source_archive,
-            output,
-            [0],
-            declaration,
-        )
+        with (
+            patch.object(NOTICES.appimage_runtime, "digest_section_range", return_value=(16, 16)),
+            patch.object(
+                NOTICES.subprocess,
+                "run",
+                return_value=SimpleNamespace(stdout="https://github.com/AppImage/type2-runtime/commit/abcdef0", stderr=""),
+            ),
+        ):
+            report = NOTICES.retain_appimage_runtime(
+                appimage,
+                runtime,
+                source_archive,
+                output,
+                [0],
+                declaration,
+            )
         self.assertTrue(report["embeddedPrefixVerified"])
         self.assertEqual(NOTICES.sha256(appimage), report["packageSha256"])
         self.assertEqual(NOTICES.sha256(runtime), report["runtimeSha256"])
@@ -164,10 +173,13 @@ class PackagedNoticesTest(unittest.TestCase):
         runtime = self.root / "runtime-x86_64"
         source_archive = self.root / "runtime-source.tar.gz"
         appimage = self.root / "visual-agent.AppImage"
-        runtime.write_bytes(b"runtime")
-        runtime.chmod(runtime.stat().st_mode | 0o111)
+        runtime_bytes = bytearray(b"\x7fELF" + bytes(4) + b"AI\x02" + bytes(5) + bytes(16) + b"runtime")
+        runtime.write_bytes(runtime_bytes)
+        appimage_prefix = bytearray(runtime_bytes)
+        appimage_prefix[16:32] = bytes(range(1, 17))
+        appimage_prefix[-1] ^= 0x01
         source_archive.write_bytes(b"pinned source archive")
-        appimage.write_bytes(b"wrong!!payload")
+        appimage.write_bytes(appimage_prefix + b"payload")
         declaration = {
             "runtimeSource": {
                 "sourceArtifactSha256": NOTICES.sha256(source_archive),
@@ -175,7 +187,10 @@ class PackagedNoticesTest(unittest.TestCase):
             },
             "linkedComponentEvidence": {},
         }
-        with self.assertRaisesRegex(ValueError, "prefix differs"):
+        with (
+            patch.object(NOTICES.appimage_runtime, "digest_section_range", return_value=(16, 16)),
+            self.assertRaisesRegex(ValueError, "differs outside"),
+        ):
             NOTICES.retain_appimage_runtime(appimage, runtime, source_archive, self.root, [0], declaration)
 
     def test_registry_declares_all_pinned_appimage_runtime_components(self):

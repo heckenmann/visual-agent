@@ -12,6 +12,7 @@ import subprocess
 import zipfile
 
 from third_party_supplements import load_runtime_packages, load_supplements
+import verify_appimage_runtime_embedded as appimage_runtime
 
 
 MAX_NOTICE_BYTES = 8 * 1024 * 1024
@@ -90,15 +91,16 @@ def retain_appimage_runtime(package, runtime, source_archive, output, total, dec
     package_hash = sha256(package)
     runtime_hash = sha256(runtime)
     source_hash = sha256(source_archive)
+    runtime_size = runtime.stat().st_size
     runtime_source = declaration["runtimeSource"]
     if source_hash != runtime_source["sourceArtifactSha256"]:
         raise ValueError("AppImage runtime source archive does not match the pinned evidence")
-    runtime_size = runtime.stat().st_size
-    if package.stat().st_size < runtime_size:
-        raise ValueError("AppImage package is shorter than its embedded runtime")
-    with package.open("rb") as package_stream, runtime.open("rb") as runtime_stream:
-        if package_stream.read(runtime_size) != runtime_stream.read():
-            raise ValueError("AppImage package prefix differs from the verified runtime")
+    appimage_runtime.verify_runtime_prefix(
+        runtime,
+        package,
+        appimage_runtime.digest_section_range(runtime),
+        appimage_runtime.digest_section_range(package),
+    )
 
     try:
         version_result = subprocess.run(
