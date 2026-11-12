@@ -6,14 +6,31 @@ review of license conditions and distribution evidence, not an external legal
 opinion or an OpenChain certification. Do not attribute this review to a human
 or organization that has not performed it.
 
-## Exact Candidate
+## Current Candidate (Non-Publishing)
 
-- Source: `4163037e6b17d4d973f425726ab31208e017b881`.
-- Version input: `v0.1.0`; no Git tag was created or moved.
-- Package workflow: [42651138364](https://github.com/heckenmann/visual-agent/actions/runs/42651138364).
-- This workflow builds candidates and does not publish a release.
-- Final package and archive hashes have not yet been reviewed. The approval
-  registry remains unchanged until that review succeeds.
+- Source: `cc6895ff1f91db28bb07484285bad084f7ce1473` (PR #533, rebased on the
+  current `master`).
+- Release version input: none. This is not a versioned release candidate.
+- Package and smoke workflow:
+  [43170724188](https://github.com/heckenmann/visual-agent/actions/runs/43170724188).
+- The workflow built all ten package variants and all ten platform smoke tests
+  successfully. It did not publish a release or create/move a tag.
+- The downloaded recipient-candidate archives were verified locally:
+  `visual-agent-legal.zip` SHA-256
+  `b0de65eff8476f2c1867be244af3a345c5926e1393c36924355c82a2be2ddd7b` and
+  `visual-agent-corresponding-sources.zip` SHA-256
+  `e0808ef31b47658151e94be029d203b2a49b80ae0b1b8d114273f1e541edf80b`.
+  Their internal SHA-256 manifests cover 4,404 and 97 entries respectively;
+  every listed file matched its recorded digest.
+- The legal archive contains six platform inventory manifests (Linux AppImage,
+  DEB and RPM; Windows; macOS ARM64 and x64). Across these manifests, all
+  1,576 component records remain `unreviewed`; each manifest sets
+  `redistributionApproved` to `false`. This is package-integrity evidence, not
+  legal clearance. The approval registry remains unchanged.
+
+Earlier candidate and inventory records below are historical evidence for the
+specific workflow runs and source revisions they name. They must not be read
+as describing the current candidate above.
 
 ## Existing GitHub Pre-release
 
