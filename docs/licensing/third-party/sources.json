@@ -254,9 +254,9 @@
       "materialPaths": ["zlib-1.4/LICENSE"],
       "reviewStatus": "unreviewed",
       "remaining": [
-        "Bind the locally verified zlib 1.4 source and Alpine zlib-static 1.4-r0 recipe to a newly built AppImage and corresponding-source archive; the earlier workflow archive remains mismatched",
-        "Review the applicable Zlib notice and final recipient-facing source/relink material"
-      ]
+        "Review the applicable Zlib notice and determine whether the source/relink materials meet obligations for the exact AppImage; recipient delivery and final release hash binding remain open"
+      ],
+      "reviewNotes": "Package and smoke workflow 43282355080 records zlib-static 1.4-r0 in the AppImage build log. The matching corresponding-sources candidate (SHA-256 fb633971382be640243fe00b0a7095c3bbcbdaccc26ad457fbf30b4a8d317a9f) contains the exact Alpine recipe archive (SHA-256 050415c464375727d855a14abb0cdf2d549bda3b32ddc3c0017256e552b3ec09). This resolves the prior candidate's source-version mismatch only; license review and recipient/final-release verification remain open."
     },
     {
       "sourceArtifacts": {
@@ -307,9 +307,9 @@
       "materialPaths": ["musl-1.2.5/COPYRIGHT"],
       "reviewStatus": "unreviewed",
       "remaining": [
-        "Bind the locally verified musl 1.2.5 source and Alpine musl-dev 1.2.5-r12 recipe/patches to a newly built AppImage and corresponding-source archive; the earlier workflow archive contains the r9 recipe",
-        "Review the applicable MIT notice and final recipient-facing source/relink material"
-      ]
+        "Review the applicable MIT notice and determine whether the source/relink materials meet obligations for the exact AppImage; recipient delivery and final release hash binding remain open"
+      ],
+      "reviewNotes": "Package and smoke workflow 43282355080 records musl-dev 1.2.5-r12 in the AppImage build log. The matching corresponding-sources candidate (SHA-256 fb633971382be640243fe00b0a7095c3bbcbdaccc26ad457fbf30b4a8d317a9f) contains the exact Alpine recipe archive (SHA-256 e63fe34178270d2d8cc74f1bab303ec1868150606e66f6da2c16221e6ec86034). This resolves the prior candidate's source-revision mismatch only; license review and recipient/final-release verification remain open."
     },
     {
       "sourceArtifacts": {

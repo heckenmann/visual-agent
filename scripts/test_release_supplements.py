@@ -244,7 +244,12 @@ class SupplementalNoticesTest(unittest.TestCase):
             "e32ff4e00d9d94930537635291da39e7e612703334bf6fde8c7f1686fe8a45a2",
             hashlib.sha256(zlib["materials"][0]["content"]).hexdigest(),
         )
-        self.assertIn("zlib-static 1.4-r0", " ".join(zlib["remaining"]))
+        zlib_record = next(item for item in registry_data["components"] if "zlib:1.4" in item["sourceArtifacts"])
+        self.assertEqual("unreviewed", zlib_record["reviewStatus"])
+        self.assertIn("zlib-static 1.4-r0", zlib_record["reviewNotes"])
+        self.assertIn("050415c464375727d855a14abb0cdf2d549bda3b32ddc3c0017256e552b3ec09",
+                      zlib_record["reviewNotes"])
+        self.assertNotIn("zlib-static 1.4-r0", " ".join(zlib_record["remaining"]))
         runtime = components["AppImage:type2-runtime:20251108"]
         self.assertEqual("MIT", runtime["proposedLicense"])
         self.assertEqual("f5fec23be76e50e2445ed2d018bac49b367490fc483c62c4637e99ec705d27ba",
@@ -262,6 +267,12 @@ class SupplementalNoticesTest(unittest.TestCase):
         musl = components["AppImage:musl:1.2.5"]
         self.assertEqual("MIT", musl["proposedLicense"])
         self.assertIn(b"musl as a whole is licensed", musl["materials"][0]["content"])
+        musl_record = next(item for item in registry_data["components"] if "AppImage:musl:1.2.5" in item["sourceArtifacts"])
+        self.assertEqual("unreviewed", musl_record["reviewStatus"])
+        self.assertIn("musl-dev 1.2.5-r12", musl_record["reviewNotes"])
+        self.assertIn("e63fe34178270d2d8cc74f1bab303ec1868150606e66f6da2c16221e6ec86034",
+                      musl_record["reviewNotes"])
+        self.assertNotIn("musl-dev 1.2.5-r12", " ".join(musl_record["remaining"]))
         graal = components["org.graalvm.js:js-isolate-linux-amd64:25.4.4.1.1"]
         self.assertEqual(
             "GraalVM Free Terms and Conditions (GFTC)",

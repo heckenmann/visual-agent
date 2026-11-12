@@ -8,39 +8,36 @@ or organization that has not performed it.
 
 ## Current Candidate (Non-Publishing)
 
-- Source: `598366e803e8559640d6f8a20ed5a75449fc2bd2` (PR #533, rebased on the
-  current `master`).
+- Source: `0ad834255a825fa7b4d7c7edee5962fd9a3fcd63` (PR #533).
 - Release version input: none. This is not a versioned release candidate.
-- The non-versioned [full package and smoke workflow](https://github.com/heckenmann/visual-agent/actions/runs/43255800118)
-  completed successfully for this exact source (final rerun attempt 5). All ten
-  package variants and their platform/container smoke jobs passed across the
-  same-source reruns. Some macOS ARM64 package/smoke jobs were initially
-  cancelled while waiting for hosted runners; rerunning them completed
-  successfully. The
-  workflow received no release-tag input and did not publish a release or
-  create/move a tag.
-- The six package-notice inventories contain 263 components each for Linux
-  AppImage, DEB, RPM, Windows, and macOS ARM64, and 261 for macOS x64. Across
-  all six, 1,576 component records and all six bundled-runtime sections remain
-  `unreviewed`; every manifest sets `redistributionApproved` to `false`.
-  Each inventory retains notices for 136 components; 127 have no detected
-  notice in the package on five platforms, and 125 on macOS x64. This is a
-  review queue, not evidence that every such component lacks a required notice.
-  `netty-resolver-dns-native-macos` is absent from all six inventories.
-- The exact AppImage build log installs `zlib-static 1.4-r0` and
-  `musl-dev 1.2.5-r12`; the corresponding package-notice artifact instead
-  contains the zlib 1.3.1 license material. The run's
-  `visual-agent-corresponding-sources.zip` has SHA-256
-  `d911aa648006492230d8ff4df8bbf61292e6c7119ad989a57715bc40268fe40f`; its
-  97-file manifest was verified, but the archive contains zlib 1.3.1 and
-  Alpine package sources that do not match the runtime build's zlib 1.4-r0 and
-  musl 1.2.5-r12 inputs. It cannot yet be treated as matching the AppImage.
-  Local uncommitted source-registry corrections do not change this candidate
-  and have not been built or inventoried by CI.
-- The six inventories set `redistributionApproved` to `false`, and every
-  component remains `unreviewed`. The successful build, package and smoke jobs
-  establish technical packaging only; they do not establish legal completeness,
-  corresponding-source sufficiency or redistribution approval.
+- The non-versioned [full package and smoke workflow](https://github.com/heckenmann/visual-agent/actions/runs/43282355080)
+  completed successfully for this exact source. All ten package variants and
+  all platform/container smoke jobs passed. The workflow received no
+  release-tag input (`tag=` and `candidate=false` in its release metadata); it
+  did not publish a release or create/move a tag.
+- The AppImage package-notice artifact from this run has inventory SHA-256
+  `70244ab8513eb2948f8f65902839ac300dd8ae6448688fee2fd5bfc808d05231`, 261
+  component records, `redistributionApproved: false`, and all component and
+  runtime review statuses set to `unreviewed`. Its runtime record identifies
+  Type 2 runtime commit `dd6cebedcbddde9c82f89b011e8e1d40b6e43868`, packaged
+  runtime SHA-256
+  `b2af9aa016b8a724b2b79c5d12c3af729839ba99ce970dff34f226351ffa190b`, and
+  source archive SHA-256
+  `f5fec23be76e50e2445ed2d018bac49b367490fc483c62c4637e99ec705d27ba`.
+- The `visual-agent-corresponding-sources.zip` embedded in this run's GitHub
+  artifact was independently downloaded and hashed as
+  `fb633971382be640243fe00b0a7095c3bbcbdaccc26ad457fbf30b4a8d317a9f`.
+  Its 98 payload files and manifest were previously verified. It includes the
+  exact Alpine recipes for zlib `1.4-r0` and musl `1.2.5-r12`, matching the
+  AppImage build log; the former recorded zlib `1.3.1` mismatch is resolved
+  for this candidate. This is evidence that the archived inputs match those
+  reported build revisions, not a qualified conclusion that LGPL-2.1 section
+  6(a)'s static-link relinking/source delivery is sufficient.
+- The package/smoke success and source-archive match establish technical
+  evidence for this non-versioned candidate only. They do not establish
+  complete legal coverage, qualified review, final release-asset hashes,
+  recipient delivery or redistribution approval. The archive has not been
+  attached to a public release, and no release is cleared.
 - The approval registry remains unchanged and no release is cleared. The
   candidate archives are not a substitute for component-level review,
   confirming source/relink sufficiency, or approval of exact final release
@@ -702,12 +699,13 @@ has confirmed this project's noncommercial distribution plan.
 
 The exact Zulu archives' `readme.txt` files give an actual three-year,
 physical-distribution-cost-limited OpenJDK source offer and a platform-specific
-request code. The four inventories from workflow `42649987764` retain these
-previously verified exact-build offer hashes:
+request code. I inspected the original text in the AppImage inventory artifact
+and verified the retained readme hashes in all six package inventories from
+the current non-publishing workflow `43282355080`:
 
-| Platform | Retained vendor readme SHA-256 |
+| Package inventory | Retained vendor readme SHA-256 |
 | --- | --- |
-| Linux x64 | `76adb733da785cd1f257bef2cfadeed5a30178e8ac1179590b5776c860609683` |
+| Linux AppImage, DEB, RPM | `76adb733da785cd1f257bef2cfadeed5a30178e8ac1179590b5776c860609683` |
 | macOS ARM64 | `ba5a54776c2990ee75398f258223515fee4f72bf3ce888603e42fe1f5947c7a3` |
 | macOS x64 | `b9748e40acbc0b4933f63e886f98ec629f7231645c0cd5caa471a01c902e85bf` |
 | Windows x64 | `8d0152e9611c44e4bce41ffa06a05befe4823a5ef48b35549a62246fed538312` |
@@ -717,9 +715,12 @@ the received vendor offer for OpenJDK portions under GPLv2 with the Classpath
 Exception, preserving the original notice, request code, GPL text, and
 exception. The exact non-publishing candidate contains the original
 platform-specific offer in all six package evidence trees, with hashes matching
-the received archives. Given the maintainer-confirmed noncommercial
-distribution, the evidence supports GPLv2 section 3(c) for those covered
-portions; a new project source offer is not required for them. This does not
+the received archives. This is evidence for a possible GPLv2 section 3(c)
+pass-through route for the covered OpenJDK portions, given the maintainer-
+confirmed noncommercial distribution; a new project source offer may not be
+required if the route is valid for the exact distributions. A qualified review
+must still confirm the offer's applicability to these received binaries, their
+downstream recipients, and the `jlink`/signing transformations. This does not
 clear separately licensed JDK components or establish that every such component
 is within Azul's offer. The incomplete Java-only source package must not be
 presented as complete native JDK source.
