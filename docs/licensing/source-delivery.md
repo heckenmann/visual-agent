@@ -90,11 +90,13 @@ resolves the corresponding native-component review.
 
 The audited candidate included the Netty macOS DNS resolver. The current build
 switches the GitHub update client to Spring's JDK HTTP connector and excludes
-that optional native resolver from the desktop distribution. The source archive
-and Apple Public Source License 2.0 text are retained as historical review
-evidence, not as a conclusion that the former binary was APSL-covered or that
-its delivery obligations were satisfied. The final platform artifacts must
-still be checked to confirm the resolver is absent. The exact Maven Central
+that optional native resolver from the desktop distribution. The four-platform
+inventory for PR head `f886c07138912645ce0e10f579c8731e49ca22c3` confirms the
+coordinate is absent from the current candidate. The source archive and Apple
+Public Source License 2.0 text are retained as historical review evidence, not
+as a conclusion that the former binary was APSL-covered or that its delivery
+obligations were satisfied. Repeat the absence check against the final release
+artifacts. The exact Maven Central
 source archive used for the historical review has SHA-256
 `98a33e5adbbe58cb084ed4ca61350fa0a6311f4f8e54bc8cd823a402d0609c42`. Its
 version/hash provenance remains in `sources.json`; it is not included in the new

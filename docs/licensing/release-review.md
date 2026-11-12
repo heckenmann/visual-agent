@@ -8,25 +8,44 @@ or organization that has not performed it.
 
 ## Current Candidate (Non-Publishing)
 
-- Source: `cc6895ff1f91db28bb07484285bad084f7ce1473` (PR #533, rebased on the
+- Source: `f886c07138912645ce0e10f579c8731e49ca22c3` (PR #533, rebased on the
   current `master`).
 - Release version input: none. This is not a versioned release candidate.
-- Package and smoke workflow:
-  [43170724188](https://github.com/heckenmann/visual-agent/actions/runs/43170724188).
-- The workflow built all ten package variants and all ten platform smoke tests
-  successfully. It did not publish a release or create/move a tag.
-- The downloaded recipient-candidate archives were verified locally:
+- Current PR CI passed: [tests, package verification, and workflow
+  contracts](https://github.com/heckenmann/visual-agent/actions/runs/43181528773)
+  and [four-platform inventories](https://github.com/heckenmann/visual-agent/actions/runs/43181528616).
+- The current package job ran `verifyPackages` and executable-JAR launch
+  checks. The separate full native-package and platform-smoke run
+  [43170724188](https://github.com/heckenmann/visual-agent/actions/runs/43170724188)
+  built all ten variants at `cc6895ff`; the only changes from that source to
+  this candidate are licensing documentation and `sources.json`. Its package
+  and smoke evidence predates the current legal-material inputs. The current
+  inventory run includes those inputs. No workflow published a release or
+  created/moved a tag.
+- Current inventories contain 263 components for Linux x64, Windows x64, and
+  macOS ARM64, and 261 for macOS x64. The optional
+  `netty-resolver-dns-native-macos` coordinate is absent on all four platforms.
+  Every component remains `unreviewed`, and every manifest sets
+  `redistributionApproved` to `false`; inventory evidence is not legal
+  clearance.
+- All four package-file inventories include the DNG patent notice and JNA
+  libffi license material. Their presence does not establish final legal
+  completeness or resolve the remaining component/source reviews.
+- The recipient-candidate archives downloaded from run `43170724188` at
+  `cc6895ff` were verified locally:
   `visual-agent-legal.zip` SHA-256
   `b0de65eff8476f2c1867be244af3a345c5926e1393c36924355c82a2be2ddd7b` and
   `visual-agent-corresponding-sources.zip` SHA-256
   `e0808ef31b47658151e94be029d203b2a49b80ae0b1b8d114273f1e541edf80b`.
   Their internal SHA-256 manifests cover 4,404 and 97 entries respectively;
-  every listed file matched its recorded digest.
+  every listed file matched its recorded digest. These are integrity checks on
+  the earlier archive, not a final bundle for the current candidate.
 - The legal archive contains six platform inventory manifests (Linux AppImage,
   DEB and RPM; Windows; macOS ARM64 and x64). Across these manifests, all
   1,576 component records remain `unreviewed`; each manifest sets
   `redistributionApproved` to `false`. This is package-integrity evidence, not
-  legal clearance. The approval registry remains unchanged.
+  legal clearance. These manifests also belong to the earlier archive. The
+  approval registry remains unchanged.
 
 Earlier candidate and inventory records below are historical evidence for the
 specific workflow runs and source revisions they name. They must not be read
@@ -49,7 +68,7 @@ identify `25.4.4.1.1`. The older artifact hashes cannot approve the new graph.
 Spring Boot, Spring AI, and CMP Clipboard versions also changed; their actual
 selected runtime dependencies must be checked in the new package inventories.
 
-### Latest Non-Publishing Candidate Evidence (PR #533)
+### Earlier Non-Publishing Candidate Evidence (PR #533)
 
 PR head `e4f0e32a1de6a6793d1958733a023b2e958d03ef` passed the complete CI
 matrix: Gradle tests, package and launch, release-workflow contracts, CodeQL,
@@ -821,10 +840,12 @@ DNS resolver JAR contains `libnetty_resolver_dns_native_macos_aarch_64.jnilib`;
 its HTTP/3 JAR contains no embedded Quiche or BoringSSL native binaries. The
 current desktop build switches the GitHub update client to Spring's JDK HTTP
 connector and excludes the optional native DNS resolver. The package verifier
-now requires the resolver to be absent. Until newly generated platform
-artifacts pass that verifier, this historical candidate finding remains open;
-the APSL scope need not be resolved for a candidate that demonstrably does not
-include the resolver binary.
+requires the resolver to be absent. The current four-platform inventories for
+PR head `f886c07138912645ce0e10f579c8731e49ca22c3` confirm that the coordinate
+is absent on Linux, Windows, macOS ARM64, and macOS x64. This resolves resolver
+presence in the current candidate only; it does not review the historical
+binary or approve future release packages. A release inventory must repeat
+the check.
 
 The exact Netty 4.2.20.Final source JAR contains `netty_resolver_dns_macos.c`
 and `dnsinfo.h`. The C source includes that header and calls
@@ -842,9 +863,9 @@ the registry. Netty's original `LICENSE.dnsinfo.txt` header notice and the full
 APSL-2.0 text remain hash-checked as historical review evidence, but the
 unshipped native resolver source archive is excluded from the release source
 bundle. A regression test verifies the legal-text hashes, all 20 historical
-Netty notice mappings, and collector output. Current candidate inventories and
-final recipient-package review must confirm that the optional native resolver
-is no longer distributed.
+Netty notice mappings, and collector output. The current candidate inventories
+confirm that the optional resolver is absent; final recipient-package review
+must repeat that check for the actual release artifacts.
 
 The official [GFTC](https://www.oracle.com/downloads/licenses/graal-free-license.html)
 and [GraalVM FAQ](https://www.graalvm.org/faq/) were checked again. Neither
