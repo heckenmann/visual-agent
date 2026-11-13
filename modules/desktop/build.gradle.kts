@@ -881,18 +881,26 @@ private fun downloadVerifiedFile(
 
     val temporaryFile = Files.createTempFile(target.parentFile.toPath(), target.name, ".download")
     try {
-        URI(url).toURL().openStream().use { source ->
-            Files.newOutputStream(temporaryFile).use(source::copyTo)
+        repeat(sourceDownloadAttempts) { attempt ->
+            URI(url).toURL().openStream().use { source ->
+                Files.newOutputStream(temporaryFile).use(source::copyTo)
+            }
+            val actualSha256 = auditHash(temporaryFile.toFile(), "SHA-256")
+            if (actualSha256 == expectedSha256) {
+                Files.move(temporaryFile, target.toPath(), REPLACE_EXISTING)
+                return
+            }
+            check(attempt < sourceDownloadAttempts - 1) {
+                "Downloaded file checksum mismatch after $sourceDownloadAttempts attempts for $url: " +
+                    "expected $expectedSha256 but received $actualSha256."
+            }
         }
-        val actualSha256 = auditHash(temporaryFile.toFile(), "SHA-256")
-        check(actualSha256 == expectedSha256) {
-            "Downloaded file checksum mismatch: expected $expectedSha256 but received $actualSha256."
-        }
-        Files.move(temporaryFile, target.toPath(), REPLACE_EXISTING)
     } finally {
         Files.deleteIfExists(temporaryFile)
     }
 }
+
+private val sourceDownloadAttempts = 3
 
 private fun quoteDesktopExecArgument(value: String): String =
     "\"" +
