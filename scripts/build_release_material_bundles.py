@@ -298,6 +298,160 @@ def _verify_curated_materials(legal_root, legal_files):
     return runtime_packages
 
 
+def _recipient_legal_files(project_root, legal_files, notice_evidence):
+    """Build recipient materials without internal review records or stale licenses."""
+    registry_path = project_root / "docs/licensing/third-party/sources.json"
+    registry = json.loads(registry_path.read_text(encoding="utf-8"))
+    legal_by_name = dict(legal_files)
+    notice_roots = {}
+    selected_coordinates = set()
+    selected_evidence = {}
+    has_apache_license = False
+
+    for root in sorted(path for path in notice_evidence.iterdir() if path.is_dir()):
+        platform = root.name.removeprefix("license-notices-")
+        if platform in notice_roots:
+            raise ValueError(f"Duplicate package notice evidence for {platform}")
+        notice_roots[platform] = root
+
+    for platform, root in sorted(notice_roots.items()):
+        manifest = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
+        selected_coordinates.update(
+            component["coordinate"]
+            for component in manifest.get("components", [])
+            if component.get("coordinate")
+        )
+        for component in manifest.get("components", []):
+            coordinate = component.get("coordinate")
+            has_apache_license = has_apache_license or any(
+                "apache" in license_entry.get("name", "").lower()
+                for license_entry in component.get("licenseMetadata", {}).get("declaredLicenses", [])
+            )
+            for material in component.get("notices", []):
+                _add_recipient_evidence(
+                    selected_evidence,
+                    _recipient_evidence_file(root, platform, material, "notices", coordinate),
+                )
+            for material in component.get("supplement", {}).get("materials", []):
+                _add_recipient_evidence(
+                    selected_evidence,
+                    _recipient_evidence_file(root, platform, material, "supplements", coordinate),
+                )
+        runtime = manifest.get("runtimeLegal", {})
+        for material in runtime.get("files", []):
+            _add_recipient_evidence(
+                selected_evidence,
+                _recipient_evidence_file(root, platform, material, "java-runtime"),
+            )
+        appimage = manifest.get("appImageRuntime", {})
+        for component in appimage.get("components", []):
+            selected_coordinates.add(component["coordinate"])
+            for material in component.get("materials", []):
+                _add_recipient_evidence(
+                    selected_evidence,
+                    _recipient_evidence_file(
+                        root,
+                        platform,
+                        material,
+                        "appimage-runtime",
+                        component["coordinate"],
+                    ),
+                )
+
+    selected_material_paths = {
+        path
+        for component in registry.get("components", [])
+        if selected_coordinates.intersection(component.get("sourceArtifacts", {}))
+        for path in component.get("materialPaths", [])
+    }
+    selected_material_paths.update(
+        asset["licenseMaterialPath"]
+        for asset in registry.get("embeddedAssets", [])
+        if asset.get("containerCoordinate") in selected_coordinates and asset.get("licenseMaterialPath")
+    )
+    if has_apache_license:
+        selected_material_paths.add("Apache-2.0.txt")
+    missing = selected_material_paths.difference(legal_by_name)
+    if missing:
+        raise ValueError(f"Recipient legal material is missing: {', '.join(sorted(missing))}")
+
+    result = [
+        ("LICENSE", project_root / "LICENSE"),
+        (
+            "README-LICENSES.txt",
+            _generated_bytes(
+                "This archive contains the Visual Agent license and third-party license/notice materials.\n"
+                "Platform-specific package and runtime materials are grouped under platforms/.\n"
+                "Each included component remains subject to its accompanying license.\n"
+                "MANIFEST.sha256 lists the SHA-256 hashes of the included files.\n"
+            ),
+        ),
+    ]
+    result.extend(
+        (f"third-party/{name}", legal_by_name[name])
+        for name in sorted(selected_material_paths)
+    )
+    result.extend(sorted(selected_evidence.items()))
+    names = [name for name, _ in result]
+    if len(names) != len(set(names)):
+        raise ValueError("Recipient legal archive contains duplicate paths")
+    return result
+
+
+def _recipient_evidence_file(root, platform, material, category, coordinate=None):
+    """Return one validated recipient path and file from package evidence."""
+    relative = material.get("path")
+    source = root / relative
+    if source.is_symlink() or not source.is_file() or not source.resolve().is_relative_to(root.resolve()):
+        raise ValueError(f"Recipient legal material is missing or escaping: {platform}/{relative}")
+    if _sha256(source) != material.get("sha256"):
+        raise ValueError(f"Recipient legal material hash mismatch: {platform}/{relative}")
+
+    if category == "java-runtime":
+        if not relative.startswith("runtime-legal/"):
+            raise ValueError(f"Unexpected Java runtime legal path: {platform}/{relative}")
+        target = f"platforms/{platform}/java-runtime/{relative.removeprefix('runtime-legal/')}"
+    elif category == "appimage-runtime":
+        if not relative.startswith("appimage-runtime-legal/"):
+            raise ValueError(f"Unexpected AppImage runtime legal path: {platform}/{relative}")
+        target = f"platforms/{platform}/appimage-runtime/{relative.removeprefix('appimage-runtime-legal/')}"
+    else:
+        if not isinstance(coordinate, str) or not coordinate:
+            raise ValueError(f"Package legal material has no component coordinate: {platform}/{relative}")
+        slug = re.sub(r"[^A-Za-z0-9._+-]+", "_", coordinate)
+        name = pathlib.PurePosixPath(relative).name
+        target = f"platforms/{platform}/{category}/{slug}/{material['sha256']}/{name}"
+    return target, source
+
+
+def _add_recipient_evidence(selected, evidence):
+    """Keep distinct payload notices and deduplicate repeated inventory rows."""
+    target, source = evidence
+    previous = selected.get(target)
+    if previous is not None and _sha256(previous) != _sha256(source):
+        raise ValueError(f"Conflicting recipient legal material for {target}")
+    selected[target] = source
+
+
+def _generated_bytes(content):
+    """Expose deterministic generated text through the same archive writer interface."""
+    return _GeneratedFile(content)
+
+
+class _GeneratedFile:
+    """Small in-memory file used for generated recipient-facing text."""
+
+    def __init__(self, content):
+        self.content = content.encode("utf-8")
+
+    def open(self, mode="rb"):
+        import io
+
+        if mode != "rb":
+            raise ValueError("Generated archive content is read-only")
+        return io.BytesIO(self.content)
+
+
 def build_bundles(project_root, source_materials, notice_evidence, output_directory, recipient_candidate=False):
     """Create deterministic review archives or recipient candidates; neither mode grants approval."""
     project_root = pathlib.Path(project_root)
@@ -339,23 +493,52 @@ def build_bundles(project_root, source_materials, notice_evidence, output_direct
         _sha256(required_project_files[0]),
         runtime_packages,
     )
-    legal_bundle_files = [
-        ("LICENSE", required_project_files[0]),
-        ("licensing/README.md", required_project_files[1]),
-        ("licensing/source-delivery.md", required_project_files[2]),
-        *((f"licensing/third-party/{name}", source) for name, source in legal_files),
-        *package_notice_files,
-    ]
-    source_bundle_files = [
-        (f"source-materials/{name}", source)
-        for name, source in source_files
-    ]
+    if recipient_candidate:
+        legal_bundle_files = _recipient_legal_files(project_root, legal_files, notice_evidence)
+    else:
+        legal_bundle_files = [
+            ("LICENSE", required_project_files[0]),
+            ("licensing/README.md", required_project_files[1]),
+            ("licensing/source-delivery.md", required_project_files[2]),
+            *((f"licensing/third-party/{name}", source) for name, source in legal_files),
+            *package_notice_files,
+        ]
+    if recipient_candidate:
+        source_bundle_files = _recipient_source_files(source_files)
+    else:
+        source_bundle_files = [
+            (f"source-materials/{name}", source)
+            for name, source in source_files
+        ]
 
     output_directory.mkdir(parents=True, exist_ok=True)
     review_only_notice = None if recipient_candidate else REVIEW_ONLY_NOTICE
     _write_archive(output_directory / LEGAL_ARCHIVE, legal_bundle_files, review_only_notice)
     _write_archive(output_directory / SOURCES_ARCHIVE, source_bundle_files, review_only_notice)
     return output_directory / LEGAL_ARCHIVE, output_directory / SOURCES_ARCHIVE
+
+
+def _recipient_source_files(source_files):
+    """Build the source candidate from collected archives, not internal review files."""
+    archives = [(name, source) for name, source in source_files if name.startswith("archives/")]
+    if not archives:
+        raise ValueError("Recipient source archive has no source inputs")
+    lines = [
+        "Source materials for the matching Visual Agent release are listed below.",
+        "The paired visual-agent-legal.zip contains applicable license and source-availability notices.",
+        "Obtain both archives from the same versioned release; MANIFEST.sha256 records file hashes.",
+        "",
+        "Included source inputs:",
+    ]
+    lines.extend(
+        f"{_sha256(source)}  source-materials/{name}"
+        for name, source in archives
+    )
+    lines.append("")
+    return [
+        ("README-SOURCES.txt", _generated_bytes("\n".join(lines))),
+        *((f"source-materials/{name}", source) for name, source in archives),
+    ]
 
 
 def main():

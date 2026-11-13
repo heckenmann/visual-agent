@@ -30,6 +30,7 @@ class ReleaseMaterialBundleTest(unittest.TestCase):
         runtime_source_hash = hashlib.sha256(runtime_source_archive).hexdigest()
         self.runtime_source_hash = runtime_source_hash
         (self.project / "docs/licensing/third-party/vendor").mkdir(parents=True)
+        (self.project / "docs/licensing/third-party/historical").mkdir(parents=True)
         (self.materials / "archives/vendor").mkdir(parents=True)
         (self.materials / "archives/appimage-runtime").mkdir(parents=True)
         (self.materials / "legal/vendor").mkdir(parents=True)
@@ -37,7 +38,11 @@ class ReleaseMaterialBundleTest(unittest.TestCase):
         (self.project / "docs/licensing/README.md").write_text("Review status")
         (self.project / "docs/licensing/source-delivery.md").write_text("Scope remains partial")
         (self.project / "docs/licensing/third-party/vendor/LICENSE").write_text("Vendor license")
+        (self.project / "docs/licensing/third-party/historical/LICENSE").write_text("Historical license")
+        (self.project / "docs/licensing/third-party/Apache-2.0.txt").write_text("Apache license")
         license_bytes = b"Vendor license"
+        historical_license_bytes = b"Historical license"
+        apache_license_bytes = b"Apache license"
         (self.project / "docs/licensing/third-party/sources.json").write_text(
             json.dumps(
                 {
@@ -46,10 +51,18 @@ class ReleaseMaterialBundleTest(unittest.TestCase):
                         {
                             "reviewStatus": "unreviewed",
                             "materialPaths": ["vendor/LICENSE"],
+                            "proposedLicense": "Apache-2.0",
+                            "licenseMetadata": {"declaredLicenses": [{"name": "Apache-2.0"}]},
                             "sourceArtifacts": {
                                 "example:runtime:1": runtime_source_hash,
                                 "example:static:1": "c" * 64,
                             },
+                            "upstreamCommit": "a" * 40,
+                        },
+                        {
+                            "reviewStatus": "unreviewed",
+                            "materialPaths": ["historical/LICENSE"],
+                            "sourceArtifacts": {"example:historical:1": "b" * 64},
                             "upstreamCommit": "a" * 40,
                         },
                     ],
@@ -68,6 +81,14 @@ class ReleaseMaterialBundleTest(unittest.TestCase):
                         {
                             "path": "vendor/LICENSE",
                             "sha256": hashlib.sha256(license_bytes).hexdigest(),
+                        },
+                        {
+                            "path": "historical/LICENSE",
+                            "sha256": hashlib.sha256(historical_license_bytes).hexdigest(),
+                        },
+                        {
+                            "path": "Apache-2.0.txt",
+                            "sha256": hashlib.sha256(apache_license_bytes).hexdigest(),
                         },
                     ],
                 },
@@ -118,7 +139,9 @@ class ReleaseMaterialBundleTest(unittest.TestCase):
             "projectLicenseSha256": hashlib.sha256((self.project / "LICENSE").read_bytes()).hexdigest(),
             "components": [
                 {
+                    "coordinate": "example:component:1",
                     "reviewStatus": "unreviewed",
+                    "licenseMetadata": {"declaredLicenses": [{"name": "Apache-2.0"}]},
                     "noticeStatus": "retained",
                     "notices": [
                         {
@@ -198,6 +221,8 @@ class ReleaseMaterialBundleTest(unittest.TestCase):
                     "licensing/README.md",
                     "licensing/source-delivery.md",
                     "licensing/third-party/vendor/LICENSE",
+                    "licensing/third-party/historical/LICENSE",
+                    "licensing/third-party/Apache-2.0.txt",
                     "licensing/third-party/sources.json",
                     "MANIFEST.sha256",
                     "REVIEW-ONLY.txt",
@@ -285,14 +310,82 @@ class ReleaseMaterialBundleTest(unittest.TestCase):
     def test_recipient_candidates_omit_review_marker_but_do_not_change_review_registry(self):
         legal, sources = self.build(recipient_candidate=True)
 
-        for archive_path in (legal, sources):
-            with zipfile.ZipFile(archive_path) as archive:
-                self.assertNotIn("REVIEW-ONLY.txt", archive.namelist())
-                self.assertTrue(archive.read("MANIFEST.sha256"))
+        with zipfile.ZipFile(legal) as archive:
+            names = set(archive.namelist())
+            self.assertNotIn("REVIEW-ONLY.txt", names)
+            self.assertIn("README-LICENSES.txt", names)
+            self.assertIn("third-party/vendor/LICENSE", names)
+            self.assertIn("third-party/Apache-2.0.txt", names)
+            self.assertNotIn("third-party/historical/LICENSE", names)
+            self.assertIn(
+                "platforms/linux-appimage/appimage-runtime/example-static-1/LICENSE",
+                names,
+            )
+            self.assertIn(
+                "platforms/linux-appimage/notices/example_component_1/"
+                f"{hashlib.sha256(b'linux-appimage dependency notice').hexdigest()}/LICENSE",
+                names,
+            )
+            self.assertIn(
+                "platforms/windows/java-runtime/vendor/readme.txt",
+                names,
+            )
+            self.assertTrue(archive.read("MANIFEST.sha256"))
+            self.assertNotIn("licensing/README.md", names)
+            self.assertNotIn("licensing/source-delivery.md", names)
+            self.assertNotIn("third-party/sources.json", names)
+            self.assertFalse(any(name.endswith("/manifest.json") for name in names))
+
+        with zipfile.ZipFile(sources) as archive:
+            names = set(archive.namelist())
+            self.assertNotIn("REVIEW-ONLY.txt", names)
+            self.assertIn("README-SOURCES.txt", names)
+            self.assertIn("source-materials/archives/vendor/source.tar.gz", names)
+            self.assertIn("source-materials/archives/appimage-runtime/runtime.tar.gz", names)
+            self.assertNotIn("source-materials/source-delivery.md", names)
+            self.assertNotIn("source-materials/legal/vendor/LICENSE", names)
+            self.assertTrue(archive.read("MANIFEST.sha256"))
+            self.assertIn(
+                b"source-materials/archives/appimage-runtime/runtime.tar.gz",
+                archive.read("README-SOURCES.txt"),
+            )
 
         registry = json.loads((self.project / "docs/licensing/third-party/sources.json").read_text())
         self.assertFalse(registry["redistributionApproved"])
         self.assertIn("must not be published as a release asset", bundler.REVIEW_ONLY_NOTICE)
+
+    def test_recipient_candidate_preserves_distinct_notices_for_repeated_coordinates(self):
+        platform_root = self.notice_evidence / "linux-appimage"
+        duplicate_bytes = b"second license for repeated component coordinate"
+        duplicate_path = platform_root / "artifacts/another-package-hash/LICENSE"
+        duplicate_path.parent.mkdir(parents=True)
+        duplicate_path.write_bytes(duplicate_bytes)
+        manifest_path = platform_root / "manifest.json"
+        manifest = json.loads(manifest_path.read_text())
+        duplicate_component = json.loads(json.dumps(manifest["components"][0]))
+        duplicate_component["notices"][0] = {
+            "path": "artifacts/another-package-hash/LICENSE",
+            "sha256": hashlib.sha256(duplicate_bytes).hexdigest(),
+        }
+        manifest["components"].append(duplicate_component)
+        manifest_path.write_text(json.dumps(manifest))
+
+        legal, _ = self.build(recipient_candidate=True)
+
+        with zipfile.ZipFile(legal) as archive:
+            same_component = "platforms/linux-appimage/notices/example_component_1"
+            self.assertEqual(
+                b"linux-appimage dependency notice",
+                archive.read(
+                    f"{same_component}/{hashlib.sha256(b'linux-appimage dependency notice').hexdigest()}/LICENSE",
+                ),
+            )
+            self.assertEqual(
+                duplicate_bytes,
+                archive.read(
+                    f"{same_component}/{hashlib.sha256(duplicate_bytes).hexdigest()}/LICENSE",
+                ),
+            )
 
     def test_missing_source_archive_fails_closed(self):
         (self.materials / "archives/vendor/source.tar.gz").unlink()
