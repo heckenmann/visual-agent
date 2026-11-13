@@ -5,6 +5,17 @@ review.** `release-approvals.json` is intentionally empty. Missing approval, leg
 material, or corresponding sources blocks publication; it is not a CI failure to
 work around by adding a generic license allowlist or a fabricated approval.
 
+## What The Release Decision Means
+
+Here, a release decision means deciding whether the exact built download files
+may be distributed after checking the license conditions that apply to their
+contents. It is not the same as a successful build, a complete inventory, or a
+statement that every dependency is legally approved. The project-specific
+`release-approvals.json` is only a technical record binding a documented review
+to exact file hashes; it does not create that review or replace the maintainer's
+publication decision. Until the evidence and any required expert assessment are
+complete, the accurate status is **not yet decided**, not “approved” or “ready”.
+
 The ongoing [beta redistribution review](release-review.md) records attributed
 component decisions and the exact candidate under inspection. Its findings are
 not an approval record until the final package evidence has been checked.
@@ -36,14 +47,18 @@ A competent review must establish the following before recording an approval:
   and its SHA-256. Never manufacture a legal opinion or approval attribution.
 
 This gate is the initial safety boundary, not completion of #410. The latest
-versioned, non-publishing candidate (workflow run 43368865856) generated review
+versioned, non-publishing candidate (workflow run
+[43451994879](https://github.com/heckenmann/visual-agent/actions/runs/43451994879),
+source commit `4073f130de8bdeee7b01a4127349b5109b642435) generated review
 evidence for Linux AppImage/DEB/RPM, macOS ARM64/x64, and Windows, plus separate
-recipient-candidate legal and corresponding-source archives. Its package
-manifests record exact package hashes and retained notices; all component rows
-remain unreviewed and redistribution is unapproved. The candidate archive
-integrity checks do not establish complete native-component coverage, legal
-sufficiency, or final-release approval. Final package-content checks remain
-required after the release source is merged and rebuilt.
+recipient-candidate legal and corresponding-source archives. All ten package
+builds and legal/source generation passed; nine of ten smoke jobs passed. The
+macOS x64 smoke assertions passed, but its cleanup failed while detaching a busy
+DMG. Its 260 distinct component coordinates remain unreviewed and
+redistribution is unapproved. Candidate archive integrity checks do not
+establish complete native-component coverage, legal sufficiency, or final-release
+approval. Final package-content checks remain required after the release source
+is merged and rebuilt.
 
 The release publisher is manually dispatched from the trusted default branch for
 an existing GitHub draft release. It accepts only a successful versioned package
@@ -241,8 +256,10 @@ The pinned Skiko `build.gradle.kts` declares static Skia libraries including
 expat, and Skottie; it additionally declares `piex`/`dng_sdk` for macOS and
 `d3d12allocator` for Windows. Direct symbol inspection of the Skiko 0.150.2
 Linux x64 and macOS runtime binaries found DNG SDK, Piex, and Wuffs symbols,
-while the stripped Windows binary leaves DNG SDK/Piex presence unknown. See the
-registry for artifact hashes, exact upstream revisions, and remaining work.
+while the pinned Windows JVM configuration disables the RAW codec and omits
+DNG SDK/Piex. It separately configures D3D12MemoryAllocator as a static Windows
+link input, with its MIT notice retained. See the registry for artifact hashes,
+exact upstream revisions, and remaining work.
 Build declarations do not substitute for binary inspection or establish
 source-delivery obligations.
 

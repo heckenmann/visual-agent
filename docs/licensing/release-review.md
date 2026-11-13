@@ -10,6 +10,70 @@ or organization that has not performed it.
 
 ### Latest Versioned Candidate (Non-Publishing)
 
+- The latest versioned non-publishing candidate is [workflow run
+  43451994879](https://github.com/heckenmann/visual-agent/actions/runs/43451994879),
+  with tag input `v0.1.0` and source commit
+  `4073f130de8bdeee7b01a4127349b5109b642435`. Its metadata artifact says
+  `candidate=true`; the workflow did not publish a release or create/move a tag.
+  All ten package jobs and the legal/source-material generation job passed.
+  Nine of ten package smoke jobs passed. The only failure was the macOS x64
+  DMG smoke job: the application started and created its isolated database,
+  then `hdiutil detach /dev/disk2 -force` returned exit 16, `Resource busy`.
+  This is a cleanup failure after the smoke assertions passed, not a failed app
+  startup. A bounded retry for this specific transient result is implemented
+  locally. The mounted-image validation-error path uses the same retry, and a
+  detach failure there is chained without replacing the original validation
+  error. Four focused regression tests cover those paths; the complete release
+  script suite passes 87 tests. The fix has not yet been run in CI.
+- The six platform manifests in the run's internal review artifact each have
+  261 component rows; all 1,566 rows remain `unreviewed`, every manifest sets
+  `redistributionApproved: false`, and none contains a `js-isolate` coordinate.
+  These exact candidate inventory facts supersede the earlier four-platform
+  inventory cited below, but do not constitute component-level legal review.
+- Deduplicating the six manifests by Maven coordinate yields 260 distinct
+  components, not 1,566 independent review cases. Of these, 128 have no
+  automatically detected notice in the packaged artifact; 69 have exact
+  curated supplemental materials in the candidate legal bundle. The remaining
+  59 are 58 components whose reported license metadata includes Apache 2.0
+  variants and the bundled JDK `jrt-fs` entry. The recipient candidate contains
+  the generic Apache-2.0 text and all six platform-specific Zulu vendor offer
+  files. For the 58 Apache-metadata components, 57 exact-version source JARs
+  were inspected (56 from Maven Central and one from Google Maven); none had a
+  `NOTICE`-named entry. The remaining Guava `listenablefuture` coordinate is an
+  empty conflict-avoidance artifact: its POM and binary were available, but no
+  source JAR was published at the tested Maven Central coordinate and neither
+  contained a `NOTICE` entry. This narrows the notice-specific follow-up, but
+  does not validate all declared license metadata, source correspondence, or
+  obligations beyond NOTICE-file presence.
+- GitHub reports the recipient legal artifact as 2,003,026 bytes with artifact
+  SHA-256 `d3f69e62d76c1ec2479d01f7d68945a3e6a4f75c7f754aea16fe948b51f5abb7`.
+  The corresponding-sources artifact is 126,250,832 bytes with artifact
+  SHA-256 `586737be40605a66e15c176900730b7d648dae4f89f47240d9c7393aa3a3de53`.
+  Its inspected ZIP contains 21 entries, including the pinned AppImage runtime
+  inputs, libfuse and relink materials, Zulu source package, and the selected
+  Maven source archives. These are GitHub workflow-artifact hashes and sizes,
+  not final public release asset hashes. The review-only artifact is separate
+  (2,985,142 bytes; SHA-256
+  `9c061b508ee57db906d8fd4a5c7340aac9919e553b555d690d8f711f9f163eba`) and
+  must never be attached as the recipient packet.
+- The exact `jakarta.annotation:jakarta.annotation-api:3.0.0` binary embeds
+  `META-INF/LICENSE.md` and `META-INF/NOTICE.md`; their candidate hashes match
+  files at pinned upstream commit
+  `d456606ef104b5602700d7a2414f812e48a8a694`. The NOTICE declares EPL-2.0 and
+  a conditional GPL-2.0-with-Classpath-Exception secondary license. Both
+  original files are present in each of the six candidate recipient packages.
+  The local curated index now exposes them in the About license panel as well.
+  This closes a document-discovery gap only: the component remains unreviewed,
+  the selected license route still needs competent review, and a new candidate
+  must be built from the updated source before final hash review.
+- This candidate's successful builds, recipient archives, package inventories,
+  and smoke results establish technical delivery evidence only. Because the
+  manifest rows remain unreviewed, the macOS x64 DMG smoke job failed during
+  cleanup, and no redistribution approval is recorded, this is not a
+  release-ready or approved release.
+
+### Previous Versioned Candidate (Run 43368865856; Non-Publishing)
+
 - Candidate workflow [run 43368865856](https://github.com/heckenmann/visual-agent/actions/runs/43368865856)
   used tag input `v0.1.0` and source commit
   `30232f4318c5fd594c1166822a2f832b78120821`. Its uploaded metadata says
@@ -79,6 +143,19 @@ or organization that has not performed it.
   snapshots for these runtime dependencies. This narrows the old-runtime source
   gap documented in `source-delivery.md`; it does not constitute an LGPL review
   or establish legal sufficiency of the relinking materials.
+- The current PR-head four-platform inventory, [run
+  43393143407](https://github.com/heckenmann/visual-agent/actions/runs/43393143407)
+  at source commit `4073f130de8bdeee7b01a4127349b5109b642435`, was downloaded
+  and checked for Linux x64, Windows x64, macOS ARM64, and macOS x64. Each
+  `packaged-artifacts.csv` contains 276 rows and 272 unique coordinates: 260
+  Maven artifact rows covering 256 unique external Maven coordinates, 15
+  first-party project modules, and the bundled JDK `jrt-fs` entry. The
+  `licenses.csv` has an exact metadata row for every external Maven coordinate;
+  its only 16 unmatched coordinates are the 15 project modules and `jrt-fs`.
+  All four reports have the same counts. Their package-file and artifact reports
+  also contain no Graal `js-isolate`. These are current dependency/inventory
+  facts, not component-level license conclusions or final DEB/RPM/AppImage/DMG/
+  MSI/JAR release-hash evidence.
 - The review archive is deliberately separate from the recipient candidate:
   it contains internal review notes, the curation registry, and unreviewed
   package inventories. It must not be distributed as the recipient legal
@@ -590,7 +667,9 @@ other component, source-delivery, notice, and package-review items remain open.
 The pinned [JetBrains angle-pack recipe](https://github.com/JetBrains/angle-pack/blob/0a5e6ab42f7c4759b7f3ae18963327e3e574995/script/build.py)
 builds only libEGL and libGLESv2, with Vulkan, GL, null backend, RapidJSON, and
 component builds disabled. This does not justify collecting every test or
-development dependency from ANGLE's DEPS file as a shipped component.
+development dependency from ANGLE's DEPS file as a shipped component. The
+separate D3D12MemoryAllocator dependency is configured by Skiko for its Windows
+JVM runtime; it is not part of the ANGLE DLL inventory.
 
 The pinned ANGLE BUILD.gn nevertheless includes compression and xxHash.
 Its Abseil switch is `angle_has_build && is_clang`; final compiler settings
@@ -602,9 +681,18 @@ refers to Chromium's BSD license, so that license is retained separately at
 the DEPS-pinned Chromium revision, not replaced by zlib's license.
 
 These permissive notices do not themselves require publishing Visual Agent
-source or a bespoke relinking framework. This scoped assessment is not final
-clearance: Khronos header attribution, source-file-specific notices, actual
-linked dependencies, and both final DLL payloads still require verification.
+source or a bespoke relinking framework. The exact
+[Skiko `v0.150.2` Windows JVM configuration](https://github.com/JetBrains/skiko/blob/v0.150.2/skiko/build.gradle.kts#L1453-L1455)
+requests `d3d12allocator` as a static Skia link input. Its retained original MIT
+license requires the copyright and permission notice, which is included in the
+curated native materials. The exact Maven Windows runtime DLL hash
+`e90e2e5ae3d48c7694b6cf5948953f6d007fe40478b1040353040acef118dd41` matches the
+historical MSI payload; string scanning the stripped DLL did not identify the
+allocator, so the pinned build configuration is the evidence for the link
+input. Reconfirm the runtime-to-package hash and notice in the exact release
+candidate. This scoped assessment is not final clearance: Khronos header
+attribution, source-file-specific notices, actual ANGLE dependencies, and both
+final ANGLE DLL payloads still require verification.
 
 ### Cross-Platform Project License Integrity
 
@@ -725,7 +813,7 @@ the original file bytes; upstream wording was not reformatted or rewritten.
 | zlib | Original Chromium-pinned LICENSE, distinct from the newer AppImage zlib source. Do not identify the two versions as the same component. |
 | ICU | Original native ICU license at the Skia-pinned revision, distinct from the separate Graal-shadowed ICU4J record. |
 | FreeType | Select FTL for core code, retain LICENSE.TXT, FTL.TXT and the BDF/PCF driver notices; add the required FreeType project credit using the pinned header's 1996-2026 copyright span. |
-| D3D12MemoryAllocator | Retain the exact pinned original MIT license; this is a build-declared candidate, not proof that it occurs in every runtime. |
+| D3D12MemoryAllocator | Skiko's exact Windows JVM configuration requests it as a static link input; retain the pinned MIT notice and verify the exact final Windows package hash. |
 
 The non-copyleft routes identified here require notices and the stated credits;
 they do not impose a general complete-source or relinking obligation. This
@@ -758,9 +846,10 @@ a commercial product. This assessment uses the maintainer-confirmed current
 noncommercial distribution plan; revisit that condition if the distribution
 plan changes. This is not a claim that a beta or free download automatically
 eliminates all contractual conditions. The agreement does not impose a general
-corresponding-source requirement. Final review still verifies original notices
-in the actual packages containing the DNG code; an unknown Windows symbol
-table must not be treated as proof of absence.
+corresponding-source requirement. The pinned Windows JVM build configuration
+maps DNG code as absent; a stripped symbol table or string scan alone would not
+prove absence. Final review still verifies original notices in the actual
+packages containing the DNG code.
 
 Adobe's [DNG SDK and specification page](https://www.adobe.com/support/downloads/dng/dng_sdk.html)
 was checked on 2026-11-13; Adobe lists it as updated on 2026-11-10. It publishes
@@ -786,6 +875,22 @@ version/hash review. This patent grant is separate from the DNG SDK's copyright
 license and its commercial-product indemnity clause; no final clearance is
 claimed from the source-level evidence alone.
 
+The exact pinned Android source repository classifies this SDK as
+`BY_EXCEPTION_ONLY` and includes a warning for Google's package consumers
+([pinned METADATA](https://android.googlesource.com/platform/external/dng_sdk/+/dbe0a676450d9b8c71bf00688bb306409b779e90/METADATA)).
+Google's [public third-party license guidance](https://opensource.google/documentation/reference/thirdparty/licenses)
+describes `by_exception_only` as Google's classification for packages whose
+terms conflict with Google's own uses; it is not an extra term in Adobe's
+license agreement. For this project, treating that classification as a
+downstream restriction would go beyond the license text. Visual Agent relies
+on the retained Adobe SDK agreement and patent license, not on Google granting
+permission. No external consultation is needed or has been made for this
+classification. The remaining DNG review is the actual Adobe-term check and
+the exact binary, prominent-notice, and final-package verification described
+above; the component remains `unreviewed` until those release-specific checks
+are complete. This is an evidence-based engineering interpretation, not legal
+advice or a qualified legal opinion.
+
 The notice is also kept beside the Skiko dependency in the desktop build source.
 The local `verifyPackages` run confirmed curated legal files in the executable
 JARs and macOS native package; the supplement regression test checks the exact
@@ -795,20 +900,23 @@ archive/package hash review or the exact Windows/Linux candidate mapping.
 
 The exact [Skiko `v0.150.2` build configuration](https://github.com/JetBrains/skiko/blob/v0.150.2/skiko/build.gradle.kts)
 statically links `piex` and `dng_sdk` for native targets and macOS JVM targets;
-the Windows JVM target adds `d3d12allocator` but does not explicitly add either
-DNG library.
-The corresponding [Skia `m150-a3f509bf52` raw-codec target](https://github.com/JetBrains/skia/blob/m150-a3f509bf52/BUILD.gn#L1572-L1586)
-is enabled only when `skia_use_dng_sdk`, `skia_use_libjpeg_turbo_decode`, and
-`skia_use_piex` are all enabled. Inspection of the hash-pinned Linux x64 and
-both macOS runtime artifacts detects DNG-specific symbols. The Windows MSI's
-Skiko DLL matches the Maven runtime artifact at SHA-256
-`eebad490c2828198e86e641cbd44958617867ce70f893b21852f07d0be099c0a`; a string
-scan found no DNG-specific identifiers, only Adobe APP14 JPEG strings. Because
-the Windows binary is stripped and string scans cannot prove absence, exact DNG
-presence in the Windows release payload remains unresolved. Keep the DNG patent
-notice in source and recipient documentation; do not treat the conditional
-build rule or missing strings as proof that the final Windows artifact contains
-or omits the decoder.
+the Windows JVM target adds `d3d12allocator` but does not add either DNG library.
+The matching [Skia `m150-a3f509bf52` configuration](https://github.com/JetBrains/skia/blob/m150-a3f509bf52/gn/skia.gni#L873)
+sets `skia_use_piex = !is_win && !is_canvaskit`, while its
+[RAW-codec target](https://github.com/JetBrains/skia/blob/m150-a3f509bf52/BUILD.gn#L1486-L1500)
+requires `skia_use_dng_sdk`, JPEG decoding, and Piex. Therefore the Windows JVM
+build disables the RAW/DNG codec at the Skia feature level as well as omitting
+the DNG/Piex link libraries. The Windows MSI DLL matches the Maven runtime
+artifact at SHA-256
+`eebad490c2828198e86e641cbd44958617867ce70f893b21852f07d0be099c0a`; its stripped
+symbols and lack of DNG-specific strings are consistent with, but are not the
+basis for, this source-configuration conclusion. For the pinned Skiko/Skia
+build, record DNG SDK and Piex as absent from the Windows JVM runtime and retain
+the existing positive binary evidence for Linux x64 and both macOS runtimes.
+This resolves component mapping for those exact Maven runtime binaries, not
+future builds or the complete release package. Keep the DNG patent notice in
+source and recipient documentation, and continue exact final-package/hash
+verification; no redistribution approval is implied.
 
 ### AppImage libfuse: LGPL-2.1 Section 6(a)
 
@@ -842,12 +950,20 @@ not itself a universal license condition. Do not turn historical package-version
 uncertainty into an invented requirement that every permissive library needs
 complete corresponding source. Preserve those provenance limitations honestly.
 
-**Final verification:** confirm the recipient source archive actually contains
-the complete described inputs and notices, and that it accompanies the exact
-AppImage being reviewed. Check the prominent libfuse notice in the legal
-materials. The initial baseline workflow failed before those final archives
-could be assembled; a later non-publishing candidate run is documented below.
-No AppImage release is approved.
+**Candidate technical review:** versioned non-publishing candidate run
+[`43368865856`](https://github.com/heckenmann/visual-agent/actions/runs/43368865856)
+generated a recipient-facing source archive. Its inspected contents include the
+pinned libfuse source, applied patch, Type 2 runtime source, build/relink
+instructions, source inputs and build recipes for the statically linked runtime
+dependencies, and a SHA-256 manifest. This is technical evidence for the
+LGPL-2.1 section 6(a) source-and-relink route, not a legal opinion or approval
+of every linked component. The release workflow attaches this archive and the
+separate recipient legal archive alongside the ten packages, then checks the exact
+12-file payload against a review bound to the release tag and source commit.
+The candidate is not a final release payload. Rebuild from the release source,
+verify the final AppImage/source archive hashes and their contents, and complete
+the remaining component review before publication. No AppImage release is
+approved.
 
 The current local packaging correction replaces the previously downloaded
 prebuilt runtime with a runtime built from the retained source archive by the
@@ -985,13 +1101,19 @@ complete corresponding source for the native JDK runtime:
 
 The `visual-agent-legal` candidate archive in that same run was also inspected:
 it contains all six files at
-`package-notice-evidence/<platform>/runtime-legal/vendor/readme.txt`, with
-hashes matching this table. This proves the offer text reached the CI archive,
-but not a recipient-ready layout: that archive also includes internal package
-manifests and review metadata. The local bundle-builder change places these
-files under `platforms/<platform>/java-runtime/vendor/readme.txt`; that revised
-archive still needs a new CI run and content review before it can be treated as
-the recipient bundle.
+`platforms/<platform>/java-runtime/vendor/readme.txt`, with hashes matching
+this table. The archive has a recipient-oriented
+`platforms/<platform>/` layout, with root `LICENSE`, `README-LICENSES.txt`,
+third-party license texts, and `MANIFEST.sha256`. Inspection of the archived
+file list found only distribution materials and the checksum manifest, with no
+internal review registry, package inventory, or `sources.json`; the earlier
+note claiming otherwise was incorrect. All six vendor offer files were hashed
+from the archive and match the platform table above. This verifies candidate
+delivery layout, not legal completeness or final package identity: the run
+used source commit `30232f4318c5fd594c1166822a2f832b78120821`, which predates
+the current PR head. Rebuild the candidate from the final merged release
+source, then inspect the actual release artifact hashes and recipient-facing
+contents before treating it as final evidence.
 
 **Evidence-supported delivery route for the covered portions:** pass through
 the received vendor offer for OpenJDK portions under GPLv2 with the Classpath
@@ -1333,14 +1455,14 @@ re-signed, not just the outer app bundle, while the JAR entry set is otherwise
 preserved. This proves the technical transformation, not whether it satisfies
 GFTC's unmodified-Program condition.
 
-The narrow unresolved clarification is whether the applicable GFTC permits
-the Compose packager's ad-hoc re-signing of the native code embedded in
-`org.graalvm.js:js-isolate-darwin-aarch64:25.5.5.0.3`. The official terms do not
-expressly answer this. Obtain an applicable Oracle clarification or qualified
-assessment, then verify and bind the same transformation to the final
-versioned candidate before recording this component's clearance. No inquiry
-has been submitted on the maintainer's behalf; redistribution approval remains
-false.
+This GFTC clarification is not an active blocker for the latest candidate:
+workflow 43451994879, at source commit
+`4073f130de8bdeee7b01a4127349b5109b642435`, contains no `js-isolate` coordinate
+in any of its six platform manifests. Keep the historical transformation
+evidence, confirm absence in the exact final package set, and reopen the GFTC
+question only if the dependency returns. No third party has been contacted.
+This conditional finding does not change the unreviewed status of other GraalJS
+artifacts or grant redistribution approval.
 
 The documented Compose property `compose.desktop.mac.sign=false` is not a
 workaround for this transformation. A local `:desktop:createDistributable`
@@ -1353,9 +1475,12 @@ preserves this GFTC payload byte-for-byte.
 
 1. Inspect all candidate package groups and legal/source archives, not only
    application tests or the earlier platform inventories.
-2. Update the version-bound Graal evidence for the selected graph, including
-   actual platform artifacts, Oracle GFTC conditions where applicable, and
-   macOS signing transformations.
+2. Confirm the final six-platform packages continue to exclude Graal `js-isolate`.
+   The four-platform current-PR inventory and the earlier six-platform
+   candidate both show it absent, so the historical GFTC/macOS-signing finding
+   is conditional rather than an active blocker. Reopen it only if the exact
+   final package graph includes an isolate artifact. Continue the separate
+   selected GraalJS language/runtime notice and metadata review.
 3. Complete the native Skia/ANGLE component notice/source review and verify the
    AppImage source-and-relink materials in the final recipient archives.
 4. Verify the selected Zulu offer pass-through route in the final packages and
@@ -1404,14 +1529,18 @@ retaining all assertions. Synthetic dependency-free fixtures remain offline.
   the exact binary and source JARs contain no package/class names or source
   references identifying JONI, the retained
   third-party notice has no JONI attribution, and the upstream changelog says
-  JONI was removed in 20.1.0. This is an unresolved upstream metadata
-  discrepancy; do not infer that MIT is either applicable or irrelevant without
-  confirmation. Source/text provenance is verified, but the discrepancy,
-  applicable-license mapping, final recipient-archive inclusion, and final
-  artifact hash review remain open.
+  JONI was removed in 20.1.0. This supports the interpretation that the MIT
+  declaration is stale metadata from the removed engine, but the exact POM still
+  declares MIT and no upstream file-to-license mapping explains that declaration.
+  Keep this artifact unreviewed until a competent reviewer determines whether
+  the metadata is stale and whether any separate MIT attribution belongs in the
+  recipient packet; no third party has been contacted. Source/text provenance
+  is verified, but the applicable-license mapping, final recipient-archive
+  inclusion, and final artifact hash review remain open.
   Evidence: [Maven POM](https://repo.maven.apache.org/maven2/org/graalvm/js/js-language/25.5.5.0.3/js-language-25.5.5.0.3.pom),
   [pinned upstream build metadata](https://github.com/oracle/graaljs/blob/dd265d542fad72d0e7e1ae4032ef7c040911e700/graal-js/mx.graal-js/suite.py#L523-L528),
-  and [pinned upstream changelog](https://github.com/oracle/graaljs/blob/dd265d542fad72d0e7e1ae4032ef7c040911e700/CHANGELOG.md#L243-L255).
+  [exact source JAR](https://repo.maven.apache.org/maven2/org/graalvm/js/js-language/25.5.5.0.3/js-language-25.5.5.0.3-sources.jar),
+  and [pinned upstream changelog](https://github.com/oracle/graaljs/blob/dd265d542fad72d0e7e1ae4032ef7c040911e700/CHANGELOG.md#L385-L398).
 - The rebuilt server JAR, desktop JAR, and local native application contain all
   four new GraalJS legal/source notices with their registered original bytes.
 - Temporary artifact-download directories were removed. Only small generated
@@ -1421,6 +1550,136 @@ retaining all assertions. Synthetic dependency-free fixtures remain offline.
 These checks validate the prepared corrections, not the outstanding final
 release decision. They do not substitute local development JDK/package hashes
 for the exact CI candidate runtime and final download hashes.
+
+### Candidate Metadata Triage (2026-11-13)
+
+I downloaded only the six `license-notices-*` evidence artifacts from candidate
+run `43451994879` and deduplicated their component rows by exact coordinate. The
+260 unique coordinates are all still marked `unreviewed`. A broad, non-normative
+grouping of their Gradle License Report strings found 221 coordinates with an
+Apache-named declaration and no GPL/EPL/LGPL/MPL/GFTC-like string, 32 with other
+declared strings and no such Apache/special-term string, six with at least one
+GPL/EPL/LGPL/MPL/GFTC-like string, and one bundled JDK `jrt-fs` entry with no
+declared metadata. These buckets are only a way to order human review: metadata
+strings may contain alternatives, be stale, or omit embedded/native terms, and
+they do not determine which license applies. The six flagged coordinates are
+Logback Classic/Core 1.6.6 (EPL-2.0 and LGPL-2.1-only reported), H2 2.5.252
+(EPL-1.0 and MPL-2.0 reported), Jakarta Annotations 3.0.0 (EPL-2.0 or GPL-2.0
+with Classpath Exception reported), and JNA/JNA Platform 5.19.1 (Apache-2.0 and
+LGPL-2.1-or-later reported). The local registry already records proposed
+routes and the retained source/notice materials for these four review groups.
+The exact-version upstream publications clarify the metadata as follows:
+
+- Logback 1.6.6 is explicitly dual-licensed under EPL-2.0 or LGPL-2.1; the
+  registry's proposed EPL-2.0 route is consistent with the upstream license
+  statement. Both exact source JARs, the EPL text, and source-availability
+  material are present in the generated source-material tree. See the
+  [upstream license](https://github.com/qos-ch/logback/blob/v_1.6.6/LICENSE.txt).
+- H2 2.5.252 explicitly offers MPL-2.0 or EPL-1.0. The registry proposes
+  MPL-2.0; its original license, binary disclaimer, source-availability
+  statement, and exact source JAR are retained. H2's own guidance specifically
+  describes the unmodified-binary distribution case and its notice needs. See
+  the [versioned upstream license](https://github.com/h2database/h2database/blob/version-2.5.252/LICENSE.txt)
+  and [H2 license guidance](https://h2database.com/html/license.html).
+- JNA 5.19.1's versioned upstream license explicitly offers Apache-2.0 or
+  LGPL-2.1-or-later. The registry proposes Apache-2.0 and separately retains
+  libffi's MIT notice for the statically linked native component; both exact
+  JNA source JARs are included in generated source materials. See the
+  [versioned JNA license](https://github.com/java-native-access/jna/blob/5.19.1/LICENSE).
+- Jakarta Annotations 3.0.0 retains the original upstream LICENSE and NOTICE,
+  which identify EPL-2.0 and the conditional GPL-2.0-with-Classpath-Exception
+  secondary-license route. Its exact source JAR is included in generated
+  source materials. The conditions for that secondary route are not assumed;
+  see the [versioned upstream license](https://github.com/jakartaee/common-annotations-api/blob/3.0.0/LICENSE.md)
+  and [NOTICE](https://github.com/jakartaee/common-annotations-api/blob/3.0.0/NOTICE.md).
+
+These publications and generated-material checks narrow the metadata ambiguity;
+they do not decide legal applicability or verify the eventual public packages.
+The final recipient archive and package hashes still need review, including
+JNA's signed macOS payload and the exact EPL/secondary-license terms. All four
+groups remain `unreviewed`, and no redistribution approval was added. The
+downloaded candidate evidence was removed after the count; authoritative
+manifests and matching hashes remain the linked workflow artifacts.
+
+### Apache NOTICE Checks: HikariCP, Gson, and JetBrains Annotations
+
+The Linux AppImage candidate manifest maps `com.zaxxer:HikariCP:7.1.0` to
+packaged JAR SHA-256
+`2be45c641b841e81df87292e181f2c203500c5f0e9a1676f135927387f3cf40b` and
+reports no embedded license/NOTICE entry. The exact upstream POM identifies
+version 7.1.0, tag `HikariCP-7.1.0`, and Apache-2.0. Its pinned root `LICENSE`
+is the Apache-2.0 license text; a `NOTICE` file at that same tag is absent.
+The recipient candidate includes the project's Apache-2.0 license text. Under
+Apache-2.0 section 4(d), additional attribution text is conditional on the
+upstream Work including a NOTICE file. On this exact evidence, no
+HikariCP-specific NOTICE supplement is identified for 7.1.0. See the
+[versioned POM](https://raw.githubusercontent.com/brettwooldridge/HikariCP/HikariCP-7.1.0/pom.xml),
+[versioned LICENSE](https://raw.githubusercontent.com/brettwooldridge/HikariCP/HikariCP-7.1.0/LICENSE),
+[pinned NOTICE path](https://raw.githubusercontent.com/brettwooldridge/HikariCP/HikariCP-7.1.0/NOTICE),
+and [Apache-2.0 section 4](https://www.apache.org/licenses/LICENSE-2.0.html).
+
+This closes only the upstream NOTICE lookup for the exact HikariCP 7.1.0
+candidate artifact. It does not review all Apache-metadata dependencies,
+replace final public-package hash checks, or grant redistribution approval;
+the candidate component row remains `unreviewed`.
+
+The same exact-candidate review also covered two additional components:
+
+- `com.google.code.gson:gson:2.14.0` has candidate JAR SHA-256
+  `2cbd119bf1961c28788310963dc80ba65f58cdeec1dd139c8bdb1240faa2c36f` and no
+  detected JAR notice. Its versioned POM declares Apache-2.0, and the exact
+  upstream release tag has a LICENSE but no root `NOTICE` or `NOTICE.txt`.
+  The recipient candidate includes the generic Apache-2.0 text. See the
+  [versioned POM](https://raw.githubusercontent.com/google/gson/gson-parent-2.14.0/gson/pom.xml),
+  [versioned LICENSE](https://raw.githubusercontent.com/google/gson/gson-parent-2.14.0/LICENSE),
+  and [pinned NOTICE path](https://raw.githubusercontent.com/google/gson/gson-parent-2.14.0/NOTICE).
+- `org.jetbrains:annotations:23.0.0` has candidate JAR SHA-256
+  `7b0f19724082cbfcbc66e5abea2b9bc92cf08a1ea11e191933ed43801eb3cd05` and no
+  detected JAR notice. The matching upstream version tag's `LICENSE.txt`
+  identifies Apache-2.0; root `NOTICE` and `NOTICE.txt` are absent. The
+  recipient candidate includes the generic Apache-2.0 text. See the
+  [versioned LICENSE](https://raw.githubusercontent.com/JetBrains/java-annotations/23.0.0/LICENSE.txt)
+  and [pinned NOTICE path](https://raw.githubusercontent.com/JetBrains/java-annotations/23.0.0/NOTICE).
+- `net.minidev:json-smart:2.6.1` (JAR SHA-256
+  `30f83e94e2ed0fe0e090b5d00fcae8bc0c95aa6883d3b9601ea67fc51418237e`) and
+  `net.minidev:accessors-smart:2.6.1` (JAR SHA-256
+  `05d0bbc1ca20163b8ed60a45596d95ed526a71732c47e5cc58e6454d6a5c9694`) both
+  have no detected JAR notice. Their exact Maven POMs declare Apache-2.0 and
+  point to the same upstream repository; its `v2.6.1` tag has a LICENSE but no
+  root `NOTICE` or `NOTICE.txt`. The recipient candidate includes the generic
+  Apache-2.0 text. See the [json-smart POM](https://repo.maven.apache.org/maven2/net/minidev/json-smart/2.6.1/json-smart-2.6.1.pom),
+  [accessors-smart POM](https://repo.maven.apache.org/maven2/net/minidev/accessors-smart/2.6.1/accessors-smart-2.6.1.pom),
+  [versioned LICENSE](https://raw.githubusercontent.com/netplex/json-smart-v2/v2.6.1/LICENSE),
+  and [pinned NOTICE path](https://raw.githubusercontent.com/netplex/json-smart-v2/v2.6.1/NOTICE).
+
+For these five artifacts, this narrows only the conditional upstream NOTICE
+question for the exact candidate versions. It does not clear other Apache
+dependencies, establish final public-package hashes, or change the component
+rows' `unreviewed` status or the empty redistribution-approval registry.
+
+### Kotlin Standard-Library NOTICE Scope
+
+The Linux AppImage candidate contains these Kotlin 2.4.21 artifacts, each with
+`noticeStatus: no-detected-notice` and no notice entry in its JAR: `kotlin-stdlib`
+(SHA-256 `bd8250210584cb659847dce9cda660f8e9906e5def7fbebcea93dc6dcb6a88a3`),
+`kotlin-reflect` (`7c9e8bda3cafa85b65692065acd22578b2843292b4e4baa8361bdc9175746e88`),
+`kotlin-stdlib-jdk7` (`6fce867d4c24c92a8b64c966317d3ac1d4b787a00e1aa6d2b76b1cedd3a0c082`),
+and `kotlin-stdlib-jdk8` (`eb83cbc07ee68fcd5f229b2ed1d66c7a0175c56ac1dca1457cce4b1702004259`).
+Their exact Maven POMs declare Apache-2.0. The Kotlin `v2.4.21` source tree
+does contain `license/NOTICE.txt`, but that file explicitly scopes itself to
+the Kotlin Compiler distribution; it is not a general Kotlin-runtime NOTICE.
+The same tag has no NOTICE or LICENSE file under `libraries/stdlib`, and the
+candidate package inventory contains no Kotlin compiler coordinate. The
+recipient candidate includes the generic Apache-2.0 text. See the
+[versioned compiler NOTICE](https://raw.githubusercontent.com/JetBrains/kotlin/v2.4.21/license/NOTICE.txt),
+[versioned license](https://raw.githubusercontent.com/JetBrains/kotlin/v2.4.21/license/LICENSE.txt),
+[stdlib source path](https://github.com/JetBrains/kotlin/tree/v2.4.21/libraries/stdlib),
+and [Kotlin 2.4.21 release](https://github.com/JetBrains/kotlin/releases/tag/v2.4.21).
+
+This evidence does not treat the compiler-distribution NOTICE as applicable to
+the separately published standard-library artifacts. The four candidate rows
+remain `unreviewed` pending final package/hash review; no redistribution
+approval was added.
 
 ## ORT Tooling Assessment (2026-11-12)
 
