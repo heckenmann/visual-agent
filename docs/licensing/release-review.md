@@ -35,6 +35,20 @@ or organization that has not performed it.
   bundle, and one to bundled-JDK `jrt-fs` legal materials. These are inventory
   and document-presence checks only; they do not validate every license
   declaration, required attribution, or legal obligation.
+- A direct read of the candidate's Linux AppImage manifest confirms that its
+  Gradle License Report metadata is not itself a reviewed license conclusion.
+  In particular, H2 2.5.252 reports an unnamed license plus EPL 1.0 and MPL 2.0;
+  Logback 1.6.6 reports EPL-2.0 and LGPL-2.1-only; JNA 5.19.1 reports
+  Apache-2.0 and LGPL-2.1-or-later; and `jakarta.annotation-api` 3.0.0 reports
+  EPL-2.0 plus GPL-2.0 with the Classpath Exception. The candidate recipient
+  archive contains the curated H2 and Logback materials, JNA's Apache and
+  libffi texts, and the exact `jakarta.annotation` LICENSE/NOTICE files for all
+  six package variants. H2, Logback, and the JDK `jrt-fs` have no notice detected
+  inside their individual packaged artifacts. These facts confirm delivery
+  paths, not that the reported metadata is accurate, that all applicable terms
+  are represented, or that source obligations are met. The exact upstream
+  license terms and these metadata discrepancies still require component-level
+  review; none of these rows is marked reviewed.
 - The recipient-candidate legal artifact `visual-agent-legal` has outer SHA-256
   `2e03a757ee0c7d13148f759ffaa8689b6117c814f3e3f0a855be77bd148bd413`. Its
   nested `visual-agent-legal.zip` SHA-256 is
