@@ -32,7 +32,8 @@ class LibrarySourceMaterialsTest(unittest.TestCase):
     def test_source_archives_match_verified_exact_version_inputs(self):
         document = (ROOT / "docs/licensing/source-delivery.md").read_text()
         expected = dict(re.findall(r"\[([^\]]+-sources\.jar)\].*?`([0-9a-f]{64})`", document))
-        self.assertEqual(6, len(expected))
+        self.assertEqual(7, len(expected))
+        self.assertIn("jakarta.annotation-api-3.0.0-sources.jar", expected)
         self.assertIn("no libffi native source tree", document)
         normalized_document = " ".join(document.split())
         self.assertIn(
@@ -43,6 +44,15 @@ class LibrarySourceMaterialsTest(unittest.TestCase):
         actual = {path.name: hashlib.sha256(path.read_bytes()).hexdigest()
                   for path in (OUTPUT / "archives").iterdir() if path.is_file()}
         self.assertEqual(expected, actual)
+
+    def test_jakarta_annotation_sources_are_included_for_the_selected_runtime_version(self):
+        source_archive = OUTPUT / "archives/jakarta.annotation-api-3.0.0-sources.jar"
+        with zipfile.ZipFile(source_archive) as archive:
+            names = archive.namelist()
+        self.assertTrue(any(name.endswith(".java") for name in names))
+        self.assertFalse(any(name.endswith(".class") for name in names))
+        document = (ROOT / "docs/licensing/source-delivery.md").read_text()
+        self.assertIn("jakarta.annotation-api-3.0.0-sources.jar", document)
 
     def test_zulu_java_source_package_is_checksum_pinned_and_included(self):
         package = RELEASE_OUTPUT / "archives/zulu-jdk/zulu27-ca-src_27.0.1.0.3-5_amd64.deb"

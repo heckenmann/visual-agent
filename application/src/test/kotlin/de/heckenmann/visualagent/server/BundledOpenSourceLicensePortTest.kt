@@ -13,6 +13,10 @@ class BundledOpenSourceLicensePortTest {
         assertTrue(documents.any { it.component == "Visual Agent" && it.path == "LICENSE" })
         val libffi = documents.single { it.path == "jna-5.19.1/libffi-LICENSE" }
         assertContains(libffi.text, "deal in the Software without restriction")
+        val jakartaLicense = documents.single { it.path == "jakarta-annotation-api-3.0.0/LICENSE.md" }
+        assertContains(jakartaLicense.text, "Eclipse Public License - v 2.0")
+        val jakartaNotice = documents.single { it.path == "jakarta-annotation-api-3.0.0/NOTICE.md" }
+        assertContains(jakartaNotice.text, "GPL-2.0-only with Classpath-exception-2.0")
         assertTrue(documents.any { it.path == "skiko-0.150.2/NOTICE" })
         assertTrue(documents.any { it.path == "dng-sdk-dbe0a676/LICENSE" })
         assertTrue(documents.any { it.path == "piex-bb217acd/LICENSE" })

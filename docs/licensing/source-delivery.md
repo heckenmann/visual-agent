@@ -34,7 +34,7 @@ source-material test.
 
 The following exact-version source archives resolve from the same selected runtime
 dependency graph used for packaging. Their source variants were verified by the
-release investigation on 2026-10-31 and 2026-11-07. Hashes identify the exact
+release investigation on 2026-10-31, 2026-11-07, and 2026-11-13. Hashes identify the exact
 downloaded bytes, not a legal determination of completeness.
 
 | Component | Source archive | SHA-256 |
@@ -45,6 +45,13 @@ downloaded bytes, not a legal determination of completeness.
 | JNA 5.19.1 | [jna-5.19.1-sources.jar](https://repo.maven.apache.org/maven2/net/java/dev/jna/jna/5.19.1/jna-5.19.1-sources.jar) | `0136f719ddd91d92d2368aa2c59a0c436810ac0b9c29024044383758b0e99786` |
 | Skiko AWT 0.150.2 | [skiko-awt-0.150.2-sources.jar](https://repo.maven.apache.org/maven2/org/jetbrains/skiko/skiko-awt/0.150.2/skiko-awt-0.150.2-sources.jar) | `7a10e5e7ec5363ed6ea3b089fd5d619d0088e9e6c05459a33da256a95f9b1d4b` |
 | GraalJS language 25.5.5.0.3 | [js-language-25.5.5.0.3-sources.jar](https://repo.maven.apache.org/maven2/org/graalvm/js/js-language/25.5.5.0.3/js-language-25.5.5.0.3-sources.jar) | `691844c58fa8efef16d550b9a7646674ca78f08751402c250ffc31857184e28b` |
+| Jakarta Annotations API 3.0.0 | [jakarta.annotation-api-3.0.0-sources.jar](https://repo.maven.apache.org/maven2/jakarta/annotation/jakarta.annotation-api/3.0.0/jakarta.annotation-api-3.0.0-sources.jar) | `142dfd2343429df2aac3e1cfacfacc21c8393112c0e0280d3628648d9b612470` |
+
+The Jakarta Annotations source archive is selected from the packaged runtime
+dependency graph and included in the generated corresponding-source materials.
+Its Maven `NOTICE.md` declares EPL-2.0 with a conditional secondary license;
+including the source archive is technical delivery evidence, not a determination
+of which license applies or approval of redistribution.
 
 The current GraalJS language source variant is collected from the selected
 runtime graph alongside its original `LICENSE_GRAALJS`,
@@ -118,16 +125,26 @@ notice collector attaches it only to the exact artifact hashes recorded in
 `third-party/sources.json`.
 
 This is historical evidence, not a license selection or approval. The
-`js-language` POM also declares MIT, and its alternative must be reviewed. The
-platform-specific `js-isolate` artifacts from earlier candidates are separately
-recorded under Oracle's GraalVM Free Terms and Conditions (GFTC); their POM
-alternatives must not be treated as proof that UPL applies. The current runtime
-configuration no longer requests isolate artifacts because they fail to start
-on the required JDK 27 and had been silently falling back to the constrained
-policy. New platform package inventories are still required to confirm the
-resulting runtime graph and notices. Source-to-binary correspondence, copyright
-scope, final-package presence, and redistribution terms for the current package
-remain unreviewed.
+`js-language` POM also declares MIT, and its applicability remains under review.
+The platform-specific `js-isolate` artifacts from earlier candidates are
+separately recorded under Oracle's GraalVM Free Terms and Conditions (GFTC); their
+POM alternatives must not be treated as proof that UPL applies. The current
+runtime configuration no longer requests isolate artifacts because they failed
+to start on the required JDK 27 and silently fell back to the constrained
+policy. The current PR-head inventory workflow
+[`43393143407`](https://github.com/heckenmann/visual-agent/actions/runs/43393143407)
+at source `4073f130de8bdeee7b01a4127349b5109b642435` confirms no `js-isolate`
+coordinate in the packaged-artifact or package-file reports for Linux x64,
+Windows x64, macOS ARM64, or macOS x64. Six-platform non-publishing candidates
+[`43368865856`](https://github.com/heckenmann/visual-agent/actions/runs/43368865856)
+and [`43451994879`](https://github.com/heckenmann/visual-agent/actions/runs/43451994879)
+also contain no isolate coordinate in their platform manifests. Treat the old
+GFTC and macOS-signing finding as historical and conditional, not as an active
+blocker for these package graphs. Confirm absence again in the exact final
+six-platform artifacts; reopen the GFTC/signing review only if an isolate
+returns. The remaining GraalJS review concerns the selected `js-language` and
+related runtime artifacts, including source/binary correspondence, notices,
+the MIT metadata discrepancy, and final package hashes.
 
 ### Skiko Native Renderer and Windows ANGLE Runtime
 
@@ -137,12 +154,16 @@ lists the static Skia libraries used for its native targets, plus macOS
 0.150.2 Maven runtime binaries shows that this build declaration is not a
 reliable platform-availability list: DNG SDK, Piex, and Wuffs symbol families
 are present in the Linux x64 and both macOS binaries, despite the build file's
-macOS-only declaration for DNG SDK and Piex. The Windows x64 DLL is stripped;
-its symbol table does not establish whether DNG SDK or Piex is present, so that
-platform remains unknown. The Windows binary does contain Wuffs-identifying
-strings. These observations are recorded in `third-party/sources.json` and do
-not establish that the current release candidates contain byte-identical
-runtime payloads.
+macOS-only declaration for DNG SDK and Piex. For Windows JVM, the pinned Skia
+configuration disables Piex (`!is_win`) and the RAW codec requires Piex; the
+Skiko Windows JVM target also omits the DNG libraries. The exact MSI DLL matches
+the Maven runtime binary, so DNG SDK/Piex are recorded as absent from that
+pinned Windows runtime based on build configuration, not on the stripped-binary
+string scan. The pinned Skiko Windows JVM target explicitly configures
+`d3d12allocator` as a static Skia link input; its original MIT notice is
+retained. The Windows binary does contain Wuffs-identifying strings. These
+observations are recorded in `third-party/sources.json` and do not establish
+that the current release candidates contain byte-identical runtime payloads.
 
 The pinned Skiko source's
 [`gradle.properties`](https://github.com/JetBrains/skiko/blob/caed3841b8725429bb9b9805ff162a40eb7bce47/skiko/gradle.properties)
@@ -386,7 +407,7 @@ exercise a recipient's custom libfuse modification.
 
 ## Delivery Approach
 
-`./gradlew :desktop:prepareLibrarySourceMaterials` collects the six
+`./gradlew :desktop:prepareLibrarySourceMaterials` collects the seven
 selected-library source archives and the checksum-pinned AppImage source archives
 as partial evidence under
 `modules/desktop/build/reports/dependency-license/library-source-materials/`.
@@ -944,19 +965,25 @@ release and source-delivery obligations remain open.
 Before publication, regenerate this evidence from the final release source for
 all six package variants (Linux AppImage, DEB, RPM, macOS ARM64/x64, and Windows),
 compare artifact identities with the reviewed source commit, and include all
-applicable original notices in the shipped legal bundle. Versioned candidate
-run 43368865856 completed this six-variant technical inventory, but it is tied
-to an unmerged branch commit and is not the final release package set. The
-inventory narrows the remaining work; it does not establish legal sufficiency or
-release approval.
+applicable original notices in the shipped legal bundle. The latest six-variant
+versioned non-publishing candidate is workflow run
+[`43451994879`](https://github.com/heckenmann/visual-agent/actions/runs/43451994879),
+for source commit `4073f130de8bdeee7b01a4127349b5109b642435`. It generated
+hash-bound internal review evidence and recipient-candidate legal and source
+archives for all six package variants. The corresponding-sources artifact is
+126,250,832 bytes (SHA-256
+`586737be40605a66e15c176900730b7d648dae4f89f47240d9c7393aa3a3de53`); its
+inspected ZIP has 21 entries, including the pinned AppImage runtime inputs,
+libfuse and relink materials, the Zulu source package, and selected Maven source
+archives. These are workflow artifact identities, not final public release
+asset hashes. The candidate did not publish a release or create or move a tag.
 
-No item in this document closes #410. Candidate run 43368865856 generated
-hash-bound review evidence and recipient-candidate legal and source archives for
-all six package variants. Their listed contents and hashes were verified, but
-the candidate is not the final release artifact set and the archives have not
-been published to recipients. The recipient-facing source-availability path,
-component completeness review, competent obligation review, and final clearance
-are still outstanding.
+All six candidate manifests have 261 component rows each, and every row remains
+`unreviewed`; each manifest has `redistributionApproved: false`. The candidate
+is not the final release package set. The recipient-facing source-availability
+path, component completeness review, competent obligation review, exact final
+package verification, and final clearance are still outstanding. No item in
+this document closes #410 or establishes legal sufficiency or release approval.
 
 ## Tooling Evaluation
 

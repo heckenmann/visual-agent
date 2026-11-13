@@ -91,6 +91,7 @@ val requiredSourceModules =
         "net.java.dev.jna:jna",
         "org.jetbrains.skiko:skiko-awt",
         "org.graalvm.js:js-language",
+        "jakarta.annotation:jakarta.annotation-api",
     )
 val runtimeSourceMaterials =
     configurations.runtimeClasspath.map { configuration ->

@@ -40,6 +40,22 @@
     },
     {
       "sourceArtifacts": {
+        "jakarta.annotation:jakarta.annotation-api:3.0.0": "b01f55552284cfb149411e64eabca75e942d26d2e1786b32914250e4330afaa2"
+      },
+      "proposedLicense": "EPL-2.0 OR GPL-2.0-only WITH Classpath-exception-2.0",
+      "upstreamCommit": "d456606ef104b5602700d7a2414f812e48a8a694",
+      "materialPaths": [
+        "jakarta-annotation-api-3.0.0/LICENSE.md",
+        "jakarta-annotation-api-3.0.0/NOTICE.md"
+      ],
+      "reviewStatus": "unreviewed",
+      "reviewNotes": "The exact 3.0.0 binary embeds these original LICENSE.md and NOTICE.md files. The NOTICE identifies EPL-2.0 as the primary license and GPL-2.0-only with the Classpath Exception as a conditional secondary license. Both files' hashes match the pinned upstream repository commit and the six-platform candidate package evidence. The curated index exposes them in the About license panel; presence and metadata do not determine which license route governs this distribution.",
+      "remaining": [
+        "Have a competent reviewer assess the EPL-2.0 terms and whether the stated Secondary License conditions apply to this distribution; preserve both original materials in every final recipient package and verify them against final hashes"
+      ]
+    },
+    {
+      "sourceArtifacts": {
         "org.jetbrains.skiko:skiko-awt:0.150.2": "6b36a9d9a931f5b4aedc3722ae9e769d13e945a8f18bd480340e625ea10e0171"
       },
       "proposedLicense": "Apache-2.0",
@@ -49,8 +65,8 @@
       "remaining": [
         "Review whether retaining the Maven runtime artifacts' notices is sufficient for every mapped package payload and inspect any applicable packaging-specific attribution requirements; direct JAR, DEB, RPM, AppImage, Windows MSI, macOS ARM64, and macOS x64 payload mappings are documented in source-delivery.md",
         "Review the statically linked Skia libraries declared by the pinned Skiko build: skia, skia_ganesh_ext, svg, skparagraph, skshaper, skunicode_core, skunicode_icu, icu, harfbuzz, skresources, png, jpeg, webp, webp_sse41, zlib, expat, skottie, sksg, and jsonreader",
-        "The pinned build declares piex/dng_sdk on macOS, but direct symbol inspection also found both in Linux x64 and macOS runtime binaries; the stripped Windows binary leaves their presence unknown",
-        "Review the Windows d3d12allocator dependency declared by the pinned Skiko build and establish whether it is present in the distributed ANGLE payload",
+        "The pinned build declares piex/dng_sdk on macOS, but direct symbol inspection also found both in Linux x64 and macOS runtime binaries; the pinned Windows JVM configuration disables Piex and the RAW codec",
+        "Verify the exact final Windows package hash and notice for the d3d12allocator static link input configured by Skiko",
         "Retain and verify applicable notices for the libraries actually present in each packaged binary; the build declaration is not by itself proof of the final binary contents",
         "Collect corresponding Skia/ANGLE source and build inputs if required by the completed obligation review"
       ]
@@ -76,7 +92,7 @@
       "reviewNotes": "The original dependency texts are retained from revisions pinned by this exact Skia DEPS. Additional IJG and FreeType acknowledgments are project-authored. FTL is selected for FreeType core; separate driver notices remain. Retaining candidate notices does not assert that all dependencies are present on every platform or approve final binary coverage.",
       "remaining": [
         "Review third-party code statically linked into the Skia libraries actually present in each platform runtime; Skiko's build declaration and Skia DEPS file identify candidates but do not prove every candidate is in each binary",
-        "Retain and review applicable license and NOTICE texts for dependencies confirmed or potentially linked into each platform binary, including piex, dng_sdk, Wuffs, and d3d12allocator",
+        "Retain and review applicable license and NOTICE texts for dependencies confirmed or potentially linked into each platform binary, including piex, dng_sdk, and Wuffs",
         "Determine whether corresponding source or build inputs are required for any embedded dependency and obtain exact matching inputs where applicable",
         "Map the runtime JAR and extracted native library in every final release package; the current hashes are from Maven artifacts, not the final candidate packages"
       ]
@@ -87,7 +103,7 @@
       },
       "proposedLicense": "BSD-3-Clause",
       "upstreamCommit": "ec4d8f8e4d3f1a9e64430abd8b6b436253732adf",
-      "materialPaths": ["angle-ec4d8f8e4d/LICENSE", "d3d12allocator-169895d5/LICENSE.txt", "angle-ec4d8f8e4d/xxhash-LICENSE", "abseil-24012838/LICENSE", "zlib-e8ff3f35/LICENSE", "chromium-055e258e/LICENSE"],
+      "materialPaths": ["angle-ec4d8f8e4d/LICENSE", "angle-ec4d8f8e4d/xxhash-LICENSE", "abseil-24012838/LICENSE", "zlib-e8ff3f35/LICENSE", "chromium-055e258e/LICENSE"],
       "reviewStatus": "unreviewed",
       "remaining": [
         "Inspect the exact ANGLE DEPS revisions and identify dependencies embedded in the two redistributed DLLs; retain and review their applicable notices",
@@ -105,10 +121,9 @@
       "upstreamCommit": "58f1795f7d12d12260d0c0423811e846c7632649",
       "materialPaths": ["graaljs-25.4.4.1.1/GFTC-TERMS-REFERENCE.md"],
       "reviewStatus": "unreviewed",
-      "reviewNotes": "These 25.4.4.1.1 isolate artifacts are retained as historical evidence from an earlier package graph, not as evidence about the current candidate. The versioned non-publishing candidate in workflow 43368865856 at source commit 30232f4318c5fd594c1166822a2f832b78120821 has six platform manifests, none containing a js-isolate artifact. Preserve the historical evidence; regenerate inventories from the final release source before deciding whether any GFTC artifact remains. This is candidate-package evidence, not legal approval.",
+      "reviewNotes": "These 25.4.4.1.1 isolate artifacts are retained as historical evidence from an earlier package graph, not as evidence about the current candidate. Versioned non-publishing candidate workflow 43368865856 at source commit 30232f4318c5fd594c1166822a2f832b78120821 has six platform manifests, none containing a js-isolate artifact. The current PR-head inventory workflow 43393143407 at source commit 4073f130de8bdeee7b01a4127349b5109b642435 has four platform inventories with no js-isolate in packaged-artifact or package-file reports. The later six-platform non-publishing candidate workflow 43451994879 at the same source commit also has no js-isolate coordinate in any manifest. The historical terms and signing evidence remain recorded but are not an active component finding for these candidate package graphs. Reconfirm against the exact final release artifacts; reopen GFTC review only if an isolate artifact returns. This is package-scope evidence, not whole-release legal approval.",
       "remaining": [
-        "Regenerate all platform inventories from the final release source and reconfirm that no GFTC artifact remains; if one is present, review the exact binary and transformations against the GFTC",
-        "For any GFTC artifacts in the final candidate, verify recipient access to the complete Oracle terms, proprietary-rights markings, and separately licensed technology"
+        "Confirm the six-platform final release artifacts still exclude js-isolate; if any artifact is present, reopen its exact GFTC terms, macOS transformation, notices, and source/third-party mapping before publication"
       ]
     },
     {
@@ -160,10 +175,9 @@
       "upstreamCommit": "dd265d542fad72d0e7e1ae4032ef7c040911e700",
       "materialPaths": ["graaljs-25.5.5.0.3/GFTC-TERMS-REFERENCE.md"],
       "reviewStatus": "unreviewed",
-      "reviewNotes": "Source artifact hashes and the macOS ad-hoc re-signing transformation were verified for the historical package candidate in workflow 43187339406 at source commit 62896caf507abd29a8f992d1ce5dd65b59e6f655. The versioned non-publishing candidate in workflow 43368865856 at source commit 30232f4318c5fd594c1166822a2f832b78120821 has six platform manifests, none containing a js-isolate artifact. Preserve the historical transformation evidence; regenerate inventories from the final release source before deciding whether any GFTC artifact remains in the release. This is candidate-package evidence, not legal approval.",
+      "reviewNotes": "Source artifact hashes and the macOS ad-hoc re-signing transformation were verified for the historical package candidate in workflow 43187339406 at source commit 62896caf507abd29a8f992d1ce5dd65b59e6f655. The versioned non-publishing candidate in workflow 43368865856 at source commit 30232f4318c5fd594c1166822a2f832b78120821 has six platform manifests, none containing a js-isolate artifact. The current PR-head inventory workflow 43393143407 at source commit 4073f130de8bdeee7b01a4127349b5109b642435 has four platform inventories with no js-isolate in packaged-artifact or package-file reports. The later six-platform non-publishing candidate workflow 43451994879 at the same source commit also has no js-isolate coordinate in any manifest. Preserve historical transformation evidence; the GFTC/signing question is conditional on the dependency being reintroduced. Reconfirm against exact final release artifacts. This is package-scope evidence, not whole-release legal approval.",
       "remaining": [
-        "Regenerate all platform inventories from the final release source and reconfirm that no GFTC artifact remains; if one is present, review the exact binary and transformations against the GFTC",
-        "For any GFTC artifacts in the final candidate, verify recipient access to the complete Oracle terms, proprietary-rights markings, and separately licensed technology"
+        "Confirm the six-platform final release artifacts still exclude js-isolate; if any artifact is present, reopen its exact GFTC terms, macOS transformation, notices, and source/third-party mapping before publication"
       ]
     },
     {
@@ -174,9 +188,9 @@
       "upstreamCommit": "dd265d542fad72d0e7e1ae4032ef7c040911e700",
       "materialPaths": ["graaljs-25.5.5.0.3/LICENSE_GRAALJS", "graaljs-25.5.5.0.3/THIRD_PARTY_LICENSE_GRAALJS.txt", "graaljs-25.5.5.0.3/SOURCE-AVAILABILITY.txt"],
       "reviewStatus": "unreviewed",
-      "reviewNotes": "The exact Maven binary SHA-256 matches the pinned artifact. The exact-version source JAR SHA-256 also matches its registered hash. LICENSE_GRAALJS and THIRD_PARTY_LICENSE_GRAALJS.txt were independently fetched from the pinned upstream commit and byte-matched to the retained files and registry hashes. The source-repository root LICENSE is a different file and must not replace these implementation-specific terms. The binary JAR contains no license/NOTICE entries. The Maven POM and pinned GraalJS build metadata declare UPL-1.0 and MIT, with the build metadata attributing MIT to the JONI regexp engine. The exact POM has no JONI dependency; its runtime dependencies are regex, truffle-api, polyglot, and shadowed ICU4J. The exact binary/source JARs contain no package/class names or source references identifying JONI; the retained third-party notice has no JONI attribution; and the upstream changelog says the JONI engine was removed in 20.1.0. Historical GraalJS issue #22 describes the former JONI compatibility module but does not clarify the 25.5.5.0.3 POM. Treat this as an unresolved upstream metadata discrepancy; do not infer that MIT is either applicable or safely irrelevant without confirmation.",
+      "reviewNotes": "The exact Maven binary SHA-256 matches the pinned artifact. The exact-version source JAR SHA-256 also matches its registered hash. LICENSE_GRAALJS and THIRD_PARTY_LICENSE_GRAALJS.txt were independently fetched from the pinned upstream commit and byte-matched to the retained files and registry hashes. The source-repository root LICENSE is a different file and must not replace these implementation-specific terms. The binary JAR contains no license/NOTICE entries. The Maven POM and pinned GraalJS build metadata declare UPL-1.0 and MIT, with the build metadata attributing MIT to the JONI regexp engine. The exact POM has no JONI dependency; its runtime dependencies are regex, truffle-api, polyglot, and shadowed ICU4J. A fresh inspection of the exact Maven binary and source JARs found no JONI package/class names, paths, source references, or strings; the retained third-party license text has no JONI attribution. The official GraalJS changelog says the JONI engine was removed in version 20.1.0. This evidence strongly supports the MIT metadata being a stale remnant of the removed engine, but the 25.5.5.0.3 POM still declares MIT and no upstream file-to-license mapping explains that continued declaration. Keep the component unreviewed until a competent reviewer determines whether the declaration is stale and what MIT attribution, if any, belongs in recipient materials; no third party has been contacted.",
       "remaining": [
-        "Resolve with authoritative upstream evidence why the 25.5.5.0.3 js-language metadata still declares MIT for JONI after its documented removal and whether any JONI-derived code or notice remains applicable",
+        "Have a competent reviewer determine whether the remaining MIT POM declaration is stale metadata from the removed JONI engine and whether any separate MIT attribution belongs in the recipient packet; retain the current evidence and do not contact upstream without explicit approval",
         "Review the file-to-license mapping for every separately licensed item in THIRD_PARTY_LICENSE_GRAALJS.txt",
         "Verify the regenerated exact-release legal archive carries all three version-bound materials and the matching corresponding-source archive",
         "Complete final package hash review; this provenance and license-text check does not grant redistribution approval"
@@ -280,10 +294,10 @@
       "upstreamCommit": "6d08472ea47db895748d5ca7d3daf032c3fefcf8",
       "materialPaths": ["libfuse-3.15.0/LICENSE", "libfuse-3.15.0/LGPL2.txt", "libfuse-3.15.0/SOURCE-AND-RELINK.txt"],
       "reviewStatus": "unreviewed",
-      "reviewNotes": "The recipient guide describes the LGPL-2.1 section 6(a) source-and-relink route. Workflow 42651138364 built the retained runtime recipe with its mount.c patch applied to libfuse. Versioned non-publishing candidate workflow 43305484301 built and smoke-tested AppImage package SHA-256 56aa8a45524079fed429d0ac4bc7aad43a2aea537798e14375027f95b7fe6819. Its runtime SHA-256 b9a99a36aa0fea7b850aef2726a6fbc805199edb62c854f8233bf5ba8b1713c5 embeds the pinned source commit, and the corresponding-sources archive SHA-256 f7c0835faba0e9c0b2793aae04400cdc63fa33a1b7528d8a59ee9d9735fc64b1 contains the corrected zlib 1.4, Alpine musl r12, mimalloc, zstd, and libfuse source/build inputs with a verified file-hash manifest. This supersedes the historical zlib/musl mismatch in candidate 43187339406. It does not establish that the materials legally suffice for relinking; final recipient-archive review and qualified obligation review remain open.",
+      "reviewNotes": "The recipient guide describes the LGPL-2.1 section 6(a) source-and-relink route. Workflow 42651138364 built the retained runtime recipe with its mount.c patch applied to libfuse. Versioned non-publishing candidate workflow 43368865856 built and smoke-tested the AppImage and generated a recipient-facing corresponding-source archive. Inspection of that archive found the pinned libfuse source, the mount.c patch, Type 2 runtime source, build instructions, and pinned source/build inputs for the statically linked runtime dependencies; the archive includes a SHA-256 manifest. These are the source and relink materials described by LGPL-2.1 section 6(a), and the candidate provides technical evidence for that delivery route, not a legal opinion or final release clearance. The release workflow downloads and attaches both recipient archives alongside the ten packages, then verifies the exact 12-file payload against a review bound to the release tag and source commit. The candidate is not the final release payload; rebuild and verify the final AppImage/source archive hashes and complete the substantive component review before publication.",
       "remaining": [
-        "Have a qualified reviewer confirm that the exact candidate source archive and build inputs satisfy the LGPL-2.1 section 6(a) static-link relinking/source-and-relink requirements for the packaged runtime",
-        "Bind recipient delivery and the completed review to the exact final AppImage and corresponding-source archive hashes"
+        "Rebuild from the release source commit and confirm the exact final AppImage and corresponding-source archive, including the libfuse source, patch, runtime source, build instructions, and source manifest, are hash-bound and attached to the same release",
+        "Complete the substantive review of all linked AppImage components and record the evidence-backed release decision"
       ]
     },
     {
@@ -599,12 +613,12 @@
         "linux-x64": "DNG symbol family found in skiko-awt-runtime-linux-x64:0.150.2 (artifact SHA-256 c6c1f9fa37464fd0bcca6e486a6b35307b6e2436199de9d009f877121de1c5c2)",
         "macos-arm64": "DNG symbol family found in skiko-awt-runtime-macos-arm64:0.150.2 (artifact SHA-256 abea519fa519f7245412011cc3ab7a5852cb333b3dc3cac08a83f5bd806c7bec)",
         "macos-x64": "DNG symbol family found in skiko-awt-runtime-macos-x64:0.150.2 (artifact SHA-256 f77b1f3a76e94daba2676780e37807697d51d300e31cacc43699709f3ccdff96)",
-        "windows-x64": "Unknown: the exact MSI-contained DLL matches skiko-awt-runtime-windows-x64:0.150.2 (artifact SHA-256 eebad490c2828198e86e641cbd44958617867ce70f893b21852f07d0be099c0a). A string scan found no DNG-specific identifiers (only Adobe APP14 JPEG strings); the pinned Skiko Windows JVM target does not explicitly add piex or dng_sdk, but the shared Skia configuration could still include them. Neither the stripped symbols nor the string scan prove absence."
+        "windows-x64": "Absent from the pinned Skiko 0.150.2 Windows JVM runtime: Skia m150-a3f509bf52 sets skia_use_piex = !is_win && !is_canvaskit, and its RAW codec requires skia_use_piex; the Skiko Windows JVM target also omits piex and dng_sdk. The exact MSI-contained DLL matches this Maven artifact (SHA-256 eebad490c2828198e86e641cbd44958617867ce70f893b21852f07d0be099c0a). This conclusion is based on the matching build configuration, not the stripped-binary string scan."
       },
       "reviewStatus": "unreviewed",
-      "reviewNotes": "The exact pinned Adobe SDK agreement was checked: section 1 permits use and redistribution without royalties, section 2 requires preserving notices, and section 5 adds indemnification for distribution in a commercial product. The maintainer confirmed the current distribution is noncommercial; revisit section 5 if that changes. The pinned Skia SkRawCodec parses, validates, and renders DNG files using Adobe's SDK, and Visual Agent reaches Skia's encoded-image decoder for canvas images. Adobe's separate DNG patent grant refers to compliant readers and sets conditions including a prominent source/documentation notice. The exact notice is in the README, beside the UI decoder call and in the hash-pinned recipient material; tests verify source/documentation placement. Linux x64 and both macOS runtime binaries contain DNG-specific symbols. The Windows runtime has no DNG-specific strings in the inspected binary, but its stripped symbols and the limits of string scanning prevent a conclusion that the component is absent. This technical review is not a qualified legal opinion or final redistribution approval.",
+      "reviewNotes": "The exact Adobe DNG SDK agreement and separate patent grant govern this component. Adobe section 1 grants distribution for any purpose subject to the agreement; section 2 requires retaining notices; section 5 adds indemnification when distributing in a commercial product. The maintainer confirmed the current plan is noncommercial; revisit that clause if the plan changes. The pinned Android METADATA labels the SDK BY_EXCEPTION_ONLY and directs Google's own package consumers to consult owners/licensing (https://android.googlesource.com/platform/external/dng_sdk/+/dbe0a676450d9b8c71bf00688bb306409b779e90/METADATA). Google's public guidance describes BY_EXCEPTION_ONLY as Google's internal classification for terms conflicting with Google's own uses (https://opensource.google/documentation/reference/thirdparty/licenses); this is not an additional Adobe license term or evidence that Visual Agent requires Google's permission. No third party was contacted. The pinned Skia SkRawCodec parses, validates, and renders DNG files using Adobe's SDK, and Visual Agent reaches Skia's encoded-image decoder for canvas images. Adobe's separate patent grant applies to compliant DNG readers/writers and requires a prominent source/documentation notice. The exact notice is in the README, beside the UI decoder call and in the recipient material; tests verify source/documentation placement. Linux x64 and both macOS runtime binaries contain DNG-specific symbols. The pinned Skiko/Skia Windows JVM configuration disables the RAW codec and omits DNG SDK/Piex, and the inspected MSI DLL matches that Maven runtime artifact. This maps the component in the pinned runtime but does not approve redistribution or replace final package verification. This is an evidence-based engineering interpretation, not a qualified legal opinion or final redistribution approval.",
       "remaining": [
-        "Map DNG presence to the exact binaries in every versioned release package; Windows binary inspection is currently inconclusive because symbols are stripped",
+        "Reconfirm the pinned-runtime mapping against exact binaries in every versioned release package",
         "Verify the exact notice remains prominent in the final recipient-facing documentation and legal materials for every package containing the implementation",
         "Review the pinned binary/source mapping and the separate DNG patent grant conditions before recording qualified redistribution clearance"
       ]
@@ -618,7 +632,7 @@
         "linux-x64": "Piex symbol family found in skiko-awt-runtime-linux-x64:0.150.2 (artifact SHA-256 c6c1f9fa37464fd0bcca6e486a6b35307b6e2436199de9d009f877121de1c5c2)",
         "macos-arm64": "Piex symbol family found in skiko-awt-runtime-macos-arm64:0.150.2 (artifact SHA-256 abea519fa519f7245412011cc3ab7a5852cb333b3dc3cac08a83f5bd806c7bec)",
         "macos-x64": "Piex symbol family found in skiko-awt-runtime-macos-x64:0.150.2 (artifact SHA-256 f77b1f3a76e94daba2676780e37807697d51d300e31cacc43699709f3ccdff96)",
-        "windows-x64": "Unknown: the exact MSI-contained DLL matches the Maven DLL hash, but its symbol table is stripped; no positive or negative component conclusion"
+        "windows-x64": "Absent from the pinned Skiko 0.150.2 Windows JVM runtime: Skia disables Piex on Windows and its RAW codec requires Piex; the Skiko Windows JVM target omits Piex. The exact MSI DLL matches the Maven runtime artifact; conclusion is based on the pinned build configuration, not stripped symbols."
       },
       "reviewStatus": "unreviewed",
       "remaining": [
@@ -641,6 +655,21 @@
       "remaining": [
         "Confirm Wuffs mapping for Windows and map all platforms to exact final package binaries",
         "Review attribution/notice placement and determine source-delivery requirements for the exact distributed payload"
+      ]
+    },
+    {
+      "name": "d3d12allocator",
+      "upstreamCommit": "169895d529dfce00390a20e69c2f516066fe7a3b",
+      "proposedLicense": "MIT",
+      "materialPaths": ["d3d12allocator-169895d5/LICENSE.txt"],
+      "binaryEvidence": {
+        "windows-x64": "The exact Skiko v0.150.2 Windows JVM configuration calls staticSkiaLibs(\"d3d12allocator\") and the Maven runtime DLL SHA-256 is e90e2e5ae3d48c7694b6cf5948953f6d007fe40478b1040353040acef118dd41, matching the historical MSI payload. The stripped DLL string scan did not identify allocator symbols; the upstream static-link configuration is the positive build evidence. Reconfirm the binary mapping against each final release package."
+      },
+      "reviewStatus": "unreviewed",
+      "reviewNotes": "The pinned original license is the MIT License and requires the copyright and permission notice in copies or substantial portions. The exact license text is included in curated native legal materials. This source/configuration mapping places D3D12MemoryAllocator with Skiko's Windows JVM runtime, not the ANGLE DLLs. This is not a final package or redistribution approval.",
+      "remaining": [
+        "Verify the exact Windows release package contains the mapped Skiko runtime DLL and the retained MIT notice",
+        "Reconfirm this mapping if the Skiko version or Windows JVM link configuration changes"
       ]
     }
   ],
@@ -694,7 +723,7 @@
       ],
       "remaining": [
         "The MSI contains only the historical H2, JNA, and Logback notice set; verify that a newly built final MSI includes all applicable later-collected materials",
-        "The native DLL is stripped: symbol absence cannot prove that a component is absent; retain DNG SDK/Piex mapping as unknown and review the complete PE dependency/content evidence"
+        "The exact historical MSI DLL matches the pinned Skiko Windows JVM runtime. Skia disables Piex on Windows and the RAW codec requires Piex; use this pinned build configuration, not stripped-symbol absence, for the DNG SDK/Piex mapping. Reconfirm against the exact binaries in each new release candidate"
       ]
     }
   ],
@@ -1137,6 +1166,16 @@
       "path": "netty-4.2.20.Final/APSL-2.0.txt",
       "sha256": "2d0c12edaaf8d31fec6796fef99291b12e833b6bef28100975120a53d209e06d",
       "url": "https://raw.githubusercontent.com/spdx/license-list-data/31846481de7ea17d92f2f46fad76abe58b2e9bb0/text/APSL-2.0.txt"
+    },
+    {
+      "path": "jakarta-annotation-api-3.0.0/LICENSE.md",
+      "sha256": "6e1f002892b81cbe0647019b150c8a056efc1add565671a4f8af629b6cd2cc7b",
+      "url": "https://raw.githubusercontent.com/jakartaee/common-annotations-api/d456606ef104b5602700d7a2414f812e48a8a694/LICENSE.md"
+    },
+    {
+      "path": "jakarta-annotation-api-3.0.0/NOTICE.md",
+      "sha256": "20bf986a153cc3095639379c99ef0a5a3bf99ac4895429920d380414a3eecf08",
+      "url": "https://raw.githubusercontent.com/jakartaee/common-annotations-api/d456606ef104b5602700d7a2414f812e48a8a694/NOTICE.md"
     },
     {
       "path": "kotlinx-io-0.9.1/NOTICE",

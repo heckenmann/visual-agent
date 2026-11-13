@@ -96,10 +96,25 @@ class SupplementalNoticesTest(unittest.TestCase):
     def test_repository_snapshots_match_the_recorded_hashes(self):
         registry = pathlib.Path(__file__).parents[1] / "docs/licensing/third-party/sources.json"
         components = load_supplements(registry)
-        self.assertEqual(102, len(components))
+        self.assertEqual(103, len(components))
         self.assertEqual("MPL-2.0", components["com.h2database:h2:2.5.252"]["proposedLicense"])
         self.assertEqual("EPL-2.0", components["ch.qos.logback:logback-core:1.6.6"]["proposedLicense"])
         self.assertEqual("Apache-2.0", components["net.java.dev.jna:jna:5.19.1"]["proposedLicense"])
+        jakarta = components["jakarta.annotation:jakarta.annotation-api:3.0.0"]
+        self.assertEqual("EPL-2.0 OR GPL-2.0-only WITH Classpath-exception-2.0", jakarta["proposedLicense"])
+        self.assertEqual("d456606ef104b5602700d7a2414f812e48a8a694", jakarta["upstreamCommit"])
+        self.assertEqual(
+            ["jakarta-annotation-api-3.0.0/LICENSE.md", "jakarta-annotation-api-3.0.0/NOTICE.md"],
+            [material["path"] for material in jakarta["materials"]],
+        )
+        self.assertEqual(
+            [
+                "6e1f002892b81cbe0647019b150c8a056efc1add565671a4f8af629b6cd2cc7b",
+                "20bf986a153cc3095639379c99ef0a5a3bf99ac4895429920d380414a3eecf08",
+            ],
+            [hashlib.sha256(material["content"]).hexdigest() for material in jakarta["materials"]],
+        )
+        self.assertTrue(jakarta["remaining"])
         icu = components["org.graalvm.shadowed:icu4j:25.4.4.1.1"]
         self.assertEqual("Unicode/ICU License", icu["proposedLicense"])
         self.assertEqual("f1b3db8ecd39d5b3a6eff4d5641b176c7f914dfb", icu["upstreamCommit"])
@@ -272,7 +287,12 @@ class SupplementalNoticesTest(unittest.TestCase):
         fuse = components["AppImage:libfuse:3.15.0"]
         self.assertEqual("LGPL-2.1-only", fuse["proposedLicense"])
         self.assertIn(b"GNU LESSER GENERAL PUBLIC LICENSE", fuse["materials"][1]["content"])
-        self.assertIn("static-link relinking", " ".join(fuse["remaining"]))
+        self.assertIn("final AppImage", " ".join(fuse["remaining"]))
+        self.assertIn("source manifest", " ".join(fuse["remaining"]))
+        fuse_record = next(item for item in registry_data["components"]
+                           if "AppImage:libfuse:3.15.0" in item["sourceArtifacts"])
+        self.assertEqual("unreviewed", fuse_record["reviewStatus"])
+        self.assertIn("technical evidence", fuse_record["reviewNotes"])
         squashfuse = components["AppImage:squashfuse:0.5.2"]
         self.assertEqual("BSD-2-Clause", squashfuse["proposedLicense"])
         self.assertIn(b"Redistribution and use in source and binary forms",
@@ -301,9 +321,17 @@ class SupplementalNoticesTest(unittest.TestCase):
             components["org.graalvm.js:js-isolate-darwin-aarch64:25.4.4.1.1"]["sourceArtifactSha256"],
         )
         self.assertIn(b"re-signing an embedded macOS library", graal["materials"][0]["content"])
-        self.assertTrue(any("final release source" in item for item in graal["remaining"]))
+        self.assertTrue(any("six-platform final release artifacts" in item for item in graal["remaining"]))
         self.assertFalse(any("unmodified-Program condition" in item for item in graal["remaining"]))
         self.assertFalse(any("no-fee redistribution condition" in item for item in graal["remaining"]))
+        graal_record = next(
+            item for item in json.loads(registry.read_text())["components"]
+            if "org.graalvm.js:js-isolate-linux-amd64:25.4.4.1.1" in item["sourceArtifacts"]
+        )
+        self.assertIn("workflow 43393143407", graal_record["reviewNotes"])
+        self.assertIn("current PR-head inventory", graal_record["reviewNotes"])
+        self.assertIn("not an active component finding", graal_record["reviewNotes"])
+        self.assertEqual("unreviewed", graal_record["reviewStatus"])
         self.assertIn("without charging recipients", graal["materials"][0]["content"].decode())
         self.assertIn("public GitHub Releases", graal["materials"][0]["content"].decode())
         self.assertFalse(json.loads(registry.read_text())["redistributionApproved"])
@@ -339,8 +367,9 @@ class SupplementalNoticesTest(unittest.TestCase):
         )
         self.assertEqual("unreviewed", language_record["reviewStatus"])
         self.assertIn("attributing MIT to the JONI regexp engine", language_record["reviewNotes"])
-        self.assertIn("exact POM has no JONI dependency", language_record["reviewNotes"])
-        self.assertTrue(any("Resolve with authoritative upstream evidence" in item
+        self.assertIn("fresh inspection of the exact Maven binary and source JARs found no JONI", language_record["reviewNotes"])
+        self.assertIn("removed in version 20.1.0", language_record["reviewNotes"])
+        self.assertTrue(any("competent reviewer determine whether the remaining MIT POM declaration is stale" in item
                             for item in language_record["remaining"]))
         self.assertIn(b"Copyright (c) 2010, 2022, Oracle", language["materials"][0]["content"])
         third_party = next(item for item in language["materials"]
@@ -503,11 +532,12 @@ class SupplementalNoticesTest(unittest.TestCase):
         registry_path = root / "docs/licensing/third-party/sources.json"
         registry = json.loads(registry_path.read_text())
         components = {item["name"]: item for item in registry["embeddedComponents"]}
-        self.assertEqual({"dng_sdk", "piex", "wuffs"}, set(components))
+        self.assertEqual({"dng_sdk", "piex", "wuffs", "d3d12allocator"}, set(components))
         expected_commits = {
             "dng_sdk": "dbe0a676450d9b8c71bf00688bb306409b779e90",
             "piex": "bb217acdca1cc0c16b704669dd6f91a1b509c406",
             "wuffs": "e3f919ccfe3ef542cfc983a82146070258fb57f8",
+            "d3d12allocator": "169895d529dfce00390a20e69c2f516066fe7a3b",
         }
         for name, commit in expected_commits.items():
             with self.subTest(name=name):
@@ -520,16 +550,44 @@ class SupplementalNoticesTest(unittest.TestCase):
                     content = (registry_path.parent / path).read_bytes()
                     self.assertEqual(material["sha256"], hashlib.sha256(content).hexdigest())
         dng_platforms = components["dng_sdk"]["binaryEvidence"]
-        self.assertIn("Unknown", dng_platforms["windows-x64"])
+        self.assertIn("Absent from the pinned Skiko 0.150.2 Windows JVM runtime", dng_platforms["windows-x64"])
+        self.assertIn("skia_use_piex = !is_win", dng_platforms["windows-x64"])
         self.assertIn("eebad490c2828198e86e641cbd44958617867ce70f893b21852f07d0be099c0a", dng_platforms["windows-x64"])
-        self.assertIn("string scan found no DNG-specific identifiers", dng_platforms["windows-x64"])
+        self.assertIn("not the stripped-binary string scan", dng_platforms["windows-x64"])
         self.assertIn("found", dng_platforms["linux-x64"])
+        piex_windows = components["piex"]["binaryEvidence"]["windows-x64"]
+        self.assertIn("Absent from the pinned Skiko 0.150.2 Windows JVM runtime", piex_windows)
+        self.assertIn("Skia disables Piex on Windows", piex_windows)
+        allocator = components["d3d12allocator"]
+        self.assertEqual("MIT", allocator["proposedLicense"])
+        self.assertIn(
+            'staticSkiaLibs("d3d12allocator")',
+            allocator["binaryEvidence"]["windows-x64"],
+        )
+        self.assertIn(
+            "e90e2e5ae3d48c7694b6cf5948953f6d007fe40478b1040353040acef118dd41",
+            allocator["binaryEvidence"]["windows-x64"],
+        )
+        angle_runtime = next(
+            item
+            for item in registry["components"]
+            if "org.jetbrains.skiko:skiko-awt-runtime-angle-windows-x64:0.150.2" in item["sourceArtifacts"]
+        )
+        self.assertNotIn("d3d12allocator-169895d5/LICENSE.txt", angle_runtime["materialPaths"])
         dng_notice_path = "dng-sdk-dbe0a676/DNG-PATENT-NOTICE.txt"
         self.assertIn(dng_notice_path, components["dng_sdk"]["materialPaths"])
         dng_notice = (registry_path.parent / dng_notice_path).read_bytes()
         self.assertEqual(b"This product includes DNG technology under license by Adobe.\n", dng_notice)
         registered_notice = next(item for item in registry["materials"] if item["path"] == dng_notice_path)
         self.assertEqual(hashlib.sha256(dng_notice).hexdigest(), registered_notice["sha256"])
+        dng_review = components["dng_sdk"]["reviewNotes"]
+        self.assertIn("BY_EXCEPTION_ONLY", dng_review)
+        self.assertIn("Google's internal classification", dng_review)
+        self.assertIn("not an additional Adobe license term", dng_review)
+        self.assertIn("/dbe0a676450d9b8c71bf00688bb306409b779e90/METADATA", dng_review)
+        self.assertIn("No third party was contacted.", dng_review)
+        self.assertFalse(any("BY_EXCEPTION_ONLY" in item for item in components["dng_sdk"]["remaining"]))
+        self.assertEqual("unreviewed", components["dng_sdk"]["reviewStatus"])
         required_notice = dng_notice.decode().strip()
         self.assertIn(required_notice, (root / "README.md").read_text())
         self.assertIn(required_notice, (root / "modules/desktop/build.gradle.kts").read_text())
@@ -563,7 +621,7 @@ class SupplementalNoticesTest(unittest.TestCase):
         self.assertIn("prohibits selling the font by itself", review_notes)
         self.assertIn("does not approve the complete release package", review_notes)
         component = load_supplements(root / "docs/licensing/third-party/sources.json")
-        self.assertEqual(102, len(component))
+        self.assertEqual(103, len(component))
         license_file = root / "docs/licensing/third-party/liberation-fonts-2.1.5/LICENSE"
         self.assertEqual(asset["licenseMaterialPath"],
                          "liberation-fonts-2.1.5/LICENSE")
