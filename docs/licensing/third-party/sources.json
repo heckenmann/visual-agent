@@ -105,10 +105,10 @@
       "upstreamCommit": "58f1795f7d12d12260d0c0423811e846c7632649",
       "materialPaths": ["graaljs-25.4.4.1.1/GFTC-TERMS-REFERENCE.md"],
       "reviewStatus": "unreviewed",
-      "reviewNotes": "The current release plan publishes the application and this bundled Program through public GitHub Releases without charging recipients for the app, bundle, or access to the release. This addresses only the no-fee condition for the current distribution plan; any paid distribution, bundle, or service involving this Program requires renewed review. It is not a legal determination or overall redistribution approval.",
+      "reviewNotes": "These 25.4.4.1.1 isolate artifacts are retained as historical evidence from an earlier package graph, not as evidence about the current candidate. The versioned non-publishing candidate in workflow 43368865856 at source commit 30232f4318c5fd594c1166822a2f832b78120821 has six platform manifests, none containing a js-isolate artifact. Preserve the historical evidence; regenerate inventories from the final release source before deciding whether any GFTC artifact remains. This is candidate-package evidence, not legal approval.",
       "remaining": [
-        "Review whether the exact macOS re-signing transformation is allowed by the GFTC unmodified-Program condition",
-        "Verify recipient access to the complete Oracle terms and all proprietary-rights markings in each final package"
+        "Regenerate all platform inventories from the final release source and reconfirm that no GFTC artifact remains; if one is present, review the exact binary and transformations against the GFTC",
+        "For any GFTC artifacts in the final candidate, verify recipient access to the complete Oracle terms, proprietary-rights markings, and separately licensed technology"
       ]
     },
     {

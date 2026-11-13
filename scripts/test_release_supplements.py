@@ -298,7 +298,8 @@ class SupplementalNoticesTest(unittest.TestCase):
             components["org.graalvm.js:js-isolate-darwin-aarch64:25.4.4.1.1"]["sourceArtifactSha256"],
         )
         self.assertIn(b"re-signing an embedded macOS library", graal["materials"][0]["content"])
-        self.assertTrue(any("unmodified-Program condition" in item for item in graal["remaining"]))
+        self.assertTrue(any("final release source" in item for item in graal["remaining"]))
+        self.assertFalse(any("unmodified-Program condition" in item for item in graal["remaining"]))
         self.assertFalse(any("no-fee redistribution condition" in item for item in graal["remaining"]))
         self.assertIn("without charging recipients", graal["materials"][0]["content"].decode())
         self.assertIn("public GitHub Releases", graal["materials"][0]["content"].decode())
