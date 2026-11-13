@@ -1,17 +1,22 @@
 name: Build and smoke release packages
 
 on:
-  release:
-    types: [published]
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Optional SemVer tag for a versioned release-candidate build (does not publish a release)
+        required: false
+        type: string
+        default: ""
 
 permissions:
   contents: read
 
 env:
   GRADLE_OPTS: -Dorg.gradle.daemon=false
-  # Every Gradle invocation, including matrix packaging jobs, resolves the same catalog override.
-  ORG_GRADLE_PROJECT_releaseTag: ${{ github.event_name == 'release' && github.event.release.tag_name || '' }}
+  ZULU_JDK_VERSION: "27.0.1.0.3+1"
+  # Every Gradle invocation, including matrix packaging jobs, resolves the same candidate version.
+  ORG_GRADLE_PROJECT_releaseTag: ${{ inputs.release_tag || '' }}
 
 jobs:
   verify:
@@ -32,7 +37,7 @@ jobs:
         uses: actions/setup-java@v6
         with:
           distribution: zulu
-          java-version: "27"
+          java-version: ${{ env.ZULU_JDK_VERSION }}
 
       - name: Read Gradle wrapper version
         id: gradle_wrapper
@@ -54,10 +59,10 @@ jobs:
       - name: Validate generated Gradle wrapper
         uses: gradle/actions/wrapper-validation@v6.4.1
 
-      - name: Resolve Gradle version from release tag
-        if: github.event_name == 'release'
+      - name: Resolve Gradle version from candidate tag
+        if: inputs.release_tag != ''
         env:
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
         run: |
           set -euo pipefail
           test -n "$RELEASE_TAG"
@@ -71,17 +76,24 @@ jobs:
 
       - name: Prepare release workflow metadata
         env:
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
-          PUBLISH_RELEASE: ${{ github.event_name == 'release' }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
         run: |
           set -euo pipefail
           mkdir release-metadata
-          printf 'tag=%s\npublish=%s\n' "$RELEASE_TAG" "$PUBLISH_RELEASE" > release-metadata/manifest
+          if [[ -n "$RELEASE_TAG" ]]; then
+            [[ "$RELEASE_TAG" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.-]+)?(\+[a-zA-Z0-9.-]+)?$ ]] || {
+              echo "Invalid SemVer release-candidate tag: $RELEASE_TAG" >&2
+              exit 1
+            }
+            printf 'tag=%s\ncandidate=true\nsource_commit=%s\n' "$RELEASE_TAG" "$GITHUB_SHA" > release-metadata/manifest
+          else
+            printf 'tag=\ncandidate=false\nsource_commit=%s\n' "$GITHUB_SHA" > release-metadata/manifest
+          fi
 
       - name: Upload release workflow metadata
         uses: actions/upload-artifact@v7
         with:
-          name: release-metadata
+          name: ${{ inputs.release_tag != '' && format('release-candidate-{0}', inputs.release_tag) || 'release-metadata' }}
           if-no-files-found: error
           path: release-metadata/manifest
 
@@ -99,51 +111,61 @@ jobs:
             task: packageLinuxDeb
             extension: deb
             install_rpm: false
+            collect_notice_evidence: true
           - platform: linux-rpm
             runner: ubuntu-latest
             task: packageLinuxRpm
             extension: rpm
             install_rpm: true
+            collect_notice_evidence: true
           - platform: linux-appimage
             runner: ubuntu-latest
-            task: packageAppImage
+            task: verifyAppImageRuntimeInPackage
             extension: AppImage
             install_rpm: false
+            collect_notice_evidence: true
           - platform: linux-x64-jar
             runner: ubuntu-latest
             task: stageReleaseJar
             extension: jar
             install_rpm: false
+            collect_notice_evidence: false
           - platform: macos-arm64-jar
             runner: macos-latest
             task: stageReleaseJar
             extension: jar
             install_rpm: false
+            collect_notice_evidence: false
           - platform: macos-x64-jar
             runner: macos-15-intel
             task: stageReleaseJar
             extension: jar
             install_rpm: false
+            collect_notice_evidence: false
           - platform: windows-x64-jar
             runner: windows-latest
             task: stageReleaseJar
             extension: jar
             install_rpm: false
+            collect_notice_evidence: false
           - platform: macos-arm64
             runner: macos-latest
             task: packageDmg
             extension: dmg
             install_rpm: false
+            collect_notice_evidence: true
           - platform: macos-x64
             runner: macos-15-intel
             task: packageDmg
             extension: dmg
             install_rpm: false
+            collect_notice_evidence: true
           - platform: windows
             runner: windows-latest
             task: packageMsi
             extension: msi
             install_rpm: false
+            collect_notice_evidence: true
 
     steps:
       - name: Check out repository
@@ -156,7 +178,7 @@ jobs:
         uses: actions/setup-java@v6
         with:
           distribution: zulu
-          java-version: "27"
+          java-version: ${{ env.ZULU_JDK_VERSION }}
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v6.4.1
@@ -178,6 +200,50 @@ jobs:
       - name: Build native package
         run: ./gradlew :desktop:${{ matrix.task }} --no-daemon --no-configuration-cache
         shell: bash
+
+      - name: Set up Python for packaged notice collection
+        if: matrix.collect_notice_evidence
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+
+      - name: Generate platform package inventory for licensing
+        if: matrix.collect_notice_evidence
+        run: ./gradlew -I scripts/license-settings.init.gradle.kts generateLicenseReport :desktop:generateDistributionArtifactInventory --no-daemon --no-configuration-cache
+        shell: bash
+
+      - name: Collect original notices from packaged runtime JARs
+        if: matrix.collect_notice_evidence
+        env:
+          PACKAGE_PLATFORM: ${{ matrix.platform }}
+        run: |
+          args=(
+            --package-root modules/desktop/build/compose/binaries/main/app
+            --inventory modules/desktop/build/reports/dependency-license/packaged-artifacts.csv
+            --license-report build/reports/dependency-license/licenses-all.json
+            --project-license LICENSE
+            --output notice-evidence
+            --supplements docs/licensing/third-party/sources.json
+          )
+          if [[ "$PACKAGE_PLATFORM" == "linux-appimage" ]]; then
+            mapfile -t appimage_packages < <(find modules/desktop/build/compose/binaries/main/packages -maxdepth 1 -type f -name '*.AppImage' -print)
+            test "${#appimage_packages[@]}" -eq 1
+            args+=(
+              --appimage-package "${appimage_packages[0]}"
+              --appimage-runtime modules/desktop/build/appimage/tools/runtime-dd6cebed-x86_64
+              --appimage-source-archive modules/desktop/build/reports/dependency-license/appimage-runtime-sources/type2-runtime-dd6cebed.tar.gz
+            )
+          fi
+          python scripts/collect-third-party-notices.py "${args[@]}"
+        shell: bash
+
+      - name: Upload platform notice evidence
+        if: matrix.collect_notice_evidence
+        uses: actions/upload-artifact@v7
+        with:
+          name: license-notices-${{ matrix.platform }}
+          if-no-files-found: error
+          path: notice-evidence/
 
       - name: Show native packaging failure logs
         if: failure()
@@ -218,6 +284,93 @@ jobs:
           name: runtime-provenance-${{ matrix.platform }}
           if-no-files-found: error
           path: modules/desktop/build/reports/dependency-license/runtime-provenance.properties
+
+  legal-materials:
+    name: Package legal and source review materials
+    needs: [verify, package]
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+        with:
+          lfs: true
+          ref: ${{ github.sha }}
+
+      - name: Set up Java
+        uses: actions/setup-java@v6
+        with:
+          distribution: zulu
+          java-version: ${{ env.ZULU_JDK_VERSION }}
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6.4.0
+        with:
+          gradle-version: ${{ needs.verify.outputs.gradle_version }}
+
+      - name: Bootstrap repository Gradle wrapper
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(sed -n 's#.*gradle-\([0-9][0-9.]*\)-[^/]*\.zip.*#\1#p' gradle/wrapper/gradle-wrapper.properties)"
+          test -n "$version"
+          gradle wrapper --gradle-version "$version" --no-daemon
+
+      - name: Collect pinned source and legal inputs
+        run: ./gradlew :desktop:prepareReleaseSourceMaterials --no-daemon --no-configuration-cache
+
+      - name: Download per-platform package notice evidence
+        uses: actions/download-artifact@v8
+        with:
+          pattern: license-notices-*
+          path: release-materials/package-notices
+          merge-multiple: false
+
+      - name: Build review-only legal and source archives
+        run: |
+          python3 scripts/build_release_material_bundles.py \
+            --project-root . \
+            --source-materials modules/desktop/build/reports/dependency-license/release-source-materials \
+            --notice-evidence release-materials/package-notices \
+            --output-directory release-materials/review-only
+
+      - name: Build hash-bound recipient candidates
+        run: |
+          python3 scripts/build_release_material_bundles.py \
+            --project-root . \
+            --source-materials modules/desktop/build/reports/dependency-license/release-source-materials \
+            --notice-evidence release-materials/package-notices \
+            --output-directory release-materials/recipient-candidates \
+            --recipient-candidate
+
+      - name: Upload recipient-candidate legal archive
+        uses: actions/upload-artifact@v7
+        with:
+          name: visual-agent-legal
+          if-no-files-found: error
+          path: release-materials/recipient-candidates/visual-agent-legal.zip
+
+      - name: Upload recipient-candidate source archive
+        uses: actions/upload-artifact@v7
+        with:
+          name: visual-agent-corresponding-sources
+          if-no-files-found: error
+          path: release-materials/recipient-candidates/visual-agent-corresponding-sources.zip
+
+      - name: Upload review-only legal archive
+        uses: actions/upload-artifact@v7
+        with:
+          name: visual-agent-legal-review
+          if-no-files-found: error
+          path: release-materials/review-only/visual-agent-legal.zip
+
+      - name: Upload review-only source archive
+        uses: actions/upload-artifact@v7
+        with:
+          name: visual-agent-corresponding-sources-review
+          if-no-files-found: error
+          path: release-materials/review-only/visual-agent-corresponding-sources.zip
 
   smoke-linux-native:
     name: Smoke ${{ matrix.platform }} in ${{ matrix.image }}
@@ -281,7 +434,7 @@ jobs:
         uses: actions/setup-java@v6
         with:
           distribution: zulu
-          java-version: "27"
+          java-version: ${{ env.ZULU_JDK_VERSION }}
 
       - name: Download Linux JAR
         uses: actions/download-artifact@v8
@@ -328,7 +481,7 @@ jobs:
         uses: actions/setup-java@v6
         with:
           distribution: zulu
-          java-version: "27"
+          java-version: ${{ env.ZULU_JDK_VERSION }}
 
       - name: Download release artifact
         uses: actions/download-artifact@v8
@@ -360,7 +513,7 @@ jobs:
         uses: actions/setup-java@v6
         with:
           distribution: zulu
-          java-version: "27"
+          java-version: ${{ env.ZULU_JDK_VERSION }}
 
       - name: Download release artifact
         uses: actions/download-artifact@v8

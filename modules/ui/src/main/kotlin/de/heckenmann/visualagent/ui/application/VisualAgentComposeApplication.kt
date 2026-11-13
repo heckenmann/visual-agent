@@ -73,6 +73,8 @@ fun VisualAgentComposeApp(
         remember {
             ComposePanelServices(
                 settings = deps.applicationPort.settings,
+                openSourceLicenses = deps.applicationPort.openSourceLicenses,
+                applicationInformation = deps.applicationPort.applicationInformation,
                 updates = deps.applicationPort.updates,
                 updateState = updateState,
                 onUpdateStateChanged = { updateState.value = it },
@@ -154,16 +156,7 @@ fun VisualAgentComposeApp(
             windows = next
         }
     }
-    val commands =
-        windows.map { window ->
-            ComposeCommand(
-                id = "open-${window.id}",
-                title = "Open ${window.title}",
-                description = window.subtitle,
-            ) {
-                activateWindow(window.id)
-            }
-        } + ComposeCommand("close-application", "Close application", "Close Visual Agent and persist workspace state", onCloseApplication)
+    val commands = workspaceCommands(windows, activateWindow, onCloseApplication)
     LaunchedEffect(Unit) {
         withFrameNanos { }
         workspaceFocusRequester.requestFocus()

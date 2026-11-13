@@ -149,6 +149,7 @@ internal fun ImageFigure(
     figure: CanvasFigureSnapshot,
     imageBytesForPath: (String) -> ByteArray?,
 ) {
+    // This product includes DNG technology under license by Adobe.
     val imageBitmap =
         remember(figure.content) {
             imageBytesForPath(figure.content)

@@ -6,9 +6,10 @@
       "sourceArtifacts": {"com.h2database:h2:2.5.252": "90b11dc413da82070ef15fc943282c1408e6ffd34fa68998335fea8603b5ff20"},
       "proposedLicense": "MPL-2.0",
       "upstreamCommit": "f986838bbbf4941d2edcd5298b18c9936d1b7359",
-      "materialPaths": ["h2-2.5.252/LICENSE.txt", "h2-2.5.252/license.html"],
+      "materialPaths": ["h2-2.5.252/LICENSE.txt", "h2-2.5.252/license.html", "h2-2.5.252/H2-DISCLAIMER.txt", "h2-2.5.252/SOURCE-AVAILABILITY.txt"],
       "reviewStatus": "unreviewed",
-      "remaining": ["Source availability statement and delivery", "Binary redistribution disclaimer inclusion"]
+      "reviewNotes": "The exact H2 2.5.252 source JAR is included in the generated corresponding-sources candidate alongside the version-specific license, disclaimer, and source-availability material. The candidate archive is not yet a reviewed final asset.",
+      "remaining": ["Confirm that the exact H2 source JAR and license/disclaimer materials remain in the final hash-reviewed corresponding-sources archive and recipient package"]
     },
     {
       "sourceArtifacts": {
@@ -17,9 +18,10 @@
       },
       "proposedLicense": "EPL-2.0",
       "upstreamCommit": "a9ee8019ee183e076ff5477957dbf90c4b04dd92",
-      "materialPaths": ["logback-1.6.6/LICENSE.txt", "logback-1.6.6/EPL-2.0.txt"],
+      "materialPaths": ["logback-1.6.6/LICENSE.txt", "logback-1.6.6/EPL-2.0.txt", "logback-1.6.6/SOURCE-AVAILABILITY.txt"],
       "reviewStatus": "unreviewed",
-      "remaining": ["Source availability statement and delivery", "Binary redistribution conditions review"]
+      "reviewNotes": "The exact logback-classic and logback-core 1.6.6 source JARs are included in the generated corresponding-sources candidate together with the EPL-2.0 text and version-specific source-availability notice. The candidate archive is not yet a reviewed final asset.",
+      "remaining": ["Confirm both exact source JARs, the EPL-2.0 text, and the source-availability statement are present in the final hash-reviewed recipient materials"]
     },
     {
       "sourceArtifacts": {
@@ -28,12 +30,968 @@
       },
       "proposedLicense": "Apache-2.0",
       "upstreamCommit": "1a91122853f6ab6f1fb2a4a284a6cf2ed8af0a4d",
-      "materialPaths": ["jna-5.19.1/LICENSE", "jna-5.19.1/AL2.0"],
+      "materialPaths": ["jna-5.19.1/LICENSE", "jna-5.19.1/AL2.0", "jna-5.19.1/libffi-LICENSE"],
       "reviewStatus": "unreviewed",
-      "remaining": ["Embedded native components including libffi", "Applicable native notices and source obligations"]
+      "reviewNotes": "The pinned JNA 5.19.1 upstream README and native source headers explicitly permit choosing Apache-2.0 instead of LGPL-2.1-or-later for JNA. The pinned build statically links libffi; its MIT copyright and permission notice is retained separately. Apache-2.0 and MIT do not require a corresponding-source or relink archive on the current evidence; the full upstream JNA archive remains provenance/build evidence, not a recipient source obligation. Final review must resolve source-specific notices and how macOS code-signing/repackaging interacts with Apache-2.0 section 4(b), then verify all materials against exact release payload hashes.",
+      "remaining": [
+        "Have a competent reviewer confirm the Apache-2.0 selection and libffi MIT notice cover each final JNA native payload, including macOS code-signing/repackaging and Apache-2.0 section 4(b) modification notices",
+        "Verify applicable source-file attribution, the JNA Apache license, and libffi copyright/permission notice in every final hash-reviewed recipient package"
+      ]
+    },
+    {
+      "sourceArtifacts": {
+        "jakarta.annotation:jakarta.annotation-api:3.0.0": "b01f55552284cfb149411e64eabca75e942d26d2e1786b32914250e4330afaa2"
+      },
+      "proposedLicense": "EPL-2.0 OR GPL-2.0-only WITH Classpath-exception-2.0",
+      "upstreamCommit": "d456606ef104b5602700d7a2414f812e48a8a694",
+      "materialPaths": [
+        "jakarta-annotation-api-3.0.0/LICENSE.md",
+        "jakarta-annotation-api-3.0.0/NOTICE.md"
+      ],
+      "reviewStatus": "unreviewed",
+      "reviewNotes": "The exact 3.0.0 binary embeds these original LICENSE.md and NOTICE.md files. The NOTICE identifies EPL-2.0 as the primary license and GPL-2.0-only with the Classpath Exception as a conditional secondary license. Both files' hashes match the pinned upstream repository commit and the six-platform candidate package evidence. The curated index exposes them in the About license panel; presence and metadata do not determine which license route governs this distribution.",
+      "remaining": [
+        "Have a competent reviewer assess the EPL-2.0 terms and whether the stated Secondary License conditions apply to this distribution; preserve both original materials in every final recipient package and verify them against final hashes"
+      ]
+    },
+    {
+      "sourceArtifacts": {
+        "org.jetbrains.skiko:skiko-awt:0.150.2": "6b36a9d9a931f5b4aedc3722ae9e769d13e945a8f18bd480340e625ea10e0171"
+      },
+      "proposedLicense": "Apache-2.0",
+      "upstreamCommit": "caed3841b8725429bb9b9805ff162a40eb7bce47",
+      "materialPaths": ["skiko-0.150.2/LICENSE", "skiko-0.150.2/NOTICE"],
+      "reviewStatus": "unreviewed",
+      "remaining": [
+        "Review whether retaining the Maven runtime artifacts' notices is sufficient for every mapped package payload and inspect any applicable packaging-specific attribution requirements; direct JAR, DEB, RPM, AppImage, Windows MSI, macOS ARM64, and macOS x64 payload mappings are documented in source-delivery.md",
+        "Review the statically linked Skia libraries declared by the pinned Skiko build: skia, skia_ganesh_ext, svg, skparagraph, skshaper, skunicode_core, skunicode_icu, icu, harfbuzz, skresources, png, jpeg, webp, webp_sse41, zlib, expat, skottie, sksg, and jsonreader",
+        "The pinned build declares piex/dng_sdk on macOS, but direct symbol inspection also found both in Linux x64 and macOS runtime binaries; the pinned Windows JVM configuration disables Piex and the RAW codec",
+        "Verify the exact final Windows package hash and notice for the d3d12allocator static link input configured by Skiko",
+        "Retain and verify applicable notices for the libraries actually present in each packaged binary; the build declaration is not by itself proof of the final binary contents",
+        "Collect corresponding Skia/ANGLE source and build inputs if required by the completed obligation review"
+      ]
+    },
+    {
+      "sourceArtifacts": {
+        "org.jetbrains.skiko:skiko-awt-runtime-linux-x64:0.150.2": "c6c1f9fa37464fd0bcca6e486a6b35307b6e2436199de9d009f877121de1c5c2",
+        "org.jetbrains.skiko:skiko-awt-runtime-macos-arm64:0.150.2": "abea519fa519f7245412011cc3ab7a5852cb333b3dc3cac08a83f5bd806c7bec",
+        "org.jetbrains.skiko:skiko-awt-runtime-macos-x64:0.150.2": "f77b1f3a76e94daba2676780e37807697d51d300e31cacc43699709f3ccdff96",
+        "org.jetbrains.skiko:skiko-awt-runtime-windows-x64:0.150.2": "eebad490c2828198e86e641cbd44958617867ce70f893b21852f07d0be099c0a"
+      },
+      "proposedLicense": "BSD-3-Clause",
+      "upstreamCommit": "a3f509bf52564dc8b27940bebe599d77ac0c4ae3",
+      "materialPaths": [
+        "skia-m150-a3f509bf52/LICENSE", "skia-m150-a3f509bf52/ATTRIBUTIONS.txt",
+        "expat-6154446f/COPYING", "harfbuzz-9cb1fee5/COPYING",
+        "d3d12allocator-169895d5/LICENSE.txt", "libwebp-845d5476/COPYING", "libwebp-845d5476/PATENTS",
+        "libpng-d5515b5b/LICENSE", "libjpeg-turbo-e14cbfaa/LICENSE.md", "libjpeg-turbo-e14cbfaa/README.ijg",
+        "zlib-646b7f56/LICENSE", "icu-364118a1/LICENSE", "freetype-264b5fbf/LICENSE.TXT",
+        "freetype-264b5fbf/FTL.TXT", "freetype-264b5fbf/bdf-README", "freetype-264b5fbf/pcf-README"
+      ],
+      "reviewStatus": "unreviewed",
+      "reviewNotes": "The original dependency texts are retained from revisions pinned by this exact Skia DEPS. Additional IJG and FreeType acknowledgments are project-authored. FTL is selected for FreeType core; separate driver notices remain. Retaining candidate notices does not assert that all dependencies are present on every platform or approve final binary coverage.",
+      "remaining": [
+        "Review third-party code statically linked into the Skia libraries actually present in each platform runtime; Skiko's build declaration and Skia DEPS file identify candidates but do not prove every candidate is in each binary",
+        "Retain and review applicable license and NOTICE texts for dependencies confirmed or potentially linked into each platform binary, including piex, dng_sdk, and Wuffs",
+        "Determine whether corresponding source or build inputs are required for any embedded dependency and obtain exact matching inputs where applicable",
+        "Map the runtime JAR and extracted native library in every final release package; the current hashes are from Maven artifacts, not the final candidate packages"
+      ]
+    },
+    {
+      "sourceArtifacts": {
+        "org.jetbrains.skiko:skiko-awt-runtime-angle-windows-x64:0.150.2": "8b09a0b92fabcbbb7cf9f61a66f684a5a4aaffc4d037e73454c35e7c5bddebbf"
+      },
+      "proposedLicense": "BSD-3-Clause",
+      "upstreamCommit": "ec4d8f8e4d3f1a9e64430abd8b6b436253732adf",
+      "materialPaths": ["angle-ec4d8f8e4d/LICENSE", "angle-ec4d8f8e4d/xxhash-LICENSE", "abseil-24012838/LICENSE", "zlib-e8ff3f35/LICENSE", "chromium-055e258e/LICENSE"],
+      "reviewStatus": "unreviewed",
+      "remaining": [
+        "Inspect the exact ANGLE DEPS revisions and identify dependencies embedded in the two redistributed DLLs; retain and review their applicable notices",
+        "Retain the angle-pack source and its two applied patches as provenance for the binaries; verify whether complete source/build materials are required after the dependency review",
+        "Map both DLLs into each final Windows package and verify the release artifact against this Maven runtime JAR"
+      ]
+    },
+    {
+      "sourceArtifacts": {
+        "org.graalvm.js:js-isolate-linux-amd64:25.4.4.1.1": "ba5a69a402d960c44e77b2bc08b631378646b1d2e6324c1b68448889b326a40d",
+        "org.graalvm.js:js-isolate-darwin-aarch64:25.4.4.1.1": "81c71eea20f3c272c69d9d6ba3ed392f3651562150f3a4f34401004fcb403821",
+        "org.graalvm.js:js-isolate-windows-amd64:25.4.4.1.1": "b4e84d35e3140441fab8f3aa8b969a8a509e4c6fb141833cddebdf6f4a86c752"
+      },
+      "proposedLicense": "GraalVM Free Terms and Conditions (GFTC)",
+      "upstreamCommit": "58f1795f7d12d12260d0c0423811e846c7632649",
+      "materialPaths": ["graaljs-25.4.4.1.1/GFTC-TERMS-REFERENCE.md"],
+      "reviewStatus": "unreviewed",
+      "reviewNotes": "These 25.4.4.1.1 isolate artifacts are retained as historical evidence from an earlier package graph, not as evidence about the current candidate. Versioned non-publishing candidate workflow 43368865856 at source commit 30232f4318c5fd594c1166822a2f832b78120821 has six platform manifests, none containing a js-isolate artifact. The current PR-head inventory workflow 43393143407 at source commit 4073f130de8bdeee7b01a4127349b5109b642435 has four platform inventories with no js-isolate in packaged-artifact or package-file reports. The later six-platform non-publishing candidate workflow 43451994879 at the same source commit also has no js-isolate coordinate in any manifest. The historical terms and signing evidence remain recorded but are not an active component finding for these candidate package graphs. Reconfirm against the exact final release artifacts; reopen GFTC review only if an isolate artifact returns. This is package-scope evidence, not whole-release legal approval.",
+      "remaining": [
+        "Confirm the six-platform final release artifacts still exclude js-isolate; if any artifact is present, reopen its exact GFTC terms, macOS transformation, notices, and source/third-party mapping before publication"
+      ]
+    },
+    {
+      "sourceArtifacts": {
+        "org.graalvm.js:js-language:25.4.4.1.1": "50a91172497d9b94b83210af2e95472ba3bd39e6b5606c9e7b07f3de0022fa93",
+        "org.graalvm.polyglot:polyglot:25.4.4.1.1": "cbacc2628fd5f99dbcebff7d398bcddde43ea15ebadc873d1da4454c718727d8",
+        "org.graalvm.regex:regex:25.4.4.1.1": "5b43366990bdd438c7dbd2ba0b3dba211acfaf67054275d0717bd0b8ea1d8dc9",
+        "org.graalvm.sdk:collections:25.4.4.1.1": "1b72cb9c9db533991bc308f2026a6fe986a4ca44b70b68fa6a2bb6c2fb9887ea",
+        "org.graalvm.sdk:jniutils:25.4.4.1.1": "a9d7e6830e5068dcd6b780ccf2903c075da04b1b2f1fa6c8197b4e9b06d4c075",
+        "org.graalvm.sdk:nativebridge:25.4.4.1.1": "5dfc32d607dc5b0f84139a58b8a28e71c715a9d14eb894d871be0b07af92dfa3",
+        "org.graalvm.sdk:nativeimage:25.4.4.1.1": "d633cb9895f01db443dbd2b6e54211cd505e679279f6745a84b1fee843156677",
+        "org.graalvm.sdk:word:25.4.4.1.1": "f20b7adf174a8c61018ce4e717d9dda65fec27d00540e547e63f1bafa400ac9a",
+        "org.graalvm.shadowed:xz:25.4.4.1.1": "556c0caae5b31ff84120655baeeb1d06677bc762a5632b36e7bb7b38a1773f7f",
+        "org.graalvm.truffle:truffle-api:25.4.4.1.1": "9dcc81b6890d6fcc9ab57d17bc4430335f071d82b108c0af8556a28381978da6",
+        "org.graalvm.truffle:truffle-compiler:25.4.4.1.1": "06e9dcc0ed60616a4e1785f18ad6836c82295af7ee22f0802c69d46d325aacb2",
+        "org.graalvm.truffle:truffle-runtime:25.4.4.1.1": "25818863ef8e50fc6329a876a033055c7418f20bedb051cfbb31c3d895fad7c9"
+      },
+      "proposedLicense": "UPL-1.0",
+      "upstreamCommit": "95ce1499c8c96ab7d5a6697c5b4bf42160f3b68b",
+      "materialPaths": ["graalvm-25.4.4.1.1/UPL-1.0.txt"],
+      "reviewStatus": "unreviewed",
+      "reviewNotes": "The exact package inventory includes these GraalVM 25.4.4.1.1 artifacts, whose resolved metadata declares UPL-1.0. The js-language artifact also declares MIT. The retained full text is from the matching official Graal release tag. This is notice evidence only; it does not select among metadata alternatives or confirm source-to-binary correspondence.",
+      "remaining": [
+        "Independently review the exact binary terms and applicable copyright notices for each packaged artifact, including the additional MIT declaration on js-language",
+        "Verify the full license text and notice are present in each final recipient package; keep the js-isolate artifacts under their separate GFTC review rather than infer UPL applicability from their POM alternatives"
+      ]
+    },
+    {
+      "sourceArtifacts": {
+        "org.graalvm.shadowed:icu4j:25.4.4.1.1": "02f9e8a76ed2f8fa80d53054ca4632c7058354010df27c8f4e7e7443543f7e1e"
+      },
+      "proposedLicense": "Unicode/ICU License",
+      "upstreamCommit": "f1b3db8ecd39d5b3a6eff4d5641b176c7f914dfb",
+      "materialPaths": ["icu4j-78.2/LICENSE"],
+      "reviewStatus": "unreviewed",
+      "reviewNotes": "The exact packaged Graal-shadowed ICU4J 25.4.4.1.1 source archive identifies ICU 78.2 and Unicode 17.0. The pinned Unicode ICU 78.2 release provides this original license text. This records provenance only, not a legal determination or package clearance.",
+      "remaining": [
+        "Independently verify that the exact Graal-shadowed ICU4J binary corresponds to the reviewed ICU 78.2 source and that the Unicode/ICU license terms apply to the packaged artifact",
+        "Verify the notice is included in every final package and that any applicable source-delivery conditions are met"
+      ]
+    },
+    {
+      "sourceArtifacts": {
+        "org.graalvm.js:js-isolate-linux-amd64:25.5.5.0.3": "057e2c8af1f3620ee7c283698b63abf8e713d0414e761d1dbabfb8a22fbdf94e",
+        "org.graalvm.js:js-isolate-darwin-aarch64:25.5.5.0.3": "41bdbf425dc998ebb6a6061eff9fa1e42ae4a762b980bffd98e4bda7e793f015",
+        "org.graalvm.js:js-isolate-windows-amd64:25.5.5.0.3": "f3ddefe0561ad68a4ea126d2235b7ed2c7ec2e75fe04e8e3ca44da444ee87c3c"
+      },
+      "proposedLicense": "GraalVM Free Terms and Conditions (GFTC)",
+      "upstreamCommit": "dd265d542fad72d0e7e1ae4032ef7c040911e700",
+      "materialPaths": ["graaljs-25.5.5.0.3/GFTC-TERMS-REFERENCE.md"],
+      "reviewStatus": "unreviewed",
+      "reviewNotes": "Source artifact hashes and the macOS ad-hoc re-signing transformation were verified for the historical package candidate in workflow 43187339406 at source commit 62896caf507abd29a8f992d1ce5dd65b59e6f655. The versioned non-publishing candidate in workflow 43368865856 at source commit 30232f4318c5fd594c1166822a2f832b78120821 has six platform manifests, none containing a js-isolate artifact. The current PR-head inventory workflow 43393143407 at source commit 4073f130de8bdeee7b01a4127349b5109b642435 has four platform inventories with no js-isolate in packaged-artifact or package-file reports. The later six-platform non-publishing candidate workflow 43451994879 at the same source commit also has no js-isolate coordinate in any manifest. Preserve historical transformation evidence; the GFTC/signing question is conditional on the dependency being reintroduced. Reconfirm against exact final release artifacts. This is package-scope evidence, not whole-release legal approval.",
+      "remaining": [
+        "Confirm the six-platform final release artifacts still exclude js-isolate; if any artifact is present, reopen its exact GFTC terms, macOS transformation, notices, and source/third-party mapping before publication"
+      ]
+    },
+    {
+      "sourceArtifacts": {
+        "org.graalvm.js:js-language:25.5.5.0.3": "8de5a84f9028c3835ad79f97657dcf3ef213e6e0f7413637a28138349bd8d04b"
+      },
+      "proposedLicense": "UPL-1.0",
+      "upstreamCommit": "dd265d542fad72d0e7e1ae4032ef7c040911e700",
+      "materialPaths": ["graaljs-25.5.5.0.3/LICENSE_GRAALJS", "graaljs-25.5.5.0.3/THIRD_PARTY_LICENSE_GRAALJS.txt", "graaljs-25.5.5.0.3/SOURCE-AVAILABILITY.txt"],
+      "reviewStatus": "unreviewed",
+      "reviewNotes": "The exact Maven binary SHA-256 matches the pinned artifact. The exact-version source JAR SHA-256 also matches its registered hash. LICENSE_GRAALJS and THIRD_PARTY_LICENSE_GRAALJS.txt were independently fetched from the pinned upstream commit and byte-matched to the retained files and registry hashes. The source-repository root LICENSE is a different file and must not replace these implementation-specific terms. The binary JAR contains no license/NOTICE entries. The Maven POM and pinned GraalJS build metadata declare UPL-1.0 and MIT, with the build metadata attributing MIT to the JONI regexp engine. The exact POM has no JONI dependency; its runtime dependencies are regex, truffle-api, polyglot, and shadowed ICU4J. A fresh inspection of the exact Maven binary and source JARs found no JONI package/class names, paths, source references, or strings; the retained third-party license text has no JONI attribution. The official GraalJS changelog says the JONI engine was removed in version 20.1.0. This evidence strongly supports the MIT metadata being a stale remnant of the removed engine, but the 25.5.5.0.3 POM still declares MIT and no upstream file-to-license mapping explains that continued declaration. Keep the component unreviewed until a competent reviewer determines whether the declaration is stale and what MIT attribution, if any, belongs in recipient materials; no third party has been contacted.",
+      "remaining": [
+        "Have a competent reviewer determine whether the remaining MIT POM declaration is stale metadata from the removed JONI engine and whether any separate MIT attribution belongs in the recipient packet; retain the current evidence and do not contact upstream without explicit approval",
+        "Review the file-to-license mapping for every separately licensed item in THIRD_PARTY_LICENSE_GRAALJS.txt",
+        "Verify the regenerated exact-release legal archive carries all three version-bound materials and the matching corresponding-source archive",
+        "Complete final package hash review; this provenance and license-text check does not grant redistribution approval"
+      ]
+    },
+    {
+      "sourceArtifacts": {
+        "org.graalvm.polyglot:polyglot:25.5.5.0.3": "51096bb48c663a82a720358d9f5f9145b9809ea3d155459211a6a05759f4f43c",
+        "org.graalvm.regex:regex:25.5.5.0.3": "646db57872bff76d4794a20f4be2a7e6d37cf4ea698d5c6c3b529532699d744b",
+        "org.graalvm.sdk:collections:25.5.5.0.3": "694c52b4536e744fd091257d190af6ba95c78f37a2eb1cb7b5d1cfc8e7c1efca",
+        "org.graalvm.sdk:jniutils:25.5.5.0.3": "1c46ac4d58434d9118026ab2f4a585102460ec07a4cfcf31973b0fb13f84268e",
+        "org.graalvm.sdk:nativebridge:25.5.5.0.3": "fe2cf1b0cfbb83b1507ba33883282894e085553e18fe47a6cb2a18645f1c381c",
+        "org.graalvm.sdk:nativeimage:25.5.5.0.3": "b8d337a9d413169953285b600bb1bd243f1b294a10654a324751f56b2a88d749",
+        "org.graalvm.sdk:word:25.5.5.0.3": "11a21c7f6a132bd21c566ec4b8b397fb06656db5d293ff52966ee8582b79ddd1",
+        "org.graalvm.shadowed:xz:25.5.5.0.3": "2f3a1fc185b269c852c5098e533a45be480bd45953bdc9f239d45ac36001f3c0",
+        "org.graalvm.truffle:truffle-api:25.5.5.0.3": "ce6662ca5f319c329eb8867f4aa809ea3e892e07b2975bf9d364d94bdad166d0",
+        "org.graalvm.truffle:truffle-compiler:25.5.5.0.3": "f12a579e489daea109d7e19d231b48fe33b2a8a34033251618ef7a54579a236d",
+        "org.graalvm.truffle:truffle-runtime:25.5.5.0.3": "a4b8df5041e6001d00019d92617cad6b7f5628a4f84d4d94b53b9e56c6b80a0e"
+      },
+      "proposedLicense": "UPL-1.0",
+      "upstreamCommit": "e3cb74fceaf6ee4f50366d5ab2bbf602e464475d",
+      "materialPaths": ["graalvm-25.4.4.1.1/UPL-1.0.txt"],
+      "reviewStatus": "unreviewed",
+      "reviewNotes": "The current Graal release tag vm-25.5.5.0.3 resolves to this commit. Its sdk/LICENSE.md SHA-256 is 4a9972e09a394d6a9f693d3e8343d4918e5c0c25863665320a7fd3b6dcac4571, identical to the retained original UPL text; reuse those exact bytes rather than duplicate the file. Artifact hashes are from workflow 42649987764.",
+      "remaining": [
+        "Review applicable copyright and separately licensed code notices for the selected runtime artifacts, including js-language",
+        "Verify retained terms in every final recipient package and keep js-isolate under its separate GFTC conditions"
+      ]
+    },
+    {
+      "sourceArtifacts": {
+        "org.graalvm.shadowed:icu4j:25.5.5.0.3": "5474c939fcd8c054d60f43978f3dd6331d762cafa71d06d9f6b292c4496432eb"
+      },
+      "proposedLicense": "Unicode/ICU License",
+      "upstreamCommit": "f1b3db8ecd39d5b3a6eff4d5641b176c7f914dfb",
+      "materialPaths": ["icu4j-78.2/LICENSE"],
+      "reviewStatus": "unreviewed",
+      "reviewNotes": "The exact-version Maven source archive has SHA-256 485f54aaa23f47224ae0fe8c12c622314dfb46a0ca93f5c3d7e2683281c612d6. VersionInfo.java still identifies ICU 78.2 and Unicode 17.0; retain the corresponding original ICU license. The binary hash comes from workflow 42649987764.",
+      "remaining": [
+        "Review notices applicable to the exact shadowed ICU distribution",
+        "Verify original ICU notices accompany every final package containing this artifact"
+      ]
+    },
+    {
+      "sourceArtifacts": {
+        "mimalloc2:2.1.7-r0": "0eed39319f139afde8515010ff59baf24de9e47ea316a315398e8027d198202d"
+      },
+      "proposedLicense": "MIT",
+      "upstreamCommit": "8c532c32c3c96e5ba1f2283e032f69ead8add00f",
+      "materialPaths": ["mimalloc2-2.1.7/LICENSE"],
+      "reviewStatus": "unreviewed",
+      "remaining": [
+        "Review and preserve the applicable MIT attribution and source materials in recipient delivery"
+      ],
+      "reviewNotes": "Versioned non-publishing candidate workflow 43305484301 records mimalloc2 2.1.7-r0 installed in the AppImage build environment and links -lmimalloc into runtime SHA-256 b9a99a36aa0fea7b850aef2726a6fbc805199edb62c854f8233bf5ba8b1713c5. The corresponding-sources archive SHA-256 f7c0835faba0e9c0b2793aae04400cdc63fa33a1b7528d8a59ee9d9735fc64b1 contains the pinned Alpine recipe/source inputs. This resolves the version uncertainty for this candidate; review and preserve the applicable MIT attribution and source materials in recipient delivery."
+    },
+    {
+      "sourceArtifacts": {
+        "zstd:1.5.6": "30f35f71c1203369dc979ecde0400ffea93c27391bfd2ac5a9715d2173d92ff7"
+      },
+      "proposedLicense": "BSD-3-Clause",
+      "upstreamCommit": "794ea1b0afca0f020f4e57b6732332231fb23c70",
+      "materialPaths": ["zstd-1.5.6/LICENSE"],
+      "reviewStatus": "unreviewed",
+      "remaining": [
+        "Reconfirm the BSD-3-Clause notice and exact zstd/runtime hashes in the final release artifacts"
+      ],
+      "reviewNotes": "The exact zstd 1.5.6 upstream release identifies the code as BSD-3-Clause OR GPLv2, and Alpine v3.21's zstd-static 1.5.6-r2 package metadata declares BSD-3-Clause OR GPL-2.0-or-later. The candidate's pinned Alpine recipe/source and runtime provenance identify this static zstd dependency; the reviewed license choice is BSD-3-Clause, with the original zstd LICENSE retained. The versioned non-publishing candidate workflow 43368865856 records zstd:1.5.6 in the Linux AppImage and maps its notice to SHA-256 7055266497633c9025b777c78eb7235af13922117480ed5c674677adc381c9d8; the runtime SHA-256 is 8c33bf1ac8a1145c0289a56781806835253a8dc81f7378cf9e742c195505a299. This scoped license-option review is not legal advice or release clearance. Final AppImage and legal/source archive hashes still require review."
+    },
+    {
+      "sourceArtifacts": {
+        "zlib:1.4": "02dd159783677a749c04adbdd02b55b8a2bcc7e054f51b76b549199a916ad584"
+      },
+      "proposedLicense": "Zlib",
+      "upstreamCommit": "dd9d5c2d62b52e8acb0e678de5768087eedce914",
+      "materialPaths": ["zlib-1.4/LICENSE"],
+      "reviewStatus": "unreviewed",
+      "remaining": [
+        "Review the applicable Zlib notice and determine whether the source/relink materials meet obligations for the exact AppImage; recipient delivery and final release hash binding remain open"
+      ],
+      "reviewNotes": "Versioned non-publishing candidate workflow 43305484301 built AppImage package SHA-256 56aa8a45524079fed429d0ac4bc7aad43a2aea537798e14375027f95b7fe6819. Its build log records zlib-static 1.4-r0, and its corresponding-sources archive SHA-256 f7c0835faba0e9c0b2793aae04400cdc63fa33a1b7528d8a59ee9d9735fc64b1 contains the exact Alpine recipe archive (SHA-256 050415c464375727d855a14abb0cdf2d549bda3b32ddc3c0017256e552b3ec09). The matching source input is zlib 1.4, not the stale zlib 1.3.1 found in historical candidate 43187339406. License review and recipient/final-release verification remain open."
+    },
+    {
+      "sourceArtifacts": {
+        "AppImage:type2-runtime:20251108": "f5fec23be76e50e2445ed2d018bac49b367490fc483c62c4637e99ec705d27ba"
+      },
+      "proposedLicense": "MIT",
+      "upstreamCommit": "dd6cebedcbddde9c82f89b011e8e1d40b6e43868",
+      "materialPaths": ["appimage-runtime-20251108/LICENSE"],
+      "reviewStatus": "unreviewed",
+      "remaining": [
+        "Complete the linked components' notice/source review and validate recipient-facing corresponding-source/relink delivery"
+      ],
+      "reviewNotes": "Versioned non-publishing candidate workflow 43305484301 records AppImage package SHA-256 56aa8a45524079fed429d0ac4bc7aad43a2aea537798e14375027f95b7fe6819, runtime SHA-256 b9a99a36aa0fea7b850aef2726a6fbc805199edb62c854f8233bf5ba8b1713c5, and corresponding source archive SHA-256 f7c0835faba0e9c0b2793aae04400cdc63fa33a1b7528d8a59ee9d9735fc64b1. Its build log records musl-dev 1.2.5-r12, mimalloc2 2.1.7-r0, zlib-static 1.4-r0, and zstd-static 1.5.6-r2, and links -lzstd -lz -lfuse3 -lmimalloc. The matching source archive contains the pinned source and Alpine recipe inputs. This resolves the package-version/source-input mismatch found in historical candidate 43187339406, not the legal sufficiency of source/relink delivery or the license review of linked components."
+    },
+    {
+      "sourceArtifacts": {
+        "AppImage:libfuse:3.15.0": "70589cfd5e1cff7ccd6ac91c86c01be340b227285c5e200baa284e401eea2ca0"
+      },
+      "proposedLicense": "LGPL-2.1-only",
+      "upstreamCommit": "6d08472ea47db895748d5ca7d3daf032c3fefcf8",
+      "materialPaths": ["libfuse-3.15.0/LICENSE", "libfuse-3.15.0/LGPL2.txt", "libfuse-3.15.0/SOURCE-AND-RELINK.txt"],
+      "reviewStatus": "unreviewed",
+      "reviewNotes": "The recipient guide describes the LGPL-2.1 section 6(a) source-and-relink route. Workflow 42651138364 built the retained runtime recipe with its mount.c patch applied to libfuse. Versioned non-publishing candidate workflow 43368865856 built and smoke-tested the AppImage and generated a recipient-facing corresponding-source archive. Inspection of that archive found the pinned libfuse source, the mount.c patch, Type 2 runtime source, build instructions, and pinned source/build inputs for the statically linked runtime dependencies; the archive includes a SHA-256 manifest. These are the source and relink materials described by LGPL-2.1 section 6(a), and the candidate provides technical evidence for that delivery route, not a legal opinion or final release clearance. The release workflow downloads and attaches both recipient archives alongside the ten packages, then verifies the exact 12-file payload against a review bound to the release tag and source commit. The candidate is not the final release payload; rebuild and verify the final AppImage/source archive hashes and complete the substantive component review before publication.",
+      "remaining": [
+        "Rebuild from the release source commit and confirm the exact final AppImage and corresponding-source archive, including the libfuse source, patch, runtime source, build instructions, and source manifest, are hash-bound and attached to the same release",
+        "Complete the substantive review of all linked AppImage components and record the evidence-backed release decision"
+      ]
+    },
+    {
+      "sourceArtifacts": {
+        "AppImage:squashfuse:0.5.2": "db0238c5981dabbd80ee09ae15387f390091668ca060a7bc38047912491443d3"
+      },
+      "proposedLicense": "BSD-2-Clause",
+      "upstreamCommit": "775b4cc72ab47641637897f11ce0da15d5c1f115",
+      "materialPaths": ["squashfuse-0.5.2/LICENSE"],
+      "reviewStatus": "unreviewed",
+      "remaining": [
+        "The runtime identifies squashfuse 0.5.2 and the pinned source script has a verified archive checksum; review the linked build recipe and determine any additional required attribution/source delivery",
+        "Review attribution for the files and static dependencies in the linked build"
+      ]
+    },
+    {
+      "sourceArtifacts": {
+        "AppImage:musl:1.2.5": "a9a118bbe84d8764da0ea0d28b3ab3fae8477fc7e4085d90102b8596fc7c75e4"
+      },
+      "proposedLicense": "MIT",
+      "upstreamCommit": "0784374d561435f7c787a555aeab8ede699ed298",
+      "materialPaths": ["musl-1.2.5/COPYRIGHT"],
+      "reviewStatus": "unreviewed",
+      "remaining": [
+        "Review the applicable MIT notice and determine whether the source/relink materials meet obligations for the exact AppImage; recipient delivery and final release hash binding remain open"
+      ],
+      "reviewNotes": "Versioned non-publishing candidate workflow 43305484301 records musl-dev 1.2.5-r12 in the AppImage build log. Its corresponding-sources archive SHA-256 f7c0835faba0e9c0b2793aae04400cdc63fa33a1b7528d8a59ee9d9735fc64b1 contains the exact Alpine recipe archive (SHA-256 e63fe34178270d2d8cc74f1bab303ec1868150606e66f6da2c16221e6ec86034). This resolves the source-revision mismatch found in historical candidate 43187339406; license review and recipient/final-release verification remain open."
+    },
+    {
+      "sourceArtifacts": {
+        "org.antlr:ST4:4.3.4": "f927ac384c46d749f8b5ec68972a53aed21e00313509299616edb73bfa15ff33"
+      },
+      "proposedLicense": "BSD-3-Clause",
+      "upstreamCommit": "a2c4ef074e7c5018c7eb46372ed07f756c140404",
+      "materialPaths": ["antlr-st4-4.3.4/LICENSE.txt"],
+      "reviewStatus": "unreviewed",
+      "reviewNotes": "The original license text is from the exact ST4-4.3.4 upstream tag. The source artifact hash matches all four platform inventories.",
+      "remaining": [
+        "Verify the exact binary's attribution and inclusion in each final recipient package."
+      ]
+    },
+    {
+      "sourceArtifacts": {
+        "org.codehaus.mojo:animal-sniffer-annotations:1.27": "cfd7e51a828fe6b98bc0dbb99e34900c9e9012322cb9ddd57fd8dd0b02da5e27"
+      },
+      "proposedLicense": "MIT",
+      "upstreamCommit": "5adf3aad06658c44de48ba2fddf9819685230e5f",
+      "materialPaths": ["animal-sniffer-1.27/LICENSE"],
+      "reviewStatus": "unreviewed",
+      "reviewNotes": "The exact Maven Central annotation POM inherits animal-sniffer-parent 1.27, whose versioned upstream POM declares MIT only (https://repo.maven.apache.org/maven2/org/codehaus/mojo/animal-sniffer-annotations/1.27/animal-sniffer-annotations-1.27.pom; https://repo.maven.apache.org/maven2/org/codehaus/mojo/animal-sniffer-parent/1.27/animal-sniffer-parent-1.27.pom; upstream tag https://github.com/mojohaus/animal-sniffer/tree/animal-sniffer-1.27). The additional Apache-2.0 entry in the generated report is not supported by the published artifact POM; MIT is selected. The exact MIT text is retained. Final recipient-package attribution still needs the exact release review.",
+      "remaining": [
+        "Verify the exact MIT attribution is present in every final recipient package and covered by the reviewed release-asset hashes."
+      ]
+    },
+    {
+      "sourceArtifacts": {
+        "org.antlr:antlr-runtime:3.5.3": "68bf9f5a33dfcb34033495c587e6236bef4e37aa6612919f5b1e843b90669fb9"
+      },
+      "proposedLicense": "BSD-3-Clause",
+      "upstreamCommit": "0519032bb167b37f206968d9037753ad655a2623",
+      "materialPaths": [
+        "antlr-runtime-3.5.3/ANTLR3-LICENSE.txt",
+        "antlr-runtime-3.5.3/RUNTIME-SOURCE-NOTICES.txt"
+      ],
+      "reviewStatus": "unreviewed",
+      "reviewNotes": "The license file is from the exact ANTLR 3 source tag. The additional copyright notices were extracted verbatim from two distinct headers in the exact published 3.5.3 runtime source JAR, SHA-256 b4353aa5270d5ddedbc59de6fc7bb170c6d8fa6293d37533a304144a18e4b24d.",
+      "remaining": [
+        "Verify the two retained runtime source headers cover all copyright notices applicable to the distributed binary and confirm the artifact's license selection."
+      ]
+    },
+    {
+      "sourceArtifacts": {
+        "org.antlr:antlr4-runtime:4.13.1": "54665d2838cc66458343468efc539e454fc95b46a8a04b13c6ac43fc9be63505"
+      },
+      "proposedLicense": "BSD-3-Clause",
+      "upstreamCommit": "7ed420ff2c78d62883875c442d75f32e73bc86c8",
+      "materialPaths": ["antlr4-runtime-4.13.1/LICENSE.txt"],
+      "reviewStatus": "unreviewed",
+      "reviewNotes": "The original license text is from the exact ANTLR 4.13.1 upstream tag. The source artifact hash matches all four platform inventories.",
+      "remaining": [
+        "Verify exact artifact attribution and inclusion in each final recipient package."
+      ]
+    },
+    {
+      "sourceArtifacts": {
+        "org.ow2.asm:asm:9.11.1": "ae4e6e10d59d0a1500317764b21881ad883f8550e33c66e6142f7032c6fb566c"
+      },
+      "proposedLicense": "BSD-3-Clause",
+      "upstreamCommit": "e1f096ce6e9f6de64921ea8b437676f146798185",
+      "materialPaths": ["asm-9.11.1/LICENSE.txt"],
+      "reviewStatus": "unreviewed",
+      "reviewNotes": "The exact Maven Central asm-9.11.1 POM declares only BSD-3-Clause and links the official ASM license; the official license page confirms the 3-Clause BSD conditions (https://repo.maven.apache.org/maven2/org/ow2/asm/asm/9.11.1/asm-9.11.1.pom; https://asm.ow2.io/license.html). The generated Gradle report's duplicate/additional license entries are not supported by this exact artifact POM. The original BSD-3-Clause text is retained from the exact ASM 9.11.1 upstream release. Final recipient-package attribution still needs the exact release review.",
+      "remaining": [
+        "Verify the exact BSD-3-Clause attribution is present in every final recipient package and covered by the reviewed release-asset hashes."
+      ]
+    },
+    {
+      "sourceArtifacts": {
+        "org.nibor.autolink:autolink:0.12.0": "04647ef989bd8096cfc253a8b5b8c36760918e3f163c1d918df6dfbfb79aa8c6"
+      },
+      "proposedLicense": "MIT",
+      "upstreamCommit": "8b07a6911fd62871042c5b63412d3ac3489a0531",
+      "materialPaths": ["autolink-0.12.0/LICENSE"],
+      "reviewStatus": "unreviewed",
+      "reviewNotes": "The original license is from the exact autolink-java 0.12.0 release tag. The source artifact hash matches all four platform inventories.",
+      "remaining": [
+        "Verify the exact artifact's copyright attribution and inclusion in each final recipient package."
+      ]
+    },
+    {
+      "sourceArtifacts": {
+        "com.github.hypfvieh:dbus-java-core:5.2.2": "dd625ba59a632b7d05d712f29ee04551736d584d0f6c40d1d8a09eabaedc9cf0",
+        "com.github.hypfvieh:dbus-java-transport-native-unixsocket:5.2.2": "6174f8256fbae335548be75e57167042cbfae7bafb442295c56ea7f38466da6a"
+      },
+      "proposedLicense": "MIT",
+      "upstreamCommit": "37d6c62403e0d4a30aab8ba044784eefa26d7260",
+      "materialPaths": ["dbus-java-5.2.2/LICENSE"],
+      "reviewStatus": "unreviewed",
+      "reviewNotes": "The original project license is from the exact dbus-java 5.2.2 release tag. Both artifact hashes match all four platform inventories.",
+      "remaining": [
+        "Verify native transport attribution and license coverage for both exact artifacts in each final recipient package."
+      ]
+    },
+    {
+      "sourceArtifacts": {
+        "io.github.vinceglb:filekit-core-jvm:0.17.0": "d35a1c44b47b6566712e8f6e7340778c3bb6f49b61496152d9bc64125387e992",
+        "io.github.vinceglb:filekit-dialogs-compose-jvm:0.17.0": "dcbc4ba25b493f5501ae08f86a39e1c29b51857f57afa67e67683faff2ac8f6d",
+        "io.github.vinceglb:filekit-dialogs-jvm:0.17.0": "1c2afa8001a9cc5f136c25a53856573c65334cdd7d2352a6c8da8bd91a983557"
+      },
+      "proposedLicense": "MIT",
+      "upstreamCommit": "38fe6b384b33c726d95d372e23cf0ef7c101cf48",
+      "materialPaths": ["filekit-0.17.0/LICENSE"],
+      "reviewStatus": "unreviewed",
+      "reviewNotes": "The original license is from the exact FileKit 0.17.0 release tag. All three source artifact hashes match the four platform inventories.",
+      "remaining": [
+        "Verify the exact artifact attribution and ensure the recipient bundle covers all three JVM modules."
+      ]
+    },
+    {
+      "sourceArtifacts": {
+        "com.knuddels:jtokkit:1.1.0": "1501ce0259ab897c6746ccfafa1d208acd404fb17e1ac62e157172f2678b1183"
+      },
+      "proposedLicense": "MIT",
+      "upstreamCommit": "4c98bebbbc285de0432abca6b2c8f55f2f51133a",
+      "materialPaths": ["jtokkit-1.1.0/LICENSE"],
+      "reviewStatus": "unreviewed",
+      "reviewNotes": "The original license is from the exact JTokkit 1.1.0 release tag. The source artifact hash matches all four platform inventories.",
+      "remaining": [
+        "Verify exact artifact copyright attribution and recipient-package inclusion."
+      ]
+    },
+    {
+      "sourceArtifacts": {
+        "com.google.protobuf:protobuf-java:4.36.2": "0773e72eaf375e1285df330575bfec5bda5da674d544d0e142a17f89c8f754da"
+      },
+      "proposedLicense": "BSD-3-Clause",
+      "upstreamCommit": "2c74169b34066ceb8ddb6b882fcb3fb32d737a55",
+      "materialPaths": ["protobuf-java-4.36.2/LICENSE"],
+      "reviewStatus": "unreviewed",
+      "reviewNotes": "The original license is from the Protocol Buffers v36.2 upstream tag. The exact tag's java/pom.xml inherits version 4.36.2, matching the packaged Maven artifact.",
+      "remaining": [
+        "Confirm the artifact-specific copyright notices and verify recipient-package inclusion."
+      ]
+    },
+    {
+      "sourceArtifacts": {
+        "org.reactivestreams:reactive-streams:1.0.4": "f75ca597789b3dac58f61857b9ac2e1034a68fa672db35055a8fb4509e325f28"
+      },
+      "proposedLicense": "MIT-0",
+      "upstreamCommit": "944163a4b2477a2bebaaada86b0ba910b6302f2f",
+      "materialPaths": ["reactive-streams-1.0.4/LICENSE"],
+      "reviewStatus": "unreviewed",
+      "reviewNotes": "The original MIT No Attribution license is from the exact Reactive Streams 1.0.4 release tag. The source artifact hash matches all four platform inventories.",
+      "remaining": [
+        "Verify the exact artifact's notice needs and inclusion in each final recipient package."
+      ]
+    },
+    {
+      "sourceArtifacts": {
+        "io.grpc:grpc-api:1.85.1": "b133a5b6ec44b7c7ca8d099668835fcd908889b44651fc3ccc872f2945418fef",
+        "io.grpc:grpc-context:1.85.1": "c9fc6f4998c523a379c41be72920e8b90d92d61712119e1eea76d480b961cdef",
+        "io.grpc:grpc-core:1.85.1": "b2ca55540b5b8195f682fa1379fd9685de66f1099400283c8b560ee35b2868ed",
+        "io.grpc:grpc-inprocess:1.85.1": "e18e6eb3732cc1714f5998289089bce2f20c6a812bc28dd23997656bb0297abc",
+        "io.grpc:grpc-netty-shaded:1.85.1": "c9fc6f4998c523a379c41be72920e8b90d92d61712119e1eea76d480b961cdef",
+        "io.grpc:grpc-protobuf:1.85.1": "c9555a34a48965653cc82c58981c42d014e22ebfbc182fc8b7bb9c65ba7c664c",
+        "io.grpc:grpc-protobuf-lite:1.85.1": "c5fde9f733333a73bed4db66584dcec55229aae19f2e117bc575b7b8f006ca4c",
+        "io.grpc:grpc-stub:1.85.1": "45a3106339b5368b489f71c2e83109c76e542eb0c02d1456911aec957fd22c1b",
+        "io.grpc:grpc-util:1.85.1": "c81bd167e989f0f4d93d0e260ad45e9bff2720a205d35a2d7df66c84864c08cf"
+      },
+      "proposedLicense": "Apache-2.0",
+      "upstreamCommit": "54c634aed4b5c78a29d0fa51d9282e9538722543",
+      "materialPaths": ["grpc-java-1.85.1/NOTICE.txt"],
+      "reviewStatus": "unreviewed",
+      "reviewNotes": "The exact grpc-java v1.85.1 root NOTICE is absent from the published source JARs and from the grpc-netty-shaded JAR's narrower NOTICE. The upstream file identifies modified OkHttp, Envoy, protoc-gen-validate, and UDPA portions. The exact release tag resolves to the pinned commit; the same NOTICE is included as a hash-checked supplement for every gRPC module in all six candidate platform inventories.",
+      "remaining": [
+        "Review the root NOTICE's attribution scope against the exact gRPC modules and verify inclusion in the final hash-reviewed recipient packages."
+      ]
+    },
+    {
+      "sourceArtifacts": {
+        "io.netty:netty-buffer:4.2.20.Final": "36c1869f58c24167180546acb933749bbe92391834eca219d3a155a719d21f26",
+        "io.netty:netty-codec-base:4.2.20.Final": "4524e76d427e3caa2d64d1793c50790b9d37d135881d157b8d96509cc0eb8330",
+        "io.netty:netty-codec-classes-quic:4.2.20.Final": "e7a91026734a915f95cc798c3d07f876f1f1c9a8e4856899fd3c08faa12091d5",
+        "io.netty:netty-codec-compression:4.2.20.Final": "179e9deb63e784017d3e8e0d294d03a738da46ad740bbf62ec38dc3d7e0636c7",
+        "io.netty:netty-codec-dns:4.2.20.Final": "b54caaeba00dcdf83a1cbe523671931e4f687e3b4f51cbc895205c4bfe1c7cdc",
+        "io.netty:netty-codec-http:4.2.20.Final": "940bb861827decaf8d194740b14611b788142171ea5b0c89fdc05b07dd2f9914",
+        "io.netty:netty-codec-http2:4.2.20.Final": "8f5a23fe5ea32b0b45aad73af1e19a563d8176588a8a0c938c78332726ca1594",
+        "io.netty:netty-codec-http3:4.2.20.Final": "c4db8f649069376e75681e33ddd06f14512940478e25f01321df1059d9f4d93e",
+        "io.netty:netty-codec-socks:4.2.20.Final": "a2867a1eff6b8079c6335f833d1c87c4dff788464d43b70b721cd1249fb2f639",
+        "io.netty:netty-common:4.2.20.Final": "e43ff1befac9e534dfd1ce99db6dc74d1317fde27b3e786371e471c69e4d9f88",
+        "io.netty:netty-handler:4.2.20.Final": "b86221a443145d7a3ef2fbf202aab4bb1857e9662c64cf85ba1c5ba835019fd0",
+        "io.netty:netty-handler-proxy:4.2.20.Final": "ac96a23a6446ec46439748b2484c5e334168bb906c6dab5ca7ef2c4cdf195529",
+        "io.netty:netty-resolver:4.2.20.Final": "d9e1a998ceabda6453668e34345f5f1c9633046a3394d7deff5441370b105142",
+        "io.netty:netty-resolver-dns:4.2.20.Final": "55daba64bac2ee9f98a942bcc703956ec17ce3b3a86366f432f1ba476381298e",
+        "io.netty:netty-resolver-dns-classes-macos:4.2.20.Final": "39eb8bc9607b85ecd052b0d1ca39c49d4df1995aebe3632530f9dcc4bb09c677",
+        "io.netty:netty-transport:4.2.20.Final": "43dc1a7f6b3fb6b84da079983e5d30ee4792d1bf0a6d96a6e633671495675ad3",
+        "io.netty:netty-transport-classes-epoll:4.2.20.Final": "30dc6f46131329ee396da4d243f47f3f3ed3f05fac11acfcce2d017a3a20daa4",
+        "io.netty:netty-transport-native-epoll:4.2.20.Final": "87f12312ff8c078ad7f98383ac116cb383cf77001933f0e6908da4ed05b8572a",
+        "io.netty:netty-transport-native-unix-common:4.2.20.Final": "3d9906bff4df25e298c237f91761015b480dac0406a77faf96f931a34dfe77c6"
+      },
+      "proposedLicense": "Apache-2.0",
+      "upstreamCommit": "4fb6a5f308382b4bee1bff3ef80b45ea8b35166d",
+      "materialPaths": ["netty-4.2.20.Final/NOTICE.txt"],
+      "reviewStatus": "unreviewed",
+      "reviewNotes": "The exact Netty 4.2.20.Final root NOTICE is retained unchanged and hash-bound to the 20 source artifacts present in the six candidate platform inventories. The macOS resolver artifact contains a native .jnilib; the packaged HTTP/3 module has no embedded Quiche or BoringSSL native binaries.",
+      "remaining": [
+        "Review which root NOTICE attributions apply to the exact packaged modules and native payloads, including whether the macOS DNS binary contains code derived from dnsinfo.h",
+        "Verify the NOTICE is included in the final hash-reviewed recipient packages and determine whether any separately applicable third-party license texts are needed"
+      ]
+    },
+    {
+      "sourceArtifacts": {
+        "io.netty:netty-resolver-dns-native-macos:4.2.20.Final": "98a33e5adbbe58cb084ed4ca61350fa0a6311f4f8e54bc8cd823a402d0609c42"
+      },
+      "proposedLicense": "Apache-2.0",
+      "upstreamCommit": "4fb6a5f308382b4bee1bff3ef80b45ea8b35166d",
+      "materialPaths": [
+        "netty-4.2.20.Final/NOTICE.txt",
+        "netty-4.2.20.Final/LICENSE.dnsinfo.txt",
+        "netty-4.2.20.Final/APSL-2.0.txt"
+      ],
+      "reviewStatus": "unreviewed",
+      "reviewNotes": "The published source JAR contains dnsinfo.h with both Apache-2.0 and Apple APSL-2.0 notices, and netty_resolver_dns_macos.c includes that header. Apache Legal issue LEGAL-700 was closed after a comment interpreting both licenses as applying to the file; Netty's public discussion remains inconclusive about the compiled native artifact. The current release build excludes this optional resolver, and the current four-platform non-publishing package workflow passed its exclusion checks at dc43fbc1f8ebbed8b563112def3b56d6bdaed490. The full APSL text remains retained as historical evidence; no Apache-only conclusion is asserted.",
+      "remaining": [
+        "Verify that the exact final, hash-reviewed release packages continue to exclude this optional resolver; if it is reintroduced, reopen the license-scope and source-delivery review before release"
+      ]
+    },
+    {
+      "sourceArtifacts": {
+        "org.jetbrains.kotlinx:kotlinx-io-bytestring-jvm:0.9.1": "8589de0b7c476bfdd02a24641685f609ade72f5e595cf2909c168acdba7e6ba4",
+        "org.jetbrains.kotlinx:kotlinx-io-core-jvm:0.9.1": "765d8851d8ca694706931331b92386844800867e041b720f1f193dbda874d370"
+      },
+      "proposedLicense": "Apache-2.0",
+      "upstreamCommit": "362bdc35e159bad6da1e08101c8321792d762281",
+      "materialPaths": ["kotlinx-io-0.9.1/NOTICE"],
+      "reviewStatus": "unreviewed",
+      "reviewNotes": "The exact 0.9.1 upstream root NOTICE is absent from both published source JARs and packaged binaries, but exists at the exact upstream tag and is explicitly identified as an Apache License section 4(d) NOTICE for kotlinx-io. Both coordinates resolve to the same source artifact hashes on all four platforms; macOS package signing changes the packaged JAR hashes, so inventory records retain the supplement under each actual package hash.",
+      "remaining": [
+        "Review the NOTICE attribution scope against the exact bytes in both runtime artifacts and verify inclusion in the final recipient-facing legal materials"
+      ]
+    },
+    {
+      "sourceArtifacts": {
+        "org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.11.0": "3e0847c0b463965404d5b6fe5d6868000a220b050180dec68501801e9439976a",
+        "org.jetbrains.kotlinx:kotlinx-coroutines-reactive:1.11.0": "44f2180d726095371e55413ef3e649e292e97f8c3742096ced8dc83b112f4d79",
+        "org.jetbrains.kotlinx:kotlinx-coroutines-reactor:1.11.0": "3c77a98b5d521e9c5bbb03ac6188fecd90fbb0c926e8b79c96eda8bb885a5b8c",
+        "org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.11.0": "b1c9feab47fe4bbd9840aced64a896ebdf1e3c1287f6a400a263cd1f6046338d"
+      },
+      "proposedLicense": "Apache-2.0",
+      "upstreamCommit": "8564f65764d3d05893cec026c6e94250e2b23874",
+      "materialPaths": ["kotlinx-coroutines-1.11.0/NOTICE"],
+      "reviewStatus": "unreviewed",
+      "reviewNotes": "The exact 1.11.0 upstream NOTICE identifies itself as the Apache section 4(d) notice for the kotlinx.coroutines library. The four source-artifact hashes were independently computed from the published Maven Central source JARs.",
+      "remaining": [
+        "Verify the notice scope against the four exact packaged runtime artifacts and confirm inclusion in the final recipient-facing legal materials"
+      ]
+    },
+    {
+      "sourceArtifacts": {
+        "org.jetbrains.kotlinx:kotlinx-serialization-core-jvm:1.12.0": "b62fb8059123c43a72ddbe4aeaa8c92c8313d822c128ca2f861e3d91e35e5070",
+        "org.jetbrains.kotlinx:kotlinx-serialization-json-jvm:1.12.0": "af584f8e83f23e62a3a06f58f79a49e0c84e0011eb6c3526afc8ea1f3ace7db1"
+      },
+      "proposedLicense": "Apache-2.0",
+      "upstreamCommit": "4c28c3e33c145da536f1f4a671f70e5eb5b62b9c",
+      "materialPaths": ["kotlinx-serialization-1.12.0/NOTICE"],
+      "reviewStatus": "unreviewed",
+      "reviewNotes": "The exact 1.12.0 upstream NOTICE identifies itself as the Apache section 4(d) notice for the kotlinx.serialization library. The two source-artifact hashes were independently computed from the published Maven Central source JARs.",
+      "remaining": [
+        "Verify the notice scope against the two exact packaged runtime artifacts and confirm inclusion in the final recipient-facing legal materials"
+      ]
+    },
+    {
+      "sourceArtifacts": {
+        "org.jetbrains.kotlinx:atomicfu-jvm:0.28.0": "750bd5f9686abceca5ee6cdcab53d7abc20a2c1bebe462a23dba9932eeb9744c"
+      },
+      "proposedLicense": "Apache-2.0",
+      "upstreamCommit": "f206f5b4052efbe97c696559c673a35350598ffa",
+      "materialPaths": ["kotlinx-atomicfu-0.28.0/NOTICE"],
+      "reviewStatus": "unreviewed",
+      "reviewNotes": "The exact upstream 0.28.0 library NOTICE identifies itself as the Apache section 4(d) notice for kotlinx.atomicfu. The published source-JAR hash is pinned; package-specific attribution and final bundle inclusion remain pending.",
+      "remaining": [
+        "Verify the NOTICE scope against the exact packaged atomicfu-jvm artifact and confirm inclusion in final recipient materials"
+      ]
+    }
+  ],
+  "embeddedComponents": [
+    {
+      "name": "dng_sdk",
+      "upstreamCommit": "dbe0a676450d9b8c71bf00688bb306409b779e90",
+      "proposedLicense": "Adobe DNG SDK License Agreement",
+      "materialPaths": ["dng-sdk-dbe0a676/LICENSE", "dng-sdk-dbe0a676/DNG-PATENT-NOTICE.txt"],
+      "binaryEvidence": {
+        "linux-x64": "DNG symbol family found in skiko-awt-runtime-linux-x64:0.150.2 (artifact SHA-256 c6c1f9fa37464fd0bcca6e486a6b35307b6e2436199de9d009f877121de1c5c2)",
+        "macos-arm64": "DNG symbol family found in skiko-awt-runtime-macos-arm64:0.150.2 (artifact SHA-256 abea519fa519f7245412011cc3ab7a5852cb333b3dc3cac08a83f5bd806c7bec)",
+        "macos-x64": "DNG symbol family found in skiko-awt-runtime-macos-x64:0.150.2 (artifact SHA-256 f77b1f3a76e94daba2676780e37807697d51d300e31cacc43699709f3ccdff96)",
+        "windows-x64": "Absent from the pinned Skiko 0.150.2 Windows JVM runtime: Skia m150-a3f509bf52 sets skia_use_piex = !is_win && !is_canvaskit, and its RAW codec requires skia_use_piex; the Skiko Windows JVM target also omits piex and dng_sdk. The exact MSI-contained DLL matches this Maven artifact (SHA-256 eebad490c2828198e86e641cbd44958617867ce70f893b21852f07d0be099c0a). This conclusion is based on the matching build configuration, not the stripped-binary string scan."
+      },
+      "reviewStatus": "unreviewed",
+      "reviewNotes": "The exact Adobe DNG SDK agreement and separate patent grant govern this component. Adobe section 1 grants distribution for any purpose subject to the agreement; section 2 requires retaining notices; section 5 adds indemnification when distributing in a commercial product. The maintainer confirmed the current plan is noncommercial; revisit that clause if the plan changes. The pinned Android METADATA labels the SDK BY_EXCEPTION_ONLY and directs Google's own package consumers to consult owners/licensing (https://android.googlesource.com/platform/external/dng_sdk/+/dbe0a676450d9b8c71bf00688bb306409b779e90/METADATA). Google's public guidance describes BY_EXCEPTION_ONLY as Google's internal classification for terms conflicting with Google's own uses (https://opensource.google/documentation/reference/thirdparty/licenses); this is not an additional Adobe license term or evidence that Visual Agent requires Google's permission. No third party was contacted. The pinned Skia SkRawCodec parses, validates, and renders DNG files using Adobe's SDK, and Visual Agent reaches Skia's encoded-image decoder for canvas images. Adobe's separate patent grant applies to compliant DNG readers/writers and requires a prominent source/documentation notice. The exact notice is in the README, beside the UI decoder call and in the recipient material; tests verify source/documentation placement. Linux x64 and both macOS runtime binaries contain DNG-specific symbols. The pinned Skiko/Skia Windows JVM configuration disables the RAW codec and omits DNG SDK/Piex, and the inspected MSI DLL matches that Maven runtime artifact. This maps the component in the pinned runtime but does not approve redistribution or replace final package verification. This is an evidence-based engineering interpretation, not a qualified legal opinion or final redistribution approval.",
+      "remaining": [
+        "Reconfirm the pinned-runtime mapping against exact binaries in every versioned release package",
+        "Verify the exact notice remains prominent in the final recipient-facing documentation and legal materials for every package containing the implementation",
+        "Review the pinned binary/source mapping and the separate DNG patent grant conditions before recording qualified redistribution clearance"
+      ]
+    },
+    {
+      "name": "piex",
+      "upstreamCommit": "bb217acdca1cc0c16b704669dd6f91a1b509c406",
+      "proposedLicense": "Apache-2.0",
+      "materialPaths": ["piex-bb217acd/LICENSE", "piex-bb217acd/NOTICE"],
+      "binaryEvidence": {
+        "linux-x64": "Piex symbol family found in skiko-awt-runtime-linux-x64:0.150.2 (artifact SHA-256 c6c1f9fa37464fd0bcca6e486a6b35307b6e2436199de9d009f877121de1c5c2)",
+        "macos-arm64": "Piex symbol family found in skiko-awt-runtime-macos-arm64:0.150.2 (artifact SHA-256 abea519fa519f7245412011cc3ab7a5852cb333b3dc3cac08a83f5bd806c7bec)",
+        "macos-x64": "Piex symbol family found in skiko-awt-runtime-macos-x64:0.150.2 (artifact SHA-256 f77b1f3a76e94daba2676780e37807697d51d300e31cacc43699709f3ccdff96)",
+        "windows-x64": "Absent from the pinned Skiko 0.150.2 Windows JVM runtime: Skia disables Piex on Windows and its RAW codec requires Piex; the Skiko Windows JVM target omits Piex. The exact MSI DLL matches the Maven runtime artifact; conclusion is based on the pinned build configuration, not stripped symbols."
+      },
+      "reviewStatus": "unreviewed",
+      "remaining": [
+        "Map component presence to exact final package binaries and review recipient-facing attribution/notice placement",
+        "Determine whether corresponding source or build inputs are required for the exact distributed payload"
+      ]
+    },
+    {
+      "name": "wuffs",
+      "upstreamCommit": "e3f919ccfe3ef542cfc983a82146070258fb57f8",
+      "proposedLicense": "Apache-2.0",
+      "materialPaths": ["wuffs-e3f919cc/LICENSE"],
+      "binaryEvidence": {
+        "linux-x64": "Wuffs symbol family found in skiko-awt-runtime-linux-x64:0.150.2 (artifact SHA-256 c6c1f9fa37464fd0bcca6e486a6b35307b6e2436199de9d009f877121de1c5c2)",
+        "macos-arm64": "Wuffs symbol family found in skiko-awt-runtime-macos-arm64:0.150.2 (artifact SHA-256 abea519fa519f7245412011cc3ab7a5852cb333b3dc3cac08a83f5bd806c7bec)",
+        "macos-x64": "Wuffs symbol family found in skiko-awt-runtime-macos-x64:0.150.2 (artifact SHA-256 f77b1f3a76e94daba2676780e37807697d51d300e31cacc43699709f3ccdff96)",
+        "windows-x64": "Wuffs-identifying strings found in the exact MSI-contained DLL (SHA-256 e90e2e5ae3d48c7694b6cf5948953f6d007fe40478b1040353040acef118dd41), which matches the Windows Maven native DLL; stripped symbols prevent definitive component mapping"
+      },
+      "reviewStatus": "unreviewed",
+      "remaining": [
+        "Confirm Wuffs mapping for Windows and map all platforms to exact final package binaries",
+        "Review attribution/notice placement and determine source-delivery requirements for the exact distributed payload"
+      ]
+    },
+    {
+      "name": "d3d12allocator",
+      "upstreamCommit": "169895d529dfce00390a20e69c2f516066fe7a3b",
+      "proposedLicense": "MIT",
+      "materialPaths": ["d3d12allocator-169895d5/LICENSE.txt"],
+      "binaryEvidence": {
+        "windows-x64": "The exact Skiko v0.150.2 Windows JVM configuration calls staticSkiaLibs(\"d3d12allocator\") and the Maven runtime DLL SHA-256 is e90e2e5ae3d48c7694b6cf5948953f6d007fe40478b1040353040acef118dd41, matching the historical MSI payload. The stripped DLL string scan did not identify allocator symbols; the upstream static-link configuration is the positive build evidence. Reconfirm the binary mapping against each final release package."
+      },
+      "reviewStatus": "unreviewed",
+      "reviewNotes": "The pinned original license is the MIT License and requires the copyright and permission notice in copies or substantial portions. The exact license text is included in curated native legal materials. This source/configuration mapping places D3D12MemoryAllocator with Skiko's Windows JVM runtime, not the ANGLE DLLs. This is not a final package or redistribution approval.",
+      "remaining": [
+        "Verify the exact Windows release package contains the mapped Skiko runtime DLL and the retained MIT notice",
+        "Reconfirm this mapping if the Skiko version or Windows JVM link configuration changes"
+      ]
+    }
+  ],
+  "packageEvidence": [
+    {
+      "artifact": "visual-agent-linux-appimage.AppImage",
+      "workflowRun": 42388152203,
+      "sourceCommit": "c754df8ee2b8dd0235d6ffe355c30cc1c10be017",
+      "sha256": "8596fdd05feffc299febae7ddf8833b85c725fdae66b81d6a03d88e9a91f717a",
+      "status": "historical-smoke-artifact-not-final-release-candidate",
+      "embeddedFiles": [
+        {
+          "path": "usr/lib/visual-agent/lib/app/libskiko-linux-x64.so",
+          "sha256": "c733456df0b83210d9e79b90a581c4e005c28d2ef2c4cd17d146d74f7a60f378",
+          "matchesSourceArtifact": "org.jetbrains.skiko:skiko-awt-runtime-linux-x64:0.150.2"
+        }
+      ],
+      "observedLegalMaterials": [
+        "h2-2.5.252/LICENSE.txt",
+        "h2-2.5.252/license.html",
+        "logback-1.6.6/LICENSE.txt",
+        "logback-1.6.6/EPL-2.0.txt",
+        "jna-5.19.1/LICENSE",
+        "jna-5.19.1/AL2.0"
+      ],
+      "remaining": [
+        "This older smoke artifact does not contain the subsequently collected DNG SDK, Piex, Wuffs, or libffi materials; verify that a newly built final artifact includes all applicable notices",
+        "The AppImage Type 2 runtime and its static dependency notices are not established by the extracted application SquashFS tree and require separate exact-package mapping"
+      ]
+    },
+    {
+      "artifact": "visual-agent-windows.msi",
+      "workflowRun": 42388152203,
+      "sourceCommit": "c754df8ee2b8dd0235d6ffe355c30cc1c10be017",
+      "sha256": "f4fee660052080643573c0d356abbb74691865b101a2f6ec85f8968a9e5bfaaf",
+      "status": "historical-smoke-artifact-not-final-release-candidate",
+      "embeddedFiles": [
+        {
+          "path": "Visual Agent/app/skiko-windows-x64.dll",
+          "sha256": "e90e2e5ae3d48c7694b6cf5948953f6d007fe40478b1040353040acef118dd41",
+          "matchesSourceArtifact": "org.jetbrains.skiko:skiko-awt-runtime-windows-x64:0.150.2"
+        }
+      ],
+      "observedLegalMaterials": [
+        "h2-2.5.252/LICENSE.txt",
+        "h2-2.5.252/license.html",
+        "jna-5.19.1/AL2.0",
+        "jna-5.19.1/LICENSE",
+        "logback-1.6.6/EPL-2.0.txt",
+        "logback-1.6.6/LICENSE.txt"
+      ],
+      "remaining": [
+        "The MSI contains only the historical H2, JNA, and Logback notice set; verify that a newly built final MSI includes all applicable later-collected materials",
+        "The exact historical MSI DLL matches the pinned Skiko Windows JVM runtime. Skia disables Piex on Windows and the RAW codec requires Piex; use this pinned build configuration, not stripped-symbol absence, for the DNG SDK/Piex mapping. Reconfirm against the exact binaries in each new release candidate"
+      ]
+    }
+  ],
+  "embeddedAssets": [
+    {
+      "name": "LiberationSans-Regular.ttf",
+      "containerCoordinate": "org.apache.pdfbox:pdfbox:3.0.8",
+      "containerSha256": "97647cfbde61ebcfc06b4cf8c9b0ffcaaee073396eceb4a7f6836a9b9128903c",
+      "assetPath": "org/apache/pdfbox/resources/ttf/LiberationSans-Regular.ttf",
+      "assetSha256": "76d04c18ea243f426b7de1f3ad208e927008f961dc5945e5aad352d0dfde8ee8",
+      "upstreamRelease": "2.1.5",
+      "upstreamCommit": "4b0192046158094654e865245832c66d2104219e",
+      "sourceArchiveUrl": "https://github.com/liberationfonts/liberation-fonts/files/7261483/liberation-fonts-2.1.5.tar.gz",
+      "sourceArchiveSha256": "fb22c2109dcbb25202aeb6202c0a58fd2e536dbf7c72879c4bbfa2b8a9a75d60",
+      "proposedLicense": "OFL-1.1",
+      "licenseMaterialPath": "liberation-fonts-2.1.5/LICENSE",
+      "reviewStatus": "reviewed",
+      "reviewNotes": "The packaged PDFBox JAR contains the expected font SHA-256 and the complete Red Hat copyright notice, Reserved Font Name, and OFL 1.1 text. OFL 1.1 permits bundling the font with software, requires its copyright/license information to accompany distributed font files, and prohibits selling the font by itself. No project modification or standalone font distribution is intended. The source archive is retained as provenance; this asset review does not approve the complete release package or its source-delivery bundle.",
+      "remaining": []
+    }
+  ],
+  "runtimePackages": [
+    {
+      "package": "linux-appimage",
+      "runtimeSourceArtifact": "AppImage:type2-runtime:20251108",
+      "sourceArchivePath": "archives/appimage-runtime/type2-runtime-dd6cebed.tar.gz",
+      "sourceArchives": [
+        {
+          "path": "archives/appimage-runtime/type2-runtime-dd6cebed.tar.gz",
+          "sha256": "f5fec23be76e50e2445ed2d018bac49b367490fc483c62c4637e99ec705d27ba"
+        },
+        {
+          "path": "archives/appimage-runtime/fuse-3.15.0.tar.xz",
+          "sha256": "70589cfd5e1cff7ccd6ac91c86c01be340b227285c5e200baa284e401eea2ca0"
+        },
+        {
+          "path": "archives/appimage-runtime/squashfuse-0.5.2.tar.gz",
+          "sha256": "db0238c5981dabbd80ee09ae15387f390091668ca060a7bc38047912491443d3"
+        },
+        {
+          "path": "archives/appimage-runtime/musl-1.2.5.tar.gz",
+          "sha256": "a9a118bbe84d8764da0ea0d28b3ab3fae8477fc7e4085d90102b8596fc7c75e4"
+        },
+        {
+          "path": "archives/appimage-runtime/alpine-musl-package.tar.gz",
+          "sha256": "e63fe34178270d2d8cc74f1bab303ec1868150606e66f6da2c16221e6ec86034"
+        },
+        {
+          "path": "archives/appimage-runtime/mimalloc-2.1.7.tar.gz",
+          "sha256": "0eed39319f139afde8515010ff59baf24de9e47ea316a315398e8027d198202d"
+        },
+        {
+          "path": "archives/appimage-runtime/alpine-mimalloc-package.tar.gz",
+          "sha256": "6f4f50fca873868e754053c828d8336a531dbca365c678dc75db8111873d87e1"
+        },
+        {
+          "path": "archives/appimage-runtime/zstd-1.5.6.tar.gz",
+          "sha256": "30f35f71c1203369dc979ecde0400ffea93c27391bfd2ac5a9715d2173d92ff7"
+        },
+        {
+          "path": "archives/appimage-runtime/alpine-zstd-package.tar.gz",
+          "sha256": "cdc49cb68d5358eefcc83955bf285ce50fbcf6b223b271ef71e1008402c201f0"
+        },
+        {
+          "path": "archives/appimage-runtime/zlib-1.4.tar.gz",
+          "sha256": "02dd159783677a749c04adbdd02b55b8a2bcc7e054f51b76b549199a916ad584"
+        },
+        {
+          "path": "archives/appimage-runtime/alpine-zlib-package.tar.gz",
+          "sha256": "050415c464375727d855a14abb0cdf2d549bda3b32ddc3c0017256e552b3ec09"
+        }
+      ],
+      "linkedComponents": [
+        "AppImage:libfuse:3.15.0",
+        "AppImage:squashfuse:0.5.2",
+        "AppImage:musl:1.2.5",
+        "mimalloc2:2.1.7-r0",
+        "zstd:1.5.6",
+        "zlib:1.4"
+      ]
     }
   ],
   "materials": [
+    {
+      "path": "Apache-2.0.txt",
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+      "url": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+    },
+    {
+      "path": "angle-ec4d8f8e4d/xxhash-LICENSE",
+      "sha256": "86ec6953794503942b70fcd4f35b565d44f63f703b7037ce44dad965c4aaae91",
+      "url": "https://chromium.googlesource.com/angle/angle/+/ec4d8f8e4d3f1a9e64430abd8b6b436253732adf/src/common/third_party/xxhash/LICENSE?format=TEXT"
+    },
+    {
+      "path": "abseil-24012838/LICENSE",
+      "sha256": "c79a7fea0e3cac04cd43f20e7b648e5a0ff8fa5344e644b0ee09ca1162b62747",
+      "url": "https://chromium.googlesource.com/chromium/src/third_party/abseil-cpp/+/2401283880a451e9ea10787920117fb67695abb4/LICENSE?format=TEXT"
+    },
+    {
+      "path": "zlib-e8ff3f35/LICENSE",
+      "sha256": "e1cfcc55c325b3f78cf55df9664abaa066e2271dffe8213347d9fccdfbac8f2c",
+      "url": "https://chromium.googlesource.com/chromium/src/third_party/zlib/+/e8ff3f35551275330696606d7fef3a2a0f73a831/LICENSE?format=TEXT"
+    },
+    {
+      "path": "chromium-055e258e/LICENSE",
+      "sha256": "368cca1106be99d39ecd32a38d8305585d802a475effb66380b91ffc9bcf709b",
+      "url": "https://chromium.googlesource.com/chromium/src/+/055e258e91fc310ded1c0071f108c08f0e924a53/LICENSE?format=TEXT"
+    },
+    {
+      "path": "liberation-fonts-2.1.5/LICENSE",
+      "sha256": "93fed46019c38bbe566b479d22148e2e8a1e85ada614accb0211c37b2c61c19b",
+      "url": "https://raw.githubusercontent.com/liberationfonts/liberation-fonts/4b0192046158094654e865245832c66d2104219e/LICENSE"
+    },
+    {
+      "path": "skiko-0.150.2/LICENSE",
+      "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+      "url": "https://raw.githubusercontent.com/JetBrains/skiko/caed3841b8725429bb9b9805ff162a40eb7bce47/LICENSE"
+    },
+    {
+      "path": "skiko-0.150.2/NOTICE",
+      "sha256": "35dd077c24768b53625101cfcc0ad853ae7e2abc08bd2a111a0267760d1406d8",
+      "url": "https://raw.githubusercontent.com/JetBrains/skiko/caed3841b8725429bb9b9805ff162a40eb7bce47/NOTICE"
+    },
+    {
+      "path": "skia-m150-a3f509bf52/ATTRIBUTIONS.txt",
+      "sha256": "c1126f3a474dca835771734c8406cac5a08e5a21eaaba55c37a6062263fd9777",
+      "url": "https://github.com/heckenmann/visual-agent"
+    },
+    {
+      "path": "expat-6154446f/COPYING",
+      "sha256": "31b15de82aa19a845156169a17a5488bf597e561b2c318d159ed583139b25e87",
+      "url": "https://raw.githubusercontent.com/libexpat/libexpat/6154446fccefbf3ca644894f598969113b0c7bcd/expat/COPYING"
+    },
+    {
+      "path": "harfbuzz-9cb1fee5/COPYING",
+      "sha256": "ba8f810f2455c2f08e2d56bb49b72f37fcf68f1f4fade38977cfd7372050ad64",
+      "url": "https://raw.githubusercontent.com/harfbuzz/harfbuzz/9cb1fee51069b206effb4736e443b038d230789d/COPYING"
+    },
+    {
+      "path": "d3d12allocator-169895d5/LICENSE.txt",
+      "sha256": "e078ee4f8c5ed0673f4d93b5318557eb8b4e0d7dbccef2ab45c763c7693f0f37",
+      "url": "https://raw.githubusercontent.com/GPUOpen-LibrariesAndSDKs/D3D12MemoryAllocator/169895d529dfce00390a20e69c2f516066fe7a3b/LICENSE.txt"
+    },
+    {
+      "path": "libwebp-845d5476/COPYING",
+      "sha256": "5aec868f669e384a22372a4e8a1a6cd7d44c64cd451f960ca69cc170d1e13acf",
+      "url": "https://chromium.googlesource.com/webm/libwebp/+/845d5476a866141ba35ac133f856fa62f0b7445f/COPYING"
+    },
+    {
+      "path": "libwebp-845d5476/PATENTS",
+      "sha256": "cc3273e0694ea5896145e0677699b53471b03ea43021ddc50e7923fbb9f5023c",
+      "url": "https://chromium.googlesource.com/webm/libwebp/+/845d5476a866141ba35ac133f856fa62f0b7445f/PATENTS"
+    },
+    {
+      "path": "libpng-d5515b5b/LICENSE",
+      "sha256": "bdb0a645ea18c60507d0368379b1ac5474b92255fcc2d115e07486a7672ba526",
+      "url": "https://skia.googlesource.com/third_party/libpng/+/d5515b5b8be3901aac04e5bd8bd5c89f287bcd33/LICENSE"
+    },
+    {
+      "path": "libjpeg-turbo-e14cbfaa/LICENSE.md",
+      "sha256": "96f5b328adbb78eeaaec6980d73fd558cb1e4d62560ed615646bc3cf5e532430",
+      "url": "https://chromium.googlesource.com/chromium/deps/libjpeg_turbo/+/e14cbfaa85529d47f9f55b0f104a579c1061f9ad/LICENSE.md"
+    },
+    {
+      "path": "libjpeg-turbo-e14cbfaa/README.ijg",
+      "sha256": "75815e3bf6484201a3c3d17a1bbf10f2e8e3237f84df10a2357ea896db2a81d6",
+      "url": "https://chromium.googlesource.com/chromium/deps/libjpeg_turbo/+/e14cbfaa85529d47f9f55b0f104a579c1061f9ad/README.ijg"
+    },
+    {
+      "path": "zlib-646b7f56/LICENSE",
+      "sha256": "e1cfcc55c325b3f78cf55df9664abaa066e2271dffe8213347d9fccdfbac8f2c",
+      "url": "https://chromium.googlesource.com/chromium/src/third_party/zlib/+/646b7f569718921d7d4b5b8e22572ff6c76f2596/LICENSE"
+    },
+    {
+      "path": "icu-364118a1/LICENSE",
+      "sha256": "17510cf7a58b4879b887ec05a45d72cf1b73544dd9ec7e72f20110ed104229ee",
+      "url": "https://chromium.googlesource.com/chromium/deps/icu/+/364118a1d9da24bb5b770ac3d762ac144d6da5a4/LICENSE"
+    },
+    {
+      "path": "freetype-264b5fbf/LICENSE.TXT",
+      "sha256": "bd36c8b474855fa294c2ec5c184544478ef3720aad37d65a6296a4f264fd2d3b",
+      "url": "https://chromium.googlesource.com/chromium/src/third_party/freetype2/+/264b5fbf5b912b39f98d038bf75d39be0a73f21b/LICENSE.TXT"
+    },
+    {
+      "path": "freetype-264b5fbf/FTL.TXT",
+      "sha256": "5a5ee54c5001bbad1cdc1a57cc3dd4c42199b2da09d39c7ee41fab002d02967f",
+      "url": "https://chromium.googlesource.com/chromium/src/third_party/freetype2/+/264b5fbf5b912b39f98d038bf75d39be0a73f21b/docs/FTL.TXT"
+    },
+    {
+      "path": "freetype-264b5fbf/bdf-README",
+      "sha256": "7984455e7e5a9faba3797c8bf095fbe10cc846316b7320aff8c58402e22b82fe",
+      "url": "https://chromium.googlesource.com/chromium/src/third_party/freetype2/+/264b5fbf5b912b39f98d038bf75d39be0a73f21b/src/bdf/README"
+    },
+    {
+      "path": "freetype-264b5fbf/pcf-README",
+      "sha256": "18d9782898d9eac04476e2f744678137b2a889689ed3e923e052fc396a86f86b",
+      "url": "https://chromium.googlesource.com/chromium/src/third_party/freetype2/+/264b5fbf5b912b39f98d038bf75d39be0a73f21b/src/pcf/README"
+    },
+    {
+      "path": "skia-m150-a3f509bf52/LICENSE",
+      "sha256": "5f787c1dee3c56547f09ccc2906ab5f5293c4d8dd6c8654e573216c38e908dbd",
+      "url": "https://raw.githubusercontent.com/JetBrains/skia/a3f509bf52564dc8b27940bebe599d77ac0c4ae3/LICENSE"
+    },
+    {
+      "path": "dng-sdk-dbe0a676/LICENSE",
+      "sha256": "012e875468ac2f9a2070ee25a950588afa2735b4b2d961f491e3d72c8f572306",
+      "url": "https://android.googlesource.com/platform/external/dng_sdk/+/dbe0a676450d9b8c71bf00688bb306409b779e90/LICENSE?format=TEXT"
+    },
+    {
+      "path": "dng-sdk-dbe0a676/DNG-PATENT-NOTICE.txt",
+      "sha256": "1c983aea9533c847ca76ec0310f68d64f0215d51ae49b5a2273133731a074c92",
+      "url": "https://www.adobe.com/support/downloads/dng/dng_sdk.html#dng-specification-patent-license"
+    },
+    {
+      "path": "piex-bb217acd/LICENSE",
+      "sha256": "58d1e17ffe5109a7ae296caafcadfdbe6a7d176f0bc4ab01e12a689b0499d8bd",
+      "url": "https://raw.githubusercontent.com/google/piex/bb217acdca1cc0c16b704669dd6f91a1b509c406/LICENSE"
+    },
+    {
+      "path": "piex-bb217acd/NOTICE",
+      "sha256": "58d1e17ffe5109a7ae296caafcadfdbe6a7d176f0bc4ab01e12a689b0499d8bd",
+      "url": "https://raw.githubusercontent.com/google/piex/bb217acdca1cc0c16b704669dd6f91a1b509c406/NOTICE"
+    },
+    {
+      "path": "wuffs-e3f919cc/LICENSE",
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+      "url": "https://raw.githubusercontent.com/google/wuffs-mirror-release-c/e3f919ccfe3ef542cfc983a82146070258fb57f8/LICENSE"
+    },
+    {
+      "path": "angle-ec4d8f8e4d/LICENSE",
+      "sha256": "bf4da21bd20bcfb5b60b7ecc67fa864a79be049e21d6178076887f178dd6c71a",
+      "url": "https://chromium.googlesource.com/angle/angle/+/ec4d8f8e4d3f1a9e64430abd8b6b436253732adf/LICENSE?format=TEXT"
+    },
+    {
+      "path": "graaljs-25.5.5.0.3/LICENSE_GRAALJS",
+      "sha256": "1ae263ef11131dfde83daccd63c94d9ea11fc854196370385867adafb0ac3778",
+      "url": "https://raw.githubusercontent.com/oracle/graaljs/dd265d542fad72d0e7e1ae4032ef7c040911e700/graal-js/LICENSE_GRAALJS"
+    },
+    {
+      "path": "graaljs-25.5.5.0.3/THIRD_PARTY_LICENSE_GRAALJS.txt",
+      "sha256": "606c1dd73cc09df7884c5862a4ceebb59a92dae286e1e7b667c50b1a067db6ad",
+      "url": "https://raw.githubusercontent.com/oracle/graaljs/dd265d542fad72d0e7e1ae4032ef7c040911e700/graal-js/THIRD_PARTY_LICENSE_GRAALJS.txt"
+    },
+    {
+      "path": "graaljs-25.5.5.0.3/SOURCE-AVAILABILITY.txt",
+      "sha256": "a2c635e8722197de43027f7a516e10f3beb8a53a22a06e845359777ab76f495c",
+      "url": "https://repo.maven.apache.org/maven2/org/graalvm/js/js-language/25.5.5.0.3/js-language-25.5.5.0.3-sources.jar"
+    },
+    {
+      "path": "graaljs-25.5.5.0.3/GFTC-TERMS-REFERENCE.md",
+      "sha256": "d674c6d6650a194b018c83e58a5bc31373f17bb7fbfe38023a5c67b5dfcbc82e",
+      "url": "https://www.oracle.com/downloads/licenses/graal-free-license.html"
+    },
+    {
+      "path": "graaljs-25.4.4.1.1/GFTC-TERMS-REFERENCE.md",
+      "sha256": "152be899a42639675c195e7a44a428943213883136f68b4c31cd8e5f5a0346e6",
+      "url": "https://www.oracle.com/downloads/licenses/graal-free-license.html"
+    },
+    {
+      "path": "graalvm-25.4.4.1.1/UPL-1.0.txt",
+      "sha256": "4a9972e09a394d6a9f693d3e8343d4918e5c0c25863665320a7fd3b6dcac4571",
+      "url": "https://raw.githubusercontent.com/oracle/graal/vm-25.4.4.1.1/sdk/LICENSE.md"
+    },
+    {
+      "path": "icu4j-78.2/LICENSE",
+      "sha256": "e55522d81edc687a341a4411e0776e54ca654e90147f354a90458aaced4116af",
+      "url": "https://raw.githubusercontent.com/unicode-org/icu/release-78.2/LICENSE"
+    },
     {
       "path": "h2-2.5.252/LICENSE.txt",
       "sha256": "827b84bb8f84dbd60d1a8955cefab142d65cc17d267e32996db400138a1e0fcf",
@@ -43,6 +1001,16 @@
       "path": "h2-2.5.252/license.html",
       "sha256": "c8924a26500183c3015079c93e1f40f48d05f0b09da40257c558f25c40894e13",
       "url": "https://raw.githubusercontent.com/h2database/h2database/f986838bbbf4941d2edcd5298b18c9936d1b7359/h2/src/docsrc/html/license.html"
+    },
+    {
+      "path": "h2-2.5.252/H2-DISCLAIMER.txt",
+      "sha256": "8087176b43a17c2839f4a5f8fc1dc9a271e0e7077870c48002a75afca20a11bd",
+      "url": "https://h2database.com/html/license.html"
+    },
+    {
+      "path": "h2-2.5.252/SOURCE-AVAILABILITY.txt",
+      "sha256": "0903176b9010f980d08f2e28aa629626dce21e3dd0e1ecb062522b01f9ad796a",
+      "url": "https://h2database.com/html/license.html"
     },
     {
       "path": "logback-1.6.6/LICENSE.txt",
@@ -55,6 +1023,16 @@
       "url": "https://www.eclipse.org/org/documents/epl-2.0/EPL-2.0.txt"
     },
     {
+      "path": "logback-1.6.6/SOURCE-AVAILABILITY.txt",
+      "sha256": "5a87bb89703313dafe4040a24687dd17f59705d5980d41e139e45f71da2d0fda",
+      "url": "https://logback.qos.ch/license.html"
+    },
+    {
+      "path": "jna-5.19.1/libffi-LICENSE",
+      "sha256": "2c9c2acb9743e6b007b91350475308aee44691d96aa20eacef8e199988c8c388",
+      "url": "https://raw.githubusercontent.com/java-native-access/jna/1a91122853f6ab6f1fb2a4a284a6cf2ed8af0a4d/native/libffi/LICENSE"
+    },
+    {
       "path": "jna-5.19.1/LICENSE",
       "sha256": "07c938b23950ab7d47a24ef35f9f5da3a05ae164278dc959ad6994135ed59ff1",
       "url": "https://raw.githubusercontent.com/java-native-access/jna/1a91122853f6ab6f1fb2a4a284a6cf2ed8af0a4d/LICENSE"
@@ -63,6 +1041,161 @@
       "path": "jna-5.19.1/AL2.0",
       "sha256": "0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594",
       "url": "https://raw.githubusercontent.com/java-native-access/jna/1a91122853f6ab6f1fb2a4a284a6cf2ed8af0a4d/AL2.0"
+    },
+    {
+      "path": "mimalloc2-2.1.7/LICENSE",
+      "sha256": "19c99805e7a44a34b297a75d1edea9985e300066dfc024d5c99d4236d4573b5d",
+      "url": "https://raw.githubusercontent.com/microsoft/mimalloc/8c532c32c3c96e5ba1f2283e032f69ead8add00f/LICENSE"
+    },
+    {
+      "path": "zstd-1.5.6/LICENSE",
+      "sha256": "7055266497633c9025b777c78eb7235af13922117480ed5c674677adc381c9d8",
+      "url": "https://raw.githubusercontent.com/facebook/zstd/794ea1b0afca0f020f4e57b6732332231fb23c70/LICENSE"
+    },
+    {
+      "path": "zlib-1.4/LICENSE",
+      "sha256": "e32ff4e00d9d94930537635291da39e7e612703334bf6fde8c7f1686fe8a45a2",
+      "url": "https://raw.githubusercontent.com/madler/zlib/dd9d5c2d62b52e8acb0e678de5768087eedce914/LICENSE"
+    },
+    {
+      "path": "appimage-runtime-20251108/LICENSE",
+      "sha256": "aa154fc9070614bbe7921f89db11efd1dba7a1f3a41685958110e2230f9c0ca1",
+      "url": "https://raw.githubusercontent.com/AppImage/type2-runtime/dd6cebedcbddde9c82f89b011e8e1d40b6e43868/LICENSE"
+    },
+    {
+      "path": "libfuse-3.15.0/LICENSE",
+      "sha256": "b8832d9caaa075bbbd2aef24efa09f8b7ab66a832812d88c602da0c7b4397fad",
+      "url": "https://raw.githubusercontent.com/libfuse/libfuse/6d08472ea47db895748d5ca7d3daf032c3fefcf8/LICENSE"
+    },
+    {
+      "path": "libfuse-3.15.0/SOURCE-AND-RELINK.txt",
+      "sha256": "88b7c3e345ebe451c3e22bd9dc4f753bb86218c9090b58686aec4a5db44b499d",
+      "url": "https://github.com/AppImage/type2-runtime/blob/dd6cebedcbddde9c82f89b011e8e1d40b6e43868/BUILD.md"
+    },
+    {
+      "path": "libfuse-3.15.0/LGPL2.txt",
+      "sha256": "dc626520dcd53a22f727af3ee42c770e56c97a64fe3adb063799d8ab032fe551",
+      "url": "https://raw.githubusercontent.com/libfuse/libfuse/6d08472ea47db895748d5ca7d3daf032c3fefcf8/LGPL2.txt"
+    },
+    {
+      "path": "squashfuse-0.5.2/LICENSE",
+      "sha256": "9e909cc8a8ba27b1a649c964cf9eda37de911f3138c2b64e6d2f01703904ac13",
+      "url": "https://raw.githubusercontent.com/vasi/squashfuse/775b4cc72ab47641637897f11ce0da15d5c1f115/LICENSE"
+    },
+    {
+      "path": "musl-1.2.5/COPYRIGHT",
+      "sha256": "f9bc4423732350eb0b3f7ed7e91d530298476f8fec0c6c427a1c04ade22655af",
+      "url": "https://musl.libc.org/releases/musl-1.2.5.tar.gz"
+    },
+    {
+      "path": "antlr-st4-4.3.4/LICENSE.txt",
+      "sha256": "022bdae9c4f408d375f8c3c16b7695c22a2152c56535af180059e3ab92adffb0",
+      "url": "https://raw.githubusercontent.com/antlr/stringtemplate4/a2c4ef074e7c5018c7eb46372ed07f756c140404/LICENSE.txt"
+    },
+    {
+      "path": "animal-sniffer-1.27/LICENSE",
+      "sha256": "0d17e86dbd1f3504cfa311e67827e1569ad27bbfff29cc405194e4a2549e9df8",
+      "url": "https://raw.githubusercontent.com/mojohaus/animal-sniffer/5adf3aad06658c44de48ba2fddf9819685230e5f/LICENSE"
+    },
+    {
+      "path": "antlr-runtime-3.5.3/ANTLR3-LICENSE.txt",
+      "sha256": "95fc87cbe29814a32fc97f6f8eb7ae55e4816d4b75143635c4db736e7e374fa2",
+      "url": "https://raw.githubusercontent.com/antlr/antlr3/0519032bb167b37f206968d9037753ad655a2623/tool/LICENSE.txt"
+    },
+    {
+      "path": "antlr-runtime-3.5.3/RUNTIME-SOURCE-NOTICES.txt",
+      "sha256": "7176404e3cd16d5478314419aab4175aea7fc77c5b4334df8fb6dcee36def649",
+      "url": "https://repo.maven.apache.org/maven2/org/antlr/antlr-runtime/3.5.3/antlr-runtime-3.5.3-sources.jar"
+    },
+    {
+      "path": "antlr4-runtime-4.13.1/LICENSE.txt",
+      "sha256": "3db1fb3ee79a4b4f9918fc4d0f6133bf18a3cf787f126cd22f8aa9b862281c0c",
+      "url": "https://raw.githubusercontent.com/antlr/antlr4/7ed420ff2c78d62883875c442d75f32e73bc86c8/LICENSE.txt"
+    },
+    {
+      "path": "asm-9.11.1/LICENSE.txt",
+      "sha256": "293b6af371eee28b0ff16f0334ea19e20a3d5522143faa4b95b346855507879a",
+      "url": "https://gitlab.ow2.org/asm/asm/-/raw/e1f096ce6e9f6de64921ea8b437676f146798185/LICENSE.txt"
+    },
+    {
+      "path": "autolink-0.12.0/LICENSE",
+      "sha256": "2d7b0f54def673747d75e8399c26f313ac1ee3e00dc86d2c488ebd0b790bb022",
+      "url": "https://raw.githubusercontent.com/robinst/autolink-java/8b07a6911fd62871042c5b63412d3ac3489a0531/LICENSE"
+    },
+    {
+      "path": "dbus-java-5.2.2/LICENSE",
+      "sha256": "d14b6f26eaa5b4cf0060d243fffb2600d9c7c36b1085c2ad61cf095db50c9840",
+      "url": "https://raw.githubusercontent.com/hypfvieh/dbus-java/37d6c62403e0d4a30aab8ba044784eefa26d7260/LICENSE"
+    },
+    {
+      "path": "filekit-0.17.0/LICENSE",
+      "sha256": "5ceb0f372844932c328a4d34bfb6b1903b157d4b3467c5de484bfec8e5aea7ca",
+      "url": "https://raw.githubusercontent.com/vinceglb/FileKit/38fe6b384b33c726d95d372e23cf0ef7c101cf48/LICENSE"
+    },
+    {
+      "path": "jtokkit-1.1.0/LICENSE",
+      "sha256": "1591448c197de536ece69aa858d63044f148ba73f14e96e981c46753a9d8ba71",
+      "url": "https://raw.githubusercontent.com/knuddelsgmbh/jtokkit/4c98bebbbc285de0432abca6b2c8f55f2f51133a/LICENSE"
+    },
+    {
+      "path": "protobuf-java-4.36.2/LICENSE",
+      "sha256": "6e5e117324afd944dcf67f36cf329843bc1a92229a8cd9bb573d7a83130fea7d",
+      "url": "https://raw.githubusercontent.com/protocolbuffers/protobuf/2c74169b34066ceb8ddb6b882fcb3fb32d737a55/LICENSE"
+    },
+    {
+      "path": "reactive-streams-1.0.4/LICENSE",
+      "sha256": "96a3b2d45af72054d0676e8eb9a944a096812a7f8ff1b71bd82dadbc60ce0444",
+      "url": "https://raw.githubusercontent.com/reactive-streams/reactive-streams-jvm/944163a4b2477a2bebaaada86b0ba910b6302f2f/LICENSE"
+    },
+    {
+      "path": "grpc-java-1.85.1/NOTICE.txt",
+      "sha256": "d891421cec918666dce9dc4516dad6a76557d12203fec121662efff365e72d63",
+      "url": "https://raw.githubusercontent.com/grpc/grpc-java/54c634aed4b5c78a29d0fa51d9282e9538722543/NOTICE.txt"
+    },
+    {
+      "path": "netty-4.2.20.Final/NOTICE.txt",
+      "sha256": "1775b0d91666fcb82493a5198f761b59a6d4d050bae6a4d26ecc377354068571",
+      "url": "https://raw.githubusercontent.com/netty/netty/4fb6a5f308382b4bee1bff3ef80b45ea8b35166d/NOTICE.txt"
+    },
+    {
+      "path": "netty-4.2.20.Final/LICENSE.dnsinfo.txt",
+      "sha256": "f0bdf5682bf317b1f85c80ed32cb4c7bf77b5a231dee485aa92d983673b7c58f",
+      "url": "https://raw.githubusercontent.com/netty/netty/4fb6a5f308382b4bee1bff3ef80b45ea8b35166d/license/LICENSE.dnsinfo.txt"
+    },
+    {
+      "path": "netty-4.2.20.Final/APSL-2.0.txt",
+      "sha256": "2d0c12edaaf8d31fec6796fef99291b12e833b6bef28100975120a53d209e06d",
+      "url": "https://raw.githubusercontent.com/spdx/license-list-data/31846481de7ea17d92f2f46fad76abe58b2e9bb0/text/APSL-2.0.txt"
+    },
+    {
+      "path": "jakarta-annotation-api-3.0.0/LICENSE.md",
+      "sha256": "6e1f002892b81cbe0647019b150c8a056efc1add565671a4f8af629b6cd2cc7b",
+      "url": "https://raw.githubusercontent.com/jakartaee/common-annotations-api/d456606ef104b5602700d7a2414f812e48a8a694/LICENSE.md"
+    },
+    {
+      "path": "jakarta-annotation-api-3.0.0/NOTICE.md",
+      "sha256": "20bf986a153cc3095639379c99ef0a5a3bf99ac4895429920d380414a3eecf08",
+      "url": "https://raw.githubusercontent.com/jakartaee/common-annotations-api/d456606ef104b5602700d7a2414f812e48a8a694/NOTICE.md"
+    },
+    {
+      "path": "kotlinx-io-0.9.1/NOTICE",
+      "sha256": "a126623d2c0c1ca21814828749243869ae2c44c7f6a56ef6074bb87f430b659e",
+      "url": "https://raw.githubusercontent.com/Kotlin/kotlinx-io/362bdc35e159bad6da1e08101c8321792d762281/NOTICE"
+    },
+    {
+      "path": "kotlinx-coroutines-1.11.0/NOTICE",
+      "sha256": "1ab6de67ef738bffae63f9aa6a8798a35e87341c83ea28d09c8dc8ca6993232a",
+      "url": "https://raw.githubusercontent.com/Kotlin/kotlinx.coroutines/8564f65764d3d05893cec026c6e94250e2b23874/license/NOTICE.txt"
+    },
+    {
+      "path": "kotlinx-serialization-1.12.0/NOTICE",
+      "sha256": "ec77bba5c852830abfdefcdefbf4a22577ff4df79ec323a898d5100ca1d6f8d6",
+      "url": "https://raw.githubusercontent.com/Kotlin/kotlinx.serialization/4c28c3e33c145da536f1f4a671f70e5eb5b62b9c/license/NOTICE.txt"
+    },
+    {
+      "path": "kotlinx-atomicfu-0.28.0/NOTICE",
+      "sha256": "2b1db3aa8302414ea2bb1be5391110268b4611a11c9c3d28e34bf3acfddc9ef4",
+      "url": "https://raw.githubusercontent.com/Kotlin/kotlinx.atomicfu/f206f5b4052efbe97c696559c673a35350598ffa/license/NOTICE.txt"
     }
   ]
 }

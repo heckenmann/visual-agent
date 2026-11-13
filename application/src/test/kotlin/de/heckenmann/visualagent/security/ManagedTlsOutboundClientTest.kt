@@ -145,7 +145,7 @@ class ManagedTlsOutboundClientTest {
         try {
             val body =
                 client
-                    .download(GitHubReleaseAsset("release.jar", 0, null, "https://localhost:${server.server.address.port}/release.jar"))
+                    .download(GitHubReleaseAsset("release.jar", 0, null, "https://localhost:${server.server.address.port}/redirect"))
                     .map { buffer ->
                         val bytes = ByteArray(buffer.readableByteCount())
                         try {
@@ -158,7 +158,7 @@ class ManagedTlsOutboundClientTest {
                     .block()
                     ?.joinToString("")
             assertEquals("{\"models\": []}", body)
-            assertEquals(1, server.requestCount.get())
+            assertEquals(2, server.requestCount.get())
 
             assertFails {
                 client
@@ -166,7 +166,7 @@ class ManagedTlsOutboundClientTest {
                     .collectList()
                     .block()
             }
-            assertEquals(1, server.requestCount.get())
+            assertEquals(2, server.requestCount.get())
         } finally {
             server.server.stop(0)
         }
@@ -196,10 +196,16 @@ class ManagedTlsOutboundClientTest {
                     httpsConfigurator = HttpsConfigurator(serverContext)
                     createContext("/") { exchange ->
                         requestCount.incrementAndGet()
-                        val body = responseFor(exchange.requestURI.path).toByteArray()
-                        exchange.responseHeaders.add("Content-Type", "application/json")
-                        exchange.sendResponseHeaders(200, body.size.toLong())
-                        exchange.responseBody.use { it.write(body) }
+                        if (exchange.requestURI.path == "/redirect") {
+                            exchange.responseHeaders.add("Location", "/release.jar")
+                            exchange.sendResponseHeaders(302, -1)
+                            exchange.close()
+                        } else {
+                            val body = responseFor(exchange.requestURI.path).toByteArray()
+                            exchange.responseHeaders.add("Content-Type", "application/json")
+                            exchange.sendResponseHeaders(200, body.size.toLong())
+                            exchange.responseBody.use { it.write(body) }
+                        }
                     }
                     start()
                 }

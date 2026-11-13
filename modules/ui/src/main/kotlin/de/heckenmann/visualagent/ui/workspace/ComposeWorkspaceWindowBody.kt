@@ -9,6 +9,7 @@ import de.heckenmann.visualagent.ui.conversation.*
 import de.heckenmann.visualagent.ui.conversation.models.ConversationWorkspacePanel
 import de.heckenmann.visualagent.ui.directories.DirectoryAccessPanel
 import de.heckenmann.visualagent.ui.files.*
+import de.heckenmann.visualagent.ui.info.AboutPanel
 import de.heckenmann.visualagent.ui.modal.*
 import de.heckenmann.visualagent.ui.settings.*
 import de.heckenmann.visualagent.ui.settings.navigation.SettingsWorkspacePanel
@@ -73,5 +74,6 @@ internal fun WindowBody(
                 clientDirectoryAccess = panelServices.clientDirectoryAccess,
                 modalRequester = panelServices.modalRequester,
             )
+        "about" -> AboutPanel(panelServices.applicationInformation, panelServices.openSourceLicenses)
     }
 }

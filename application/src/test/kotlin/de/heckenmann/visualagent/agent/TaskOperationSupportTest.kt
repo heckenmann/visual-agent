@@ -23,8 +23,9 @@ class TaskOperationSupportTest {
         fun tool(
             id: String,
             schema: String,
+            functionName: String = id,
         ) = object : VisualAgentTool {
-            override val definition = ToolDefinition(ToolId(id), id, "Test", schema)
+            override val definition = ToolDefinition(ToolId(id), functionName, "Test", schema)
 
             override fun execute(
                 inputJson: String,
@@ -36,6 +37,7 @@ class TaskOperationSupportTest {
                 listOf(
                     tool("known", """{"properties":{"action":{"enum":["read"]}}}"""),
                     tool("unknown", "{}"),
+                    tool("javascript:execute", "{}", "javascript_execute"),
                 ),
                 ToolEventBus(),
             )
@@ -47,6 +49,7 @@ class TaskOperationSupportTest {
         assertFalse(service.supportsOperation(agent, TaskOperation("known", "write")))
         assertTrue(service.supportsOperation(agent, TaskOperation("unknown", "read")))
         assertFalse(service.supportsOperation(agent, TaskOperation("missing", "read")))
+        assertFalse(service.supportsOperation(agent, TaskOperation("javascript:execute")))
         assertEquals("missing_tool", service.providerToolName("missing:tool"))
         assertEquals("x".repeat(80), service.providerToolName("x".repeat(80)))
     }

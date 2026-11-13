@@ -1,0 +1,11 @@
+H2 database engine 2.5.252 source archive
+
+The source archive corresponding to the unmodified H2 2.5.252 runtime artifact
+is available from Maven Central:
+https://repo.maven.apache.org/maven2/com/h2database/h2/2.5.252/h2-2.5.252-sources.jar
+
+SHA-256:
+ff3d277f962df614283d0a754949eea1e4685ed645f603a590f19c5dbbdb83b3
+
+This source-availability reference identifies the matching published archive; it
+does not claim that this project modified the H2 source or provide legal advice.

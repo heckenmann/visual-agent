@@ -5,6 +5,7 @@ import de.heckenmann.visualagent.gradle.verifyNativeProjectLegalMaterials
 import de.heckenmann.visualagent.gradle.verifyPackagedRuntimeLegalMaterials
 import org.gradle.api.artifacts.component.ModuleComponentIdentifier
 import org.gradle.api.tasks.SourceSetContainer
+import org.gradle.jvm.toolchain.JvmVendorSpec
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import org.jlleitschuh.gradle.ktlint.tasks.BaseKtLintCheckTask
 import org.springframework.boot.gradle.tasks.bundling.BootJar
@@ -48,17 +49,6 @@ version =
     libs.versions.visual.agent
         .get()
 
-val macOsDnsResolverClassifier =
-    if (System.getProperty("os.name").equals("Mac OS X", ignoreCase = true)) {
-        when (System.getProperty("os.arch").lowercase()) {
-            "aarch64", "arm64" -> "osx-aarch_64"
-            "amd64", "x86_64" -> "osx-x86_64"
-            else -> error("Unsupported macOS architecture for Netty DNS resolver: ${System.getProperty("os.arch")}")
-        }
-    } else {
-        null
-    }
-
 repositories {
     google()
     mavenCentral()
@@ -78,13 +68,6 @@ dependencies {
     runtimeOnly(libs.coroutines.swing)
     implementation(libs.spring.boot.starter)
     implementation(platform(libs.spring.boot.bom))
-    macOsDnsResolverClassifier?.let { classifier ->
-        runtimeOnly(
-            variantOf(libs.netty.resolver.dns.native.macos) {
-                classifier(classifier)
-            },
-        )
-    }
     implementation(libs.tika.core)
     implementation(libs.appdirs)
     implementation(libs.serialization.json)
@@ -98,7 +81,18 @@ val desktopDispatcherProbeClasspath = files(sourceSets.main.get().runtimeClasspa
 
 // Resolve sources from the selected runtime graph, not independently selected versions.
 // This is a partial evidence set; JDK/native source obligations remain open in #410.
-val requiredSourceModules = setOf("com.h2database:h2", "ch.qos.logback:logback-core", "ch.qos.logback:logback-classic")
+// Adobe's DNG specification patent license requires this notice in source and documentation:
+// This product includes DNG technology under license by Adobe.
+val requiredSourceModules =
+    setOf(
+        "com.h2database:h2",
+        "ch.qos.logback:logback-core",
+        "ch.qos.logback:logback-classic",
+        "net.java.dev.jna:jna",
+        "org.jetbrains.skiko:skiko-awt",
+        "org.graalvm.js:js-language",
+        "jakarta.annotation:jakarta.annotation-api",
+    )
 val runtimeSourceMaterials =
     configurations.runtimeClasspath.map { configuration ->
         configuration.incoming
@@ -116,19 +110,163 @@ val runtimeSourceMaterials =
             }.files
     }
 
-tasks.register<Sync>("prepareLibrarySourceMaterials") {
-    group = "distribution"
-    description = "Collects partial H2/Logback source evidence; does not approve redistribution."
-    from(runtimeSourceMaterials) { into("archives") }
-    from(rootProject.layout.projectDirectory.dir("docs/licensing/third-party")) { into("legal") }
-    from(rootProject.layout.projectDirectory.file("docs/licensing/source-delivery.md"))
-    into(layout.buildDirectory.dir("reports/dependency-license/library-source-materials"))
-    duplicatesStrategy = DuplicatesStrategy.FAIL
-    doFirst {
-        check(runtimeSourceMaterials.get().files.size == requiredSourceModules.size) {
-            "Missing required H2/Logback source artifacts; source evidence is incomplete."
+// Preserve the exact AppImage runtime source inputs used by the pinned binary.
+// This is partial evidence: the upstream Alpine image did not pin all APK revisions.
+val appImageRuntimeSourceArchives =
+    listOf(
+        Triple(
+            "type2-runtime-dd6cebed.tar.gz",
+            "https://codeload.github.com/AppImage/type2-runtime/tar.gz/dd6cebedcbddde9c82f89b011e8e1d40b6e43868",
+            "f5fec23be76e50e2445ed2d018bac49b367490fc483c62c4637e99ec705d27ba",
+        ),
+        Triple(
+            "fuse-3.15.0.tar.xz",
+            "https://github.com/libfuse/libfuse/releases/download/fuse-3.15.0/fuse-3.15.0.tar.xz",
+            "70589cfd5e1cff7ccd6ac91c86c01be340b227285c5e200baa284e401eea2ca0",
+        ),
+        Triple(
+            "squashfuse-0.5.2.tar.gz",
+            "https://github.com/vasi/squashfuse/archive/0.5.2.tar.gz",
+            "db0238c5981dabbd80ee09ae15387f390091668ca060a7bc38047912491443d3",
+        ),
+        Triple(
+            "musl-1.2.5.tar.gz",
+            "https://musl.libc.org/releases/musl-1.2.5.tar.gz",
+            "a9a118bbe84d8764da0ea0d28b3ab3fae8477fc7e4085d90102b8596fc7c75e4",
+        ),
+        Triple(
+            "alpine-musl-package.tar.gz",
+            "https://github.com/alpinelinux/aports/archive/5245849e14d213abe18d589b4b80d65793327940.tar.gz",
+            "e63fe34178270d2d8cc74f1bab303ec1868150606e66f6da2c16221e6ec86034",
+        ),
+        Triple(
+            "mimalloc-2.1.7.tar.gz",
+            "https://github.com/microsoft/mimalloc/archive/refs/tags/v2.1.7.tar.gz",
+            "0eed39319f139afde8515010ff59baf24de9e47ea316a315398e8027d198202d",
+        ),
+        Triple(
+            "alpine-mimalloc-package.tar.gz",
+            "https://github.com/alpinelinux/aports/archive/5a1a5dc3216a69e3cd66a57ee07cb5ef01b8be39.tar.gz",
+            "6f4f50fca873868e754053c828d8336a531dbca365c678dc75db8111873d87e1",
+        ),
+        Triple(
+            "zstd-1.5.6.tar.gz",
+            "https://github.com/facebook/zstd/archive/v1.5.6.tar.gz",
+            "30f35f71c1203369dc979ecde0400ffea93c27391bfd2ac5a9715d2173d92ff7",
+        ),
+        Triple(
+            "alpine-zstd-package.tar.gz",
+            "https://github.com/alpinelinux/aports/archive/5c2ddf18f193dafdd25ae7391d96c7e30766eecd.tar.gz",
+            "cdc49cb68d5358eefcc83955bf285ce50fbcf6b223b271ef71e1008402c201f0",
+        ),
+        Triple(
+            "zlib-1.4.tar.gz",
+            "https://www.zlib.net/fossils/zlib-1.4.tar.gz",
+            "02dd159783677a749c04adbdd02b55b8a2bcc7e054f51b76b549199a916ad584",
+        ),
+        Triple(
+            "alpine-zlib-package.tar.gz",
+            "https://github.com/alpinelinux/aports/archive/d3332621d44c2c4cf52e52217b16674db190212c.tar.gz",
+            "050415c464375727d855a14abb0cdf2d549bda3b32ddc3c0017256e552b3ec09",
+        ),
+    )
+val appImageRuntimeSourceDirectory =
+    layout.buildDirectory.dir("reports/dependency-license/appimage-runtime-sources")
+val appImageRuntimeSourceFiles =
+    appImageRuntimeSourceArchives.map { (name, _, _) -> appImageRuntimeSourceDirectory.get().file(name).asFile }
+val liberationFontSourceArchive =
+    Triple(
+        "liberation-fonts-2.1.5.tar.gz",
+        "https://github.com/liberationfonts/liberation-fonts/files/7261483/liberation-fonts-2.1.5.tar.gz",
+        "fb22c2109dcbb25202aeb6202c0a58fd2e536dbf7c72879c4bbfa2b8a9a75d60",
+    )
+val liberationFontSourceArchiveFile =
+    layout.buildDirectory.file("reports/dependency-license/liberation-font-source/${liberationFontSourceArchive.first}")
+val validateRuntimeSourceMaterials =
+    tasks.register("validateRuntimeSourceMaterials") {
+        group = "verification"
+        description = "Fails before downloads when a selected runtime source artifact is unavailable."
+        doLast {
+            check(runtimeSourceMaterials.get().files.size == requiredSourceModules.size) {
+                "Missing required selected-library source artifacts; source evidence is incomplete."
+            }
         }
     }
+val zuluSourcePackage =
+    Triple(
+        "zulu27-ca-src_27.0.1.0.3-5_amd64.deb",
+        "https://repos.azul.com/zulu/deb/pool/main/z/zulu/27/zulu27-ca-src_27.0.1.0.3-5_amd64.deb",
+        "c803bd7fa69e94c8f1a7370e00dd98212480d8648d6e27eed06c27b97bd4b6b4",
+    )
+val zuluSourcePackageFile =
+    layout.buildDirectory.file("reports/dependency-license/zulu-source-package/${zuluSourcePackage.first}")
+val prepareZuluSourcePackage =
+    tasks.register("prepareZuluSourcePackage") {
+        group = "distribution"
+        description = "Collects the checksum-pinned supplemental Zulu Java source package."
+        inputs.property("sourcePackage", zuluSourcePackage)
+        outputs.file(zuluSourcePackageFile)
+        doLast {
+            downloadVerifiedFile(
+                zuluSourcePackage.second,
+                zuluSourcePackageFile.get().asFile,
+                zuluSourcePackage.third,
+            )
+        }
+    }
+val librarySourceMaterialsDirectory =
+    layout.buildDirectory.dir("reports/dependency-license/library-source-materials")
+val releaseSourceMaterialsDirectory =
+    layout.buildDirectory.dir("reports/dependency-license/release-source-materials")
+val prepareLiberationFontSourceMaterial =
+    tasks.register("prepareLiberationFontSourceMaterial") {
+        group = "distribution"
+        description = "Collects the checksum-pinned source archive for the embedded Liberation font."
+        dependsOn(validateRuntimeSourceMaterials)
+        inputs.property("sourceArchive", liberationFontSourceArchive)
+        outputs.file(liberationFontSourceArchiveFile)
+        doLast {
+            downloadVerifiedFile(
+                liberationFontSourceArchive.second,
+                liberationFontSourceArchiveFile.get().asFile,
+                liberationFontSourceArchive.third,
+            )
+        }
+    }
+val prepareAppImageRuntimeSourceMaterials =
+    tasks.register("prepareAppImageRuntimeSourceMaterials") {
+        group = "distribution"
+        description = "Collects checksum-pinned, partial AppImage runtime source evidence."
+        dependsOn(validateRuntimeSourceMaterials)
+        inputs.property("sourceArchives", appImageRuntimeSourceArchives)
+        outputs.files(appImageRuntimeSourceFiles)
+        doLast {
+            appImageRuntimeSourceArchives.zip(appImageRuntimeSourceFiles).forEach { (archive, target) ->
+                downloadVerifiedFile(archive.second, target, archive.third)
+            }
+        }
+    }
+
+tasks.register<Sync>("prepareLibrarySourceMaterials") {
+    group = "distribution"
+    description = "Collects partial source evidence for selected runtime libraries; does not approve redistribution."
+    dependsOn(prepareAppImageRuntimeSourceMaterials, prepareLiberationFontSourceMaterial)
+    from(runtimeSourceMaterials) { into("archives") }
+    from(appImageRuntimeSourceFiles) { into("archives/appimage-runtime") }
+    from(liberationFontSourceArchiveFile) { into("archives/liberation-fonts") }
+    from(rootProject.layout.projectDirectory.dir("docs/licensing/third-party")) { into("legal") }
+    from(rootProject.layout.projectDirectory.file("docs/licensing/source-delivery.md"))
+    into(librarySourceMaterialsDirectory)
+    duplicatesStrategy = DuplicatesStrategy.FAIL
+}
+
+tasks.register<Sync>("prepareReleaseSourceMaterials") {
+    group = "distribution"
+    description = "Adds the supplemental pinned Zulu source package once for the release review archive."
+    dependsOn("prepareLibrarySourceMaterials", prepareZuluSourcePackage)
+    from(librarySourceMaterialsDirectory)
+    from(zuluSourcePackageFile) { into("archives/zulu-jdk") }
+    into(releaseSourceMaterialsDirectory)
 }
 
 val generateDesktopDispatcherProbeClasspath =
@@ -149,19 +287,18 @@ tasks.withType<Test>().configureEach {
     )
 }
 
-if (macOsDnsResolverClassifier != null) {
-    dependencies {
-        components {
-            listOf(
-                "io.projectreactor.netty:reactor-netty-core",
-                "io.projectreactor.netty:reactor-netty-http",
-            ).forEach { reactorNettyModule ->
-                withModule(reactorNettyModule) {
-                    allVariants {
-                        withDependencies {
-                            removeIf { dependency ->
-                                dependency.group == "io.netty" && dependency.name == "netty-resolver-dns-native-macos"
-                            }
+dependencies {
+    components {
+        // Keep Reactor Netty's optional macOS resolver out of the distribution; outbound HTTP uses the JDK connector.
+        listOf(
+            "io.projectreactor.netty:reactor-netty-core",
+            "io.projectreactor.netty:reactor-netty-http",
+        ).forEach { reactorNettyModule ->
+            withModule(reactorNettyModule) {
+                allVariants {
+                    withDependencies {
+                        removeIf { dependency ->
+                            dependency.group == "io.netty" && dependency.name == "netty-resolver-dns-native-macos"
                         }
                     }
                 }
@@ -216,8 +353,10 @@ val desktopJavaVersion =
         .toInt()
 val desktopJavaHome =
     javaToolchains
-        .launcherFor { languageVersion.set(JavaLanguageVersion.of(desktopJavaVersion)) }
-        .get()
+        .launcherFor {
+            languageVersion.set(JavaLanguageVersion.of(desktopJavaVersion))
+            vendor.set(JvmVendorSpec.AZUL)
+        }.get()
         .metadata.installationPath.asFile
 
 val prepareRuntimeLegalMaterials =
@@ -334,6 +473,8 @@ installPackagedKeytool.configure {
 
 tasks.matching { it.name == "createDistributable" }.configureEach {
     dependsOn(generatedBranding, installPackagedKeytool)
+    // A task dependency alone does not invalidate a previously signed app image.
+    inputs.dir(prepareDistributionLegalResources.map { it.destinationDir }).withPropertyName("distributionLegalMaterials")
 }
 
 val linuxApplicationImage =
@@ -352,12 +493,9 @@ val appImageOutput =
 val appImageToolDownloadUrl =
     "https://github.com/AppImage/appimagetool/releases/download/$appImageToolVersion/appimagetool-x86_64.AppImage"
 val appImageToolSha256 = "ed4ce84f0d9caff66f50bcca6ff6f35aae54ce8135408b3fa33abfc3cb384eb0"
-val appImageRuntimeVersion = "20251108"
+val appImageRuntimeSourceCommit = "dd6cebedcbddde9c82f89b011e8e1d40b6e43868"
 val appImageRuntime =
-    layout.buildDirectory.file("appimage/tools/runtime-$appImageRuntimeVersion-x86_64")
-val appImageRuntimeDownloadUrl =
-    "https://github.com/AppImage/type2-runtime/releases/download/$appImageRuntimeVersion/runtime-x86_64"
-val appImageRuntimeSha256 = "2fca8b443c92510f1483a883f60061ad09b46b978b2631c807cd873a47ec260d"
+    layout.buildDirectory.file("appimage/tools/runtime-${appImageRuntimeSourceCommit.take(8)}-x86_64")
 val developmentLinuxDesktopEntry =
     layout.buildDirectory.file("compose/desktop-integration/visualagent-development.desktop")
 
@@ -484,12 +622,21 @@ tasks.register("generateDistributionArtifactInventory") {
     dependsOn("verifyNativeDistributionLauncher")
     val report = layout.buildDirectory.file("reports/dependency-license/packaged-artifacts.csv")
     doLast {
-        val artifactsByPackagingHash =
+        val runtimeArtifacts =
             configurations
                 .getByName("runtimeClasspath")
                 .incoming.artifacts.artifacts
                 .filter { artifact -> artifact.file.isFile && artifact.file.extension == "jar" }
-                .groupBy { artifact -> auditPackagingHash(artifact.file) }
+        val artifactsByPackagingHash =
+            runtimeArtifacts.groupBy { artifact -> auditPackagingHash(artifact.file) }
+        val projectJar =
+            tasks
+                .named<org.gradle.jvm.tasks.Jar>("jar")
+                .get()
+                .archiveFile
+                .get()
+                .asFile
+        val bundledJdkJar = desktopJavaHome.resolve("lib/jrt-fs.jar")
         val packageRoot =
             layout.buildDirectory
                 .dir("compose/binaries/main/app")
@@ -505,24 +652,64 @@ tasks.register("generateDistributionArtifactInventory") {
                         artifactsByPackagingHash[packagingHash].orEmpty().filter { artifact ->
                             file.name == "${artifact.file.name.removeSuffix(".jar")}-$packagingHash.jar"
                         }
-                    val artifact = artifacts.singleOrNull()
+                    val transformedArtifactCandidates =
+                        if (artifacts.isEmpty()) {
+                            // Compose removes the host-native entry from platform JARs, changing their content hash.
+                            runtimeArtifacts.filter { candidate ->
+                                val packagedPrefix = "${candidate.file.name.removeSuffix(".jar")}-"
+                                val packagedSuffix = file.name.removePrefix(packagedPrefix).removeSuffix(".jar")
+                                file.name.startsWith(packagedPrefix) && packagedSuffix.matches(Regex("[0-9a-f]{1,32}"))
+                            }
+                        } else {
+                            emptyList()
+                        }
+                    val artifact = (artifacts.ifEmpty { transformedArtifactCandidates }).singleOrNull()
                     val component = artifact?.id?.componentIdentifier
+                    val packagedPrefix = "${projectJar.nameWithoutExtension}-"
+                    val packagedSuffix = file.name.removePrefix(packagedPrefix).removeSuffix(".jar")
+                    val isProjectJar =
+                        file.name.startsWith(packagedPrefix) && packagedSuffix.matches(Regex("[0-9a-f]{1,32}"))
+                    val isBundledJdkJar =
+                        file.name == "jrt-fs.jar" && file.invariantSeparatorsPath.contains("/runtime/")
+                    val resolvedFile =
+                        artifact?.file
+                            ?: when {
+                                isProjectJar -> projectJar
+                                isBundledJdkJar -> bundledJdkJar
+                                else -> null
+                            }
                     val coordinate =
                         if (component is ModuleComponentIdentifier) {
                             "${component.group}:${component.module}:${component.version}"
+                        } else if (artifact != null) {
+                            component?.displayName ?: "UNMATCHED"
+                        } else if (isProjectJar) {
+                            "project ':desktop'"
+                        } else if (isBundledJdkJar) {
+                            "bundled-jdk:$desktopJavaVersion:jrt-fs"
                         } else {
-                            component?.displayName ?: if (artifacts.size > 1) "AMBIGUOUS" else "UNMATCHED"
+                            if (artifacts.size > 1 || transformedArtifactCandidates.size > 1) "AMBIGUOUS" else "UNMATCHED"
                         }
-                    val sourceHash = artifact?.let { auditHash(it.file, "SHA-256") }.orEmpty()
+                    val sourceHash = resolvedFile?.takeIf(File::isFile)?.let { auditHash(it, "SHA-256") }.orEmpty()
                     val packageHash = auditHash(file, "SHA-256")
                     "${file.relativeTo(
                         packageRoot,
-                    ).invariantSeparatorsPath},$coordinate,${artifact?.file?.name.orEmpty()},$sourceHash,$packageHash"
+                    ).invariantSeparatorsPath},$coordinate,${resolvedFile?.name.orEmpty()},$sourceHash,$packageHash"
                 }.sorted()
                 .toList()
+        val unresolvedArtifacts = rows.filter { row -> ",UNMATCHED," in row || ",AMBIGUOUS," in row }
+        check(unresolvedArtifacts.isEmpty()) {
+            "Unable to map packaged JARs to unique resolved runtime artifacts:\n${unresolvedArtifacts.joinToString("\n")}"
+        }
         report.get().asFile.apply {
             parentFile.mkdirs()
-            writeText((listOf("packagePath,coordinate,resolvedFile,sourceSha256,packageSha256") + rows).joinToString("\n", postfix = "\n"))
+            writeText(
+                (
+                    listOf(
+                        "packagePath,coordinate,resolvedFile,resolvedArtifactSha256,packageSha256",
+                    ) + rows
+                ).joinToString("\n", postfix = "\n"),
+            )
         }
     }
 }
@@ -573,20 +760,26 @@ val downloadAppImageTool =
         }
     }
 
-val downloadAppImageRuntime =
-    tasks.register("downloadAppImageRuntime") {
+val buildAppImageRuntime =
+    tasks.register<Exec>("buildAppImageRuntime") {
         group = "distribution"
-        description = "Downloads the verified AppImage Type 2 runtime embedded in the portable Linux package."
+        description = "Builds the AppImage Type 2 runtime embedded in the portable Linux package from retained sources."
+        dependsOn(prepareAppImageRuntimeSourceMaterials)
+        val sourceArchive = appImageRuntimeSourceDirectory.get().file("type2-runtime-dd6cebed.tar.gz")
+        val buildScript = rootProject.layout.projectDirectory.file("scripts/verify-appimage-runtime-build.sh")
+        inputs.file(sourceArchive)
+        inputs.file(buildScript)
         outputs.file(appImageRuntime)
         onlyIf {
             System.getProperty("os.name", "").contains("linux", ignoreCase = true) &&
                 System.getProperty("os.arch", "").equals("amd64", ignoreCase = true)
         }
-        doLast {
-            downloadVerifiedFile(
-                appImageRuntimeDownloadUrl,
+        doFirst {
+            commandLine(
+                "bash",
+                buildScript.asFile,
+                sourceArchive.asFile,
                 appImageRuntime.get().asFile,
-                appImageRuntimeSha256,
             )
         }
     }
@@ -634,7 +827,7 @@ val packageAppImage =
     tasks.register<Exec>("packageAppImage") {
         group = "distribution"
         description = "Packages Visual Agent as a portable Linux AppImage."
-        dependsOn(downloadAppImageTool, downloadAppImageRuntime, prepareAppImage)
+        dependsOn(downloadAppImageTool, buildAppImageRuntime, prepareAppImage)
         inputs.dir(appImageDirectory)
         inputs.file(appImageTool)
         inputs.file(appImageRuntime)
@@ -656,24 +849,58 @@ val packageAppImage =
         }
     }
 
+tasks.register<Exec>("verifyAppImageRuntimeInPackage") {
+    group = "verification"
+    description = "Verifies the AppImage embeds the runtime built from retained source materials."
+    dependsOn(packageAppImage)
+    val verificationScript = rootProject.layout.projectDirectory.file("scripts/verify_appimage_runtime_embedded.py")
+    inputs.file(appImageRuntime)
+    inputs.file(appImageOutput)
+    inputs.file(verificationScript)
+    onlyIf {
+        System.getProperty("os.name", "").contains("linux", ignoreCase = true) &&
+            System.getProperty("os.arch", "").equals("amd64", ignoreCase = true)
+    }
+    doFirst {
+        commandLine(
+            "python3",
+            verificationScript.asFile,
+            appImageRuntime.get().asFile,
+            appImageOutput.get().asFile,
+        )
+    }
+}
+
 private fun downloadVerifiedFile(
     url: String,
     target: File,
     expectedSha256: String,
 ) {
     target.parentFile.mkdirs()
-    URI(url).toURL().openStream().use { source ->
-        target.outputStream().use(source::copyTo)
-    }
-    val actualSha256 =
-        MessageDigest
-            .getInstance("SHA-256")
-            .digest(target.readBytes())
-            .joinToString(separator = "") { byte -> "%02x".format(byte.toInt() and 0xff) }
-    check(actualSha256 == expectedSha256) {
-        "Downloaded file checksum mismatch: expected $expectedSha256 but received $actualSha256."
+    if (target.isFile && auditHash(target, "SHA-256") == expectedSha256) return
+
+    val temporaryFile = Files.createTempFile(target.parentFile.toPath(), target.name, ".download")
+    try {
+        repeat(sourceDownloadAttempts) { attempt ->
+            URI(url).toURL().openStream().use { source ->
+                Files.newOutputStream(temporaryFile).use(source::copyTo)
+            }
+            val actualSha256 = auditHash(temporaryFile.toFile(), "SHA-256")
+            if (actualSha256 == expectedSha256) {
+                Files.move(temporaryFile, target.toPath(), REPLACE_EXISTING)
+                return
+            }
+            check(attempt < sourceDownloadAttempts - 1) {
+                "Downloaded file checksum mismatch after $sourceDownloadAttempts attempts for $url: " +
+                    "expected $expectedSha256 but received $actualSha256."
+            }
+        }
+    } finally {
+        Files.deleteIfExists(temporaryFile)
     }
 }
+
+private val sourceDownloadAttempts = 3
 
 private fun quoteDesktopExecArgument(value: String): String =
     "\"" +
@@ -879,12 +1106,11 @@ val verifyExecutableJar =
         }
     }
 
-val verifyMacOsNativeDnsResolver =
-    tasks.register("verifyMacOsNativeDnsResolver") {
+val verifyMacOsNativeDnsResolverAbsent =
+    tasks.register("verifyMacOsNativeDnsResolverAbsent") {
         group = "verification"
-        description = "Verifies that the desktop boot JAR contains the matching macOS Netty DNS resolver."
+        description = "Verifies the desktop boot JAR does not bundle the optional macOS Netty DNS resolver."
         dependsOn(tasks.named("bootJar"))
-        onlyIf { macOsDnsResolverClassifier != null }
         doLast {
             val executableJar =
                 tasks
@@ -893,23 +1119,16 @@ val verifyMacOsNativeDnsResolver =
                     .archiveFile
                     .get()
                     .asFile
-            val expectedResolver = "netty-resolver-dns-native-macos-"
-            val expectedClassifier = "-$macOsDnsResolverClassifier.jar"
-            val unexpectedClassifier =
-                if (macOsDnsResolverClassifier == "osx-aarch_64") "-osx-x86_64.jar" else "-osx-aarch_64.jar"
             JarFile(executableJar).use { archive ->
                 val resolverLibraries =
                     archive
                         .entries()
                         .asSequence()
                         .map { entry -> entry.name }
-                        .filter { entry -> entry.startsWith("BOOT-INF/lib/$expectedResolver") }
+                        .filter { entry -> entry.startsWith("BOOT-INF/lib/netty-resolver-dns-native-macos-") }
                         .toList()
-                check(resolverLibraries.any { entry -> entry.endsWith(expectedClassifier) }) {
-                    "Desktop boot JAR must contain the Netty macOS DNS resolver for $macOsDnsResolverClassifier"
-                }
-                check(resolverLibraries.none { entry -> entry.endsWith(unexpectedClassifier) }) {
-                    "Desktop boot JAR must not contain the Netty macOS DNS resolver for the other architecture"
+                check(resolverLibraries.isEmpty()) {
+                    "Desktop boot JAR must not bundle the optional native Netty DNS resolver: $resolverLibraries"
                 }
             }
         }

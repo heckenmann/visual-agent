@@ -26,6 +26,11 @@ fun verifyPackagedRuntimeLegalMaterials(
     }
     val runtimeVersion = loadRuntimeProperties(runtimeHome.resolve("release")).getProperty("JAVA_VERSION").trim('"')
     check(retained.getProperty("JAVA_VERSION").trim('"') == runtimeVersion) { "Runtime legal provenance has a different Java version" }
+    val sourceModules = runtimeModules(original)
+    val packagedModules = runtimeModules(loadRuntimeProperties(runtimeHome.resolve("release")))
+    check("java.base" in sourceModules && "java.base" in packagedModules) {
+        "Runtime module inventory is missing java.base"
+    }
     val suffix = if (sourceJdk.resolve("bin/keytool.exe").isFile) ".exe" else ""
     val records =
         legal.resolve("source-inputs.sha256").readLines().map { line ->
@@ -75,10 +80,25 @@ fun verifyPackagedRuntimeLegalMaterials(
         "source.vendor" to retained.getProperty("IMPLEMENTOR").trim('"'),
         "source.release.sha256" to inputs.getValue("release"),
         "source.modules.sha256" to inputs.getValue("lib/modules"),
+        "source.modules.list" to sourceModules.joinToString(","),
         "source.keytool.sha256" to inputs.getValue("bin/keytool$suffix"),
         "packaged.modules.sha256" to runtimeLegalSha256(runtimeHome.resolve("lib/modules")),
+        "packaged.modules.list" to packagedModules.joinToString(","),
         "packaged.keytool.sha256" to runtimeLegalSha256(runtimeHome.resolve("bin/keytool$suffix")),
     )
+}
+
+private fun runtimeModules(release: Properties): List<String> {
+    val value = release.getProperty("MODULES")?.trim('"') ?: error("Missing MODULES runtime metadata")
+    val modules = value.split(Regex("\\s+")).filter(String::isNotBlank)
+    val valid =
+        modules.isNotEmpty() &&
+            modules.distinct().size == modules.size &&
+            modules.all { it.matches(Regex("[A-Za-z0-9_.]+")) }
+    check(valid) {
+        "Invalid MODULES runtime metadata"
+    }
+    return modules
 }
 
 /** Public vendor/version fields only; never serialize arbitrary local JDK properties. */
@@ -113,10 +133,13 @@ private fun loadRuntimeProperties(file: File): Properties = Properties().apply {
 internal fun runtimeSourceInputs(root: Path): Map<String, File> {
     val inputs = sortedMapOf<String, File>()
 
-    fun add(path: Path) {
+    fun add(
+        path: Path,
+        requireNonEmpty: Boolean = true,
+    ) {
         val relative = root.relativize(path).toString().replace(File.separatorChar, '/')
         check(Files.isRegularFile(path) && path.toRealPath().startsWith(root)) { "Missing or escaping source-JDK file: $relative" }
-        check(path.toFile().length() > 0) { "Empty source-JDK legal/input file: $relative" }
+        check(!requireNonEmpty || path.toFile().length() > 0) { "Empty source-JDK legal/input file: $relative" }
         inputs[relative] = path.toFile()
     }
     val suffix = if (Files.isRegularFile(root.resolve("bin/keytool.exe"))) ".exe" else ""
@@ -126,7 +149,7 @@ internal fun runtimeSourceInputs(root: Path): Map<String, File> {
     Files.walk(legal).use { paths ->
         paths.forEach { path ->
             check(!Files.isSymbolicLink(path) || !Files.isDirectory(path)) { "JDK legal directory links require explicit review" }
-            if (!Files.isDirectory(path)) add(path)
+            if (!Files.isDirectory(path)) add(path, requireNonEmpty = false)
         }
     }
     val notice = Regex("(?i)(LICENSE|NOTICE|COPYING|COPYRIGHT|DISCLAIMER|README|THIRD_PARTY_README)([._-].*)?")
@@ -135,6 +158,6 @@ internal fun runtimeSourceInputs(root: Path): Map<String, File> {
         .listFiles()
         .orEmpty()
         .filter { notice.matches(it.name) }
-        .forEach { add(it.toPath()) }
+        .forEach { add(it.toPath(), requireNonEmpty = false) }
     return inputs
 }

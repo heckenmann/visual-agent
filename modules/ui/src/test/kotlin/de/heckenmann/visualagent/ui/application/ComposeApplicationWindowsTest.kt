@@ -23,10 +23,17 @@ import kotlin.test.assertTrue
  */
 class ComposeApplicationWindowsTest {
     @Test
-    fun `default windows cover all shortcut ids`() {
+    fun `default windows include every shortcut panel and the About panel`() {
         val windows = defaultWindows()
 
-        assertEquals(workspacePanelShortcutIds, windows.map { it.id })
+        assertEquals(workspacePanelShortcutIds + "about", windows.map { it.id })
+    }
+
+    @Test
+    fun `About panel is reachable from the command palette`() {
+        val commands = workspaceCommands(defaultWindows(), activateWindow = {}, onCloseApplication = {})
+
+        assertTrue(commands.any { it.id == "open-about" && it.title == "Open About" })
     }
 
     @Test
@@ -39,6 +46,7 @@ class ComposeApplicationWindowsTest {
         assertFalse(windows.getValue("agents").visible)
         assertFalse(windows.getValue("settings").visible)
         assertFalse(windows.getValue("canvas").visible)
+        assertFalse(windows.getValue("about").visible)
     }
 
     @Test

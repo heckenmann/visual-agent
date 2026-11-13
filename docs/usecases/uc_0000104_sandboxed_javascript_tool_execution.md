@@ -12,9 +12,14 @@ Allow an enabled agent to run a JavaScript program for deterministic multi-tool 
 
 ## Preconditions
 
+- The runtime has been verified to enforce Graal's `UNTRUSTED` policy for model-supplied code.
 - The current request explicitly enables the `javascript_execute` provider function.
 - The request-scoped tool set contains the tools the script is expected to call.
 - The server is running with the configured JavaScript resource limits.
+
+## Current Availability
+
+The tool is excluded from main-agent and sub-agent tool sets, including previously persisted per-agent grants. Global enablement is rejected. On the required JDK 27, the current GraalJS version cannot start its `UNTRUSTED` isolate; `CONSTRAINED` is not an acceptable replacement for untrusted model-generated code. Restore access only after the packaged runtime and its resource limits pass security-relevant integration tests.
 
 ## Flow
 
@@ -25,7 +30,7 @@ Allow an enabled agent to run a JavaScript program for deterministic multi-tool 
 5. The script filters, aggregates, transforms, or combines results locally. For complex deterministic logic or large generated text (for example CSV exports and Markdown tables), it assembles the complete output before returning it. It can return a string, Markdown document, primitive, array, object, or null.
 6. Only the final `return` value becomes the model-visible tool result. Console diagnostics remain bounded execution metadata and never use the server's real stdout/stderr.
 7. If execution fails, the tool returns a compact category and message to the model. The model can correct the source or arguments and retry; an unchanged failing script must not be repeated.
-8. The server enforces time, guest-memory (when the Graal isolate runtime is available), result, call-count, concurrency, workspace read/write, tool-argument, and recursion limits, then closes the context. Inline script source length is not capped; workspace-backed source is read through the bounded workspace API, and the normal tool-call timeout remains the execution bound.
+8. The server enforces an outer execution deadline, result, call-count, concurrency, workspace read/write, tool-argument, and recursion limits, then closes the context. The packaged JDK 27/GraalJS runtime uses Graal's constrained host-access policy and does not provide a hard per-execution guest-heap quota. Inline script source length is not capped; workspace-backed source is read through the bounded workspace API.
 
 ## Tool Calls
 
@@ -55,8 +60,10 @@ Execution exceptions are returned to the model as actionable tool errors (for ex
 - Parent cancellation cancels the guest context and in-flight bridge calls.
 - Nested calls inherit the outer deadline. Their `timeoutSeconds` argument can shorten the remaining budget but cannot extend it.
 - Workspace reads and writes count toward the request tool-call budget and are bounded per file and cumulatively for the execution. Reads are bounded before their UTF-8 content is copied into JavaScript. These data-transfer limits do not cap inline JavaScript source length.
-- The Oracle GraalVM isolate path applies hard isolate and retained guest-heap limits. Supported runtimes without the isolate image use Graal's constrained host-access policy plus the same bounded result traversal; no host filesystem or application classes are exposed.
-- GraalJS no longer publishes a macOS x64 isolate for the configured version. On macOS x64, JavaScript execution therefore uses the constrained policy rather than claiming the isolate-only memory limits.
+- The supported packaged runtime uses Graal's constrained host-access policy on every platform. Host classes, filesystem APIs, native access, process creation, networking, and polyglot access are disabled. The execution service applies a deadline and cancels/closes the context on timeout, but there is no hard per-execution heap or CPU quota; do not describe this as an isolate-level resource sandbox.
+- Platform-specific Graal isolate artifacts are not packaged: direct startup on the required JDK 27 fails with a `JavaLangAccess.addEnableNativeAccess(Module)` linkage error, and the previous fallback had hidden that failure. If hard guest resource quotas become a requirement, select and verify a compatible runtime or process boundary before claiming them.
+- GraalVM documents `CONSTRAINED` for trusted, potentially buggy code and does not support untrusted code with that policy. Because this tool executes model-supplied scripts, the current JDK 27 constrained fallback is not approved as the model-facing sandbox. Keep JavaScript execution unavailable for untrusted scripts until a compatible `UNTRUSTED` runtime or separately reviewed process boundary is implemented and verified.
+- GraalVM's documented external-isolate mode also fails before worker startup on the required JDK 27 with the same `JavaLangAccess.addEnableNativeAccess(Module)` linkage error.
 - Nested registry calls are always awaited; asynchronous scheduling is rejected so permits remain held until side effects finish.
 - Syntax, runtime, access, tool, timeout, cancellation, and limit failures are returned as compact safe categories without stack traces or internal paths.
 

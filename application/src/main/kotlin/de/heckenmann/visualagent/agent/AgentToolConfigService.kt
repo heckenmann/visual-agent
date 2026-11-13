@@ -59,7 +59,6 @@ class AgentToolConfigService(
             "diagnostics:logs",
             SERVER_TLS_TRUST_TOOL_ID,
             SERVER_TLS_KEY_TOOL_ID,
-            "javascript:execute",
             "memory",
             "skills",
             TOOL_HELP_ID,
@@ -102,20 +101,21 @@ class AgentToolConfigService(
         agent: SubAgent,
         operation: de.heckenmann.visualagent.task.TaskOperation,
     ): Boolean {
+        if (!isToolGloballyEnabled(operation.tool)) return false
         if (modelCapabilities?.supportsTools(agent) == false) return false
         val tool = registry?.ifAvailable?.resolve(setOf(RegistryToolId(operation.tool)))?.singleOrNull() ?: return false
         return operation.action == null || tool.supportedActions?.contains(operation.action) != false
     }
 
     /**
-     * Returns whether a tool is globally enabled.
+     * Returns whether a tool is available to model requests after runtime and global policy checks.
      *
      * @param toolId Canonical tool ID
      * @return true when the tool is not globally disabled
      * @see docs/usecases/uc_0000019_configure_agent_tools.md
      */
     fun isToolGloballyEnabled(toolId: String): Boolean =
-        toolId !in RESTRICTED_HOST_ACCESS_TOOL_IDS &&
+        toolId !in BLOCKED_TOOL_IDS &&
             toolId !in disabledToolIds() &&
             (toolId !in PROCESS_INVENTORY_TOOL_IDS || preferenceStore?.getPreference(PROCESS_INVENTORY_INITIALIZED_KEY) == "true") &&
             (toolId != SYSTEM_ENV_TOOL_ID || preferenceStore?.getPreference(SYSTEM_ENV_INITIALIZED_KEY) == "true")
@@ -153,8 +153,8 @@ class AgentToolConfigService(
         toolId: String,
         enabled: Boolean,
     ) {
-        require(!enabled || toolId !in RESTRICTED_HOST_ACCESS_TOOL_IDS) {
-            "Unsandboxed host-access tools are permanently disabled; use workspace:file instead"
+        require(!enabled || toolId !in BLOCKED_TOOL_IDS) {
+            "This tool is unavailable due to a security policy"
         }
         val next =
             if (enabled) {
@@ -277,7 +277,6 @@ class AgentToolConfigService(
                         "workspace:file",
                         "workspace:download",
                         "canvas",
-                        "javascript:execute",
                     ),
             ),
             SubAgentToolConfig(
@@ -296,7 +295,6 @@ class AgentToolConfigService(
                         "workspace:file",
                         "workspace:download",
                         "canvas",
-                        "javascript:execute",
                     ),
                 maxTurns = 8,
             ),
@@ -330,7 +328,6 @@ class AgentToolConfigService(
                         "workspace:file",
                         "workspace:download",
                         "canvas",
-                        "javascript:execute",
                     ),
             ),
         )
@@ -346,7 +343,6 @@ private const val SYSTEM_ENV_TOOL_ID = "system:env"
 private const val LOG_DIAGNOSTICS_TOOL_ID = "diagnostics:logs"
 private const val SERVER_TLS_TRUST_TOOL_ID = "security:truststore"
 private const val SERVER_TLS_KEY_TOOL_ID = "security:keystore"
-
 private val SERVER_TLS_TOOL_IDS = setOf(SERVER_TLS_TRUST_TOOL_ID, SERVER_TLS_KEY_TOOL_ID)
 private val PROCESS_INVENTORY_TOOL_IDS = setOf("system:processes", "system:client-processes")
 private val MAIN_AGENT_ONLY_TOOL_IDS =
@@ -361,7 +357,7 @@ private val MAIN_AGENT_ONLY_TOOL_IDS =
             "system:client-processes",
         )
 
-private val RESTRICTED_HOST_ACCESS_TOOL_IDS =
+private val BLOCKED_TOOL_IDS =
     setOf(
         "file:read",
         "file:list",
@@ -371,6 +367,7 @@ private val RESTRICTED_HOST_ACCESS_TOOL_IDS =
         "file:edit",
         "terminal",
         "pwd",
+        "javascript:execute",
     )
 
 /**

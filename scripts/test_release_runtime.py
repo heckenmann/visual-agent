@@ -29,6 +29,7 @@ class RuntimeLegalMaterialsTest(unittest.TestCase):
         self.jdk.mkdir()
         (self.jdk / "release").write_text(
             'JAVA_VERSION="27.0.1"\nJAVA_RUNTIME_VERSION="27.0.1+9"\n'
+            'MODULES="java.base java.compiler java.logging java.sql"\n'
             'IMPLEMENTOR="Synthetic Vendor"\nOS_NAME="FixtureOS"\nOS_ARCH="x86_64"\n'
             'PRIVATE_HOST_PATH="/private/not-for-distribution"\n'
         )
@@ -62,7 +63,9 @@ class RuntimeLegalMaterialsTest(unittest.TestCase):
         packaged = self.root / "packaged-runtime"
         (packaged / "bin").mkdir(parents=True)
         (packaged / "lib").mkdir()
-        (packaged / "release").write_text('JAVA_VERSION="27.0.1"\n')
+        (packaged / "release").write_text(
+            'JAVA_VERSION="27.0.1"\nMODULES="java.base java.logging"\n'
+        )
         (packaged / "bin/keytool").write_bytes(b"Synthetic post-packaging keytool")
         (packaged / "lib/modules").write_bytes(b"Synthetic trimmed modules")
 
@@ -110,7 +113,16 @@ class RuntimeLegalMaterialsTest(unittest.TestCase):
         self.assertNotEqual(source_hash, packaged_hash)
         self.assertIn("source.keytool.sha256=" + source_hash, report)
         self.assertIn("packaged.keytool.sha256=" + packaged_hash, report)
+        self.assertIn("source.modules.list=java.base,java.compiler,java.logging,java.sql", report)
+        self.assertIn("packaged.modules.list=java.base,java.logging", report)
         self.assertNotIn(str(self.root), report)
+
+    def test_missing_packaged_module_inventory_fails(self):
+        self.assert_prepared()
+        (self.root / "packaged-runtime/release").write_text('JAVA_VERSION="27.0.1"\n')
+        result = self.prepare("verifyRuntimeFixture")
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn("Missing MODULES runtime metadata", result.stderr)
 
     def test_notice_tampering_fails_verification(self):
         self.assert_prepared()
@@ -139,6 +151,23 @@ class RuntimeLegalMaterialsTest(unittest.TestCase):
         result = self.prepare()
         self.assertNotEqual(0, result.returncode)
         self.assertIn("Missing or escaping source-JDK file", result.stderr)
+
+    def test_empty_optional_module_legal_placeholder_is_preserved(self):
+        placeholder = self.jdk / "legal/java.management.rmi/LICENSE"
+        placeholder.parent.mkdir(parents=True)
+        placeholder.write_bytes(b"")
+        self.assert_prepared()
+        retained = self.output / "legal/java.management.rmi/LICENSE"
+        self.assertTrue(retained.is_file())
+        self.assertEqual(b"", retained.read_bytes())
+        manifest = (self.output / "source-inputs.sha256").read_text()
+        self.assertIn(hashlib.sha256(b"").hexdigest() + "  legal/java.management.rmi/LICENSE", manifest)
+
+    def test_empty_required_base_license_still_fails(self):
+        (self.jdk / "legal/java.base/LICENSE").write_bytes(b"")
+        result = self.prepare()
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn("Empty source-JDK legal/input file: legal/java.base/LICENSE", result.stderr)
 
     def test_missing_exact_build_identity_fails(self):
         (self.jdk / "release").write_text('JAVA_VERSION="27"\nIMPLEMENTOR="Synthetic Vendor"\n')

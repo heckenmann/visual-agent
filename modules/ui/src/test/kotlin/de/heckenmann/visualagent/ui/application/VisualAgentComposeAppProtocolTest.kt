@@ -48,7 +48,7 @@ class VisualAgentComposeAppProtocolTest {
     fun `workspace renders all persisted panels without application imports`() {
         val port = protocolPort()
         val allPanels =
-            listOf("chat", "todos", "files", "agents", "settings", "canvas", "directories").mapIndexed { index, id ->
+            listOf("chat", "todos", "files", "agents", "settings", "canvas", "directories", "about").mapIndexed { index, id ->
                 LayoutWindowState(id = id, order = index, visible = true, preferredWidth = 360.0)
             }
 
@@ -70,6 +70,7 @@ class VisualAgentComposeAppProtocolTest {
         assertTrue(composeTestRule.onAllNodesWithText("Settings").fetchSemanticsNodes().isNotEmpty())
         assertTrue(composeTestRule.onAllNodesWithText("Canvas").fetchSemanticsNodes().isNotEmpty())
         assertTrue(composeTestRule.onAllNodesWithText("Directory access").fetchSemanticsNodes().isNotEmpty())
+        assertTrue(composeTestRule.onAllNodesWithText("About").fetchSemanticsNodes().isNotEmpty())
         val shellBounds = composeTestRule.onNodeWithTag("workspace-shell").getUnclippedBoundsInRoot()
         val contentBounds = composeTestRule.onNodeWithTag("workspace-content-slot").getUnclippedBoundsInRoot()
         assertTrue(contentBounds.left > shellBounds.left)
@@ -173,6 +174,8 @@ class VisualAgentComposeAppProtocolTest {
         every { application.agents } returns agents
         every { application.providers } returns providers
         every { application.settings } returns settings
+        every { application.openSourceLicenses } returns mockk(relaxed = true)
+        every { application.applicationInformation } returns mockk(relaxed = true)
         every { application.updates } returns mockk<UpdatePort>(relaxed = true)
         every { application.skills } returns mockk<SkillPort>(relaxed = true)
         every { application.mainAgentMemory } returns mainAgentMemory

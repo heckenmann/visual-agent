@@ -2,6 +2,7 @@ package de.heckenmann.visualagent.server
 
 import de.heckenmann.visualagent.protocol.ActivityPort
 import de.heckenmann.visualagent.protocol.AgentPort
+import de.heckenmann.visualagent.protocol.ApplicationInformationPort
 import de.heckenmann.visualagent.protocol.ApplicationPort
 import de.heckenmann.visualagent.protocol.CanvasPort
 import de.heckenmann.visualagent.protocol.ConversationPort
@@ -10,6 +11,7 @@ import de.heckenmann.visualagent.protocol.DirectoryGrantAdministrationPort
 import de.heckenmann.visualagent.protocol.LifecyclePort
 import de.heckenmann.visualagent.protocol.MainAgentMemoryPort
 import de.heckenmann.visualagent.protocol.OnboardingPort
+import de.heckenmann.visualagent.protocol.OpenSourceLicensePort
 import de.heckenmann.visualagent.protocol.ProviderPort
 import de.heckenmann.visualagent.protocol.SettingsPort
 import de.heckenmann.visualagent.protocol.SkillPort
@@ -26,6 +28,8 @@ class SpringApplicationPort(
     override val agents: AgentPort,
     override val providers: ProviderPort,
     override val settings: SettingsPort,
+    override val openSourceLicenses: OpenSourceLicensePort,
+    override val applicationInformation: ApplicationInformationPort,
     override val updates: de.heckenmann.visualagent.protocol.UpdatePort,
     override val onboarding: OnboardingPort,
     override val mainAgentMemory: MainAgentMemoryPort,

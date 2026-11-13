@@ -11,45 +11,64 @@ Visual Agent is a Kotlin desktop application. Its goal is to provide the model w
 
 Visual Agent's own source is [MIT-licensed](LICENSE). Dependencies and packaged components retain their
 own licenses; see the [dependency and distribution license audit](docs/dependency-license-audit.md)
-for the current inventory, outstanding notice obligations, and binary-release limitations.
+for the current inventory, outstanding notice obligations, and binary-release limitations. The
+packaged third-party license texts are also available in the application's About panel.
+
+The bundled Skiko native renderer includes Adobe DNG technology. Its required
+notice is:
+
+> This product includes DNG technology under license by Adobe.
 
 ## Download and Run
 
-Download the matching artifact from [GitHub Releases](https://github.com/heckenmann/visual-agent/releases). Native packages contain the Visual Agent JAR, all runtime dependencies, and a platform-native launcher, so no Java installation is required. The platform-specific JAR downloads require Java 24.
+Binary downloads are temporarily unavailable while the beta release packages and their
+required third-party license/source materials are being completed and reviewed. The
+existing `v0.1.0` prerelease currently has no downloadable assets. No `latest/download`
+URLs are provided until a verified package set is published. The planned package matrix
+is listed below for reference; download links will be added to
+[GitHub Releases](https://github.com/heckenmann/visual-agent/releases) when available.
+
+Native packages are intended to contain the Visual Agent JAR, runtime dependencies, and
+a platform-native launcher, so no Java installation is required. Platform-specific JAR
+downloads require Java 24.
 
 | Operating system | Architecture | Package | Download |
 | --- | --- | --- | --- |
-| macOS | Apple Silicon | DMG | [visual-agent-macos-arm64.dmg](https://github.com/heckenmann/visual-agent/releases/latest/download/visual-agent-macos-arm64.dmg) |
-| macOS | Apple Silicon | JAR (Java 24) | [visual-agent-macos-arm64-jar.jar](https://github.com/heckenmann/visual-agent/releases/latest/download/visual-agent-macos-arm64-jar.jar) |
-| macOS | Intel | DMG | [visual-agent-macos-x64.dmg](https://github.com/heckenmann/visual-agent/releases/latest/download/visual-agent-macos-x64.dmg) |
-| macOS | Intel | JAR (Java 24) | [visual-agent-macos-x64-jar.jar](https://github.com/heckenmann/visual-agent/releases/latest/download/visual-agent-macos-x64-jar.jar) |
-| Windows | x64 | MSI | [visual-agent-windows.msi](https://github.com/heckenmann/visual-agent/releases/latest/download/visual-agent-windows.msi) |
-| Windows | x64 | JAR (Java 24) | [visual-agent-windows-x64-jar.jar](https://github.com/heckenmann/visual-agent/releases/latest/download/visual-agent-windows-x64-jar.jar) |
-| Debian / Ubuntu Linux | x86_64 | DEB | [visual-agent-linux-deb.deb](https://github.com/heckenmann/visual-agent/releases/latest/download/visual-agent-linux-deb.deb) |
-| Fedora / openSUSE / RHEL Linux | x86_64 | RPM | [visual-agent-linux-rpm.rpm](https://github.com/heckenmann/visual-agent/releases/latest/download/visual-agent-linux-rpm.rpm) |
-| Linux | x86_64 | AppImage | [visual-agent-linux-appimage.AppImage](https://github.com/heckenmann/visual-agent/releases/latest/download/visual-agent-linux-appimage.AppImage) |
-| Linux | x86_64 | JAR (Java 24) | [visual-agent-linux-x64-jar.jar](https://github.com/heckenmann/visual-agent/releases/latest/download/visual-agent-linux-x64-jar.jar) |
+| macOS | Apple Silicon | DMG | Planned |
+| macOS | Apple Silicon | JAR (Java 24) | Planned |
+| macOS | Intel | DMG | Planned |
+| macOS | Intel | JAR (Java 24) | Planned |
+| Windows | x64 | MSI | Planned |
+| Windows | x64 | JAR (Java 24) | Planned |
+| Debian / Ubuntu Linux | x86_64 | DEB | Planned |
+| Fedora / openSUSE / RHEL Linux | x86_64 | RPM | Planned |
+| Linux | x86_64 | AppImage | Planned |
+| Linux | x86_64 | JAR (Java 24) | Planned |
 
-Open a macOS disk image and move Visual Agent to Applications. Run the Windows installer directly.
-Install Linux DEB/RPM files with the system package manager. Make the AppImage executable and start
-it directly; it does not need to be installed. Run a platform-matched JAR with `java -jar`; it does
-not provide native operating-system integration.
+Once published, open a macOS disk image and move Visual Agent to Applications, run the Windows
+installer, install Linux DEB/RPM files with the system package manager, or make the AppImage
+executable and start it directly. A platform-matched executable JAR can be run with `java -jar`;
+it does not provide native operating-system integration.
 
 The native launcher supplies the Visual Agent name and icon to the operating system. On first
 launch the server creates its H2 database in the platform-specific per-user server data
 directory and the Compose UI loads its client-local server bootstrap configuration before opening
 the selected connection.
 
-Supported native release platforms are macOS (Apple Silicon and Intel), Windows x64, and Linux x86_64. The Linux AppImage is portable; the DEB and RPM packages integrate with the system package manager and application menu. A platform-matched executable JAR is additionally available for Java 24 environments.
+The planned native release platforms are macOS (Apple Silicon and Intel), Windows x64, and Linux x86_64. The Linux AppImage is portable; the DEB and RPM packages are intended to integrate with the system package manager and application menu. A platform-matched executable JAR is planned for Java 24 environments.
 
-Publishing a GitHub release builds its tag with the corresponding Gradle application version automatically
-(for example, `v1.2.3-beta.1` becomes `1.2.3-beta.1`), without changing the checked-in version catalog.
-Tags must be Semantic Versions, with or without a `v` prefix (`v` is recommended).
+For a release-candidate workflow run, a supplied SemVer tag sets the corresponding Gradle
+application version automatically (for example, `v1.2.3-beta.1` becomes `1.2.3-beta.1`), without
+changing the checked-in version catalog. Tags must be Semantic Versions, with or without a `v`
+prefix (`v` is recommended).
 Native installer versions use the numeric `1.2.3` core; application metadata and JARs retain the full version.
 Development, compilation, tests, CI, and packaging use JDK 27, including its corrected `jpackage`
 and bundled native runtime. Bytecode/API targets stay at Java 24 for standalone JAR compatibility.
-Assets are attached only after package smoke tests pass. Creating a tag alone does not trigger publication.
-Local builds and manually dispatched smoke tests use the catalog's default version.
+Assets are attached only after package smoke tests and the recipient asset check pass. That check
+verifies package/archive presence and integrity; it does not certify legal clearance. A tag or
+GitHub draft release does not start the package workflow; maintainers dispatch the tagged candidate
+and publisher workflows explicitly. Local builds and untagged smoke tests use the catalog's
+default version.
 See [Release Versions](docs/setup.md#release-versions) for examples, installer limits, and local reproduction.
 
 ## Features

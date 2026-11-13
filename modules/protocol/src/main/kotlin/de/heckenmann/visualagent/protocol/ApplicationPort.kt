@@ -20,6 +20,12 @@ interface ApplicationPort {
     /** Runtime and presentation settings. */
     val settings: SettingsPort
 
+    /** Recipient-facing open-source license documents bundled with this application build. */
+    val openSourceLicenses: OpenSourceLicensePort
+
+    /** Read-only local application and runtime metadata for the About panel. */
+    val applicationInformation: ApplicationInformationPort
+
     /** Application update discovery, staging, and explicit installation commands. */
     val updates: UpdatePort
 

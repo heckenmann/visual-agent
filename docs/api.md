@@ -130,11 +130,13 @@ conversation messages.
 ### Main-agent tool set
 
 The main agent receives the sub-agent definition IDs (`agent:*`), `todos`,
-managed workspace tools, `memory`, `skills`, and `javascript:execute` through
-`AgentToolConfigService.mainAgentTools()`. It delegates repository file,
+managed workspace tools, `memory`, and `skills` through
+`AgentToolConfigService.mainAgentTools()`. `javascript:execute` is currently
+excluded until the packaged runtime can enforce Graal's `UNTRUSTED` policy. It delegates repository file,
 browser, search, history, manual, use-case, and canvas work to
-sub-agents. JavaScript may call only tools enabled for this request through
-the shared registry; it does not bypass that delegation or permission policy.
+sub-agents. If JavaScript execution is restored, it may call only tools enabled
+for that request through the shared registry; it must not bypass delegation or
+permission policy.
 
 | Tool ID | Action | Purpose |
 |---|---|---|
@@ -145,7 +147,7 @@ the shared registry; it does not bypass that delegation or permission policy.
 | `agent:delete` | `delete` | Removes a sub-agent. |
 | `agent:log` | `get` | Returns up to 50 persisted work-log entries for one sub-agent. |
 | `todos` | multiple | Lists and manages todos, including assigning work to a sub-agent and retrieving a stored result. |
-| `javascript:execute` | `execute` | Runs sandboxed inline JavaScript or a workspace-relative JavaScript file for complex logic or large CSV/Markdown output; `workspace.write/read/delete` provides hardened text access, and actionable execution errors are returned to the model. |
+| `javascript:execute` | `execute` | Currently unavailable: not included in model schemas or sub-agent tool sets until a compatible untrusted-code sandbox is verified. |
 | `diagnostics:config` | `get` | Reports the sanitized effective server provider/model selection, declared model limits/capabilities, and runtime limits; main-agent only. |
 | `diagnostics:database` | `get` | Reports server H2 reachability and Flyway schema status using static read-only probes; main-agent only. |
 | `diagnostics:provider` | `check` | Performs an active model-catalog request and reports sanitized endpoint origin, connectivity, model availability, and provider-reported selected-model capabilities without changing the provider catalog; main-agent only. |
@@ -268,11 +270,9 @@ role-based sets above and the global blocklist:
 - `workspace:download`: download an HTTP(S), FTP, SFTP, or SCP
   resource into `workspace/downloads` or another workspace-relative
   directory, then register it with managed metadata.
-- `javascript:execute`: execute bounded JavaScript using only the tools
-  enabled for the current request. Use `tools.call(name, arguments)` for
-  multi-tool processing and return strings, Markdown, or JSON-compatible
-  values. The sandbox has no direct host, filesystem, process, network,
-  JVM, environment, or credential access.
+- `javascript:execute`: implementation retained but globally unavailable until
+  the packaged runtime supports and verifies Graal's `UNTRUSTED` policy. Old
+  persisted agent grants cannot expose it.
 - `skills`: search, read, create, update, and delete reusable Markdown skills.
   Search is bounded by database-neutral `LIKE` matching; model reads update persisted
   read statistics, while user-panel reads do not.

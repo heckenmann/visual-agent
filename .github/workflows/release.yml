@@ -1,11 +1,12 @@
 name: Publish verified desktop release
 
 on:
-  workflow_run:
-    workflows:
-      - Build and smoke release packages
-    types:
-      - completed
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: SemVer tag of the existing draft release to verify and publish
+        required: true
+        type: string
 
 permissions:
   actions: read
@@ -13,13 +14,9 @@ permissions:
 
 jobs:
   publish:
-    name: Publish verified artifacts
-    if: >-
-      github.event.workflow_run.conclusion == 'success' &&
-      github.event.workflow_run.event == 'release' &&
-      github.event.workflow_run.head_repository.full_name == github.repository
+    name: Verify and publish draft release
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
 
     steps:
       - name: Check out trusted publication policy
@@ -28,31 +25,65 @@ jobs:
           ref: ${{ github.event.repository.default_branch }}
           persist-credentials: false
 
-      - name: Read package workflow metadata
+      - name: Select successful candidate for this tag and commit
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          RUN_ID: ${{ github.event.workflow_run.id }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          GITHUB_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
         run: |
           set -euo pipefail
-          gh run download "$RUN_ID" --repo "$GH_REPO" --name release-metadata --dir release-metadata
-          tag="$(sed -n 's/^tag=//p' release-metadata/manifest)"
-          publish="$(sed -n 's/^publish=//p' release-metadata/manifest)"
-          [[ "$publish" == "true" || "$publish" == "false" ]] || exit 1
-          if [[ "$publish" != "true" ]]; then
-            echo "Manual smoke workflow completed; skipping publication."
-            exit 0
-          fi
-          [[ "$tag" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.-]+)?(\+[a-zA-Z0-9.-]+)?$ ]] || exit 1
-          echo "RELEASE_TAG=$tag" >> "$GITHUB_ENV"
-          echo "PUBLISH_RELEASE=true" >> "$GITHUB_ENV"
+          [[ "$GITHUB_REF" == "refs/heads/$GITHUB_DEFAULT_BRANCH" ]] || {
+            echo "Run the publisher from the trusted default branch." >&2
+            exit 1
+          }
+          [[ "$RELEASE_TAG" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.-]+)?(\+[a-zA-Z0-9.-]+)?$ ]] || {
+            echo "Invalid SemVer release tag: $RELEASE_TAG" >&2
+            exit 1
+          }
+          release="$(gh api "repos/$GH_REPO/releases/tags/$RELEASE_TAG")"
+          jq -e --arg tag "$RELEASE_TAG" '.tag_name == $tag and .draft == true' <<< "$release" >/dev/null || {
+            echo "The matching GitHub release must exist as a draft; published releases are not accepted." >&2
+            exit 1
+          }
+          release_id="$(jq -r .id <<< "$release")"
+          source_commit="$(gh api "repos/$GH_REPO/commits/$RELEASE_TAG" --jq .sha)"
+          branch_relation="$(gh api "repos/$GH_REPO/compare/$RELEASE_TAG...$GITHUB_DEFAULT_BRANCH" --jq .status)"
+          [[ "$branch_relation" == "ahead" || "$branch_relation" == "identical" ]] || {
+            echo "The release tag must point to a commit contained in the trusted default branch." >&2
+            exit 1
+          }
+          artifact_name="release-candidate-$RELEASE_TAG"
+          candidate_run=""
+          while IFS=$'\t' read -r _created_at run_id candidate_sha; do
+            [[ "$candidate_sha" == "$source_commit" ]] || continue
+            run="$(gh run view "$run_id" --repo "$GH_REPO" --json workflowName,event,status,conclusion,headSha)"
+            if jq -e --arg sha "$source_commit" \
+              '.workflowName == "Build and smoke release packages" and .event == "workflow_dispatch" and .status == "completed" and .conclusion == "success" and .headSha == $sha' \
+              <<< "$run" >/dev/null; then
+              candidate_run="$run_id"
+              break
+            fi
+          done < <(gh api --paginate --method GET "repos/$GH_REPO/actions/artifacts" \
+            -f name="$artifact_name" \
+            --jq '.artifacts[] | select(.expired == false) | [.created_at, .workflow_run.id, .workflow_run.head_sha] | @tsv' \
+            | sort -r)
+          [[ -n "$candidate_run" ]] || {
+            echo "No successful versioned package-and-smoke candidate exists for $RELEASE_TAG at $source_commit." >&2
+            exit 1
+          }
+          mkdir candidate-metadata
+          gh run download "$candidate_run" --repo "$GH_REPO" --name "$artifact_name" --dir candidate-metadata
+          grep -Fx "tag=$RELEASE_TAG" candidate-metadata/manifest
+          grep -Fx 'candidate=true' candidate-metadata/manifest
+          grep -Fx "source_commit=$source_commit" candidate-metadata/manifest
+          printf 'RELEASE_TAG=%s\nRELEASE_ID=%s\nSOURCE_COMMIT=%s\nCANDIDATE_RUN_ID=%s\n' \
+            "$RELEASE_TAG" "$release_id" "$source_commit" "$candidate_run" >> "$GITHUB_ENV"
 
-      - name: Download verified release artifacts
-        if: env.PUBLISH_RELEASE == 'true'
+      - name: Download preflighted release artifacts
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          RUN_ID: ${{ github.event.workflow_run.id }}
         run: |
           set -euo pipefail
           mkdir release-assets
@@ -69,22 +100,14 @@ jobs:
             visual-agent-windows \
             visual-agent-legal \
             visual-agent-corresponding-sources; do
-            gh run download "$RUN_ID" --repo "$GH_REPO" --name "$artifact" --dir release-assets
+            gh run download "$CANDIDATE_RUN_ID" --repo "$GH_REPO" --name "$artifact" --dir release-assets
           done
 
-      - name: Verify exact release license clearance
-        if: env.PUBLISH_RELEASE == 'true'
-        env:
-          SOURCE_COMMIT: ${{ github.event.workflow_run.head_sha }}
+      - name: Verify recipient release assets
         run: |
-          python3 scripts/verify-release-licenses.py \
-            --policy docs/licensing/release-approvals.json \
-            --assets release-assets \
-            --tag "$RELEASE_TAG" \
-            --source-commit "$SOURCE_COMMIT"
+          python3 scripts/verify-release-assets.py --assets release-assets
 
-      - name: Attach artifacts to existing GitHub release
-        if: env.PUBLISH_RELEASE == 'true'
+      - name: Attach verified artifacts to the draft release
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
@@ -92,5 +115,22 @@ jobs:
           set -euo pipefail
           mapfile -t assets < <(find release-assets -maxdepth 1 -type f -print | sort)
           test "${#assets[@]}" -eq 12
-          gh release view "$RELEASE_TAG" --repo "$GH_REPO" >/dev/null
+          release="$(gh api "repos/$GH_REPO/releases/$RELEASE_ID")"
+          jq -e --arg tag "$RELEASE_TAG" '.tag_name == $tag and .draft == true' <<< "$release" >/dev/null || {
+            echo "The release stopped being a draft before verified assets could be attached." >&2
+            exit 1
+          }
           gh release upload "$RELEASE_TAG" "${assets[@]}" --repo "$GH_REPO" --clobber
+
+      - name: Publish after recipient asset checks pass
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          release="$(gh api "repos/$GH_REPO/releases/$RELEASE_ID")"
+          jq -e --arg tag "$RELEASE_TAG" '.tag_name == $tag and .draft == true' <<< "$release" >/dev/null || {
+            echo "The release stopped being a draft before publication." >&2
+            exit 1
+          }
+          gh api --method PATCH "repos/$GH_REPO/releases/$RELEASE_ID" -F draft=false >/dev/null

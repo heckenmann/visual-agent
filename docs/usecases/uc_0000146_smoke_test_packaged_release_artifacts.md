@@ -12,8 +12,9 @@ Release workflow.
 
 - The package-and-smoke workflow builds all platform artifacts and uploads them as workflow artifacts.
 - Linux package tests run in Ubuntu or Fedora containers with a virtual display; macOS and Windows tests run on matching hosted runners.
-- A maintainer can manually dispatch the package-and-smoke workflow for a branch (normally `master`) without an existing tag or release. Manual runs never publish assets.
-- Publishing a GitHub release triggers the same package-and-smoke workflow for the associated tag. This path derives the Gradle project version from the tag and uploads assets only after successful tests.
+- A maintainer can manually dispatch the package-and-smoke workflow for a commit, optionally supplying a SemVer release tag. Without a tag it is an unversioned smoke run; with a tag it creates a versioned candidate and never publishes assets.
+- The maintainer creates a GitHub draft release for a SemVer tag on a commit contained in the trusted default branch. A separate manually dispatched publisher, run from that branch, accepts only that draft, finds a successful versioned candidate for the tag's exact commit, verifies the recipient asset set, and publishes the draft last.
+- Candidate artifacts expire with the GitHub Actions artifact-retention period; an expired or missing candidate blocks asset publication and must be rebuilt.
 - No model provider credentials or configured external endpoints are required.
 
 ## Main Flow
@@ -26,7 +27,10 @@ Release workflow.
    Automatic onboarding is hidden for this launch without changing its stored status, so the main workspace can be verified without provider credentials.
 6. The workflow verifies that the application created a non-empty H2 database and a workspace in the isolated data root.
 7. It closes the application, verifies orderly process exit, uninstalls installed packages, and removes temporary data.
-8. After every package smoke test succeeds, release-triggered runs attach artifacts to the existing GitHub release through a separate workflow. Manual runs stop without uploading release assets.
+8. A tagged manual run stores its tag and source commit in candidate metadata. The run completes only after every package, legal-material, and smoke job succeeds; it does not create or publish a GitHub release.
+9. The maintainer creates a GitHub draft release for the candidate tag, then manually dispatches the publisher with that tag.
+10. The publisher requires the release to remain a draft, resolves its tag to a commit, and selects the newest successful, unexpired candidate for that exact tag and commit.
+11. It checks candidate metadata, downloads the candidate artifacts, and verifies the ten packages plus legal/source archives before attaching anything. Only after attachment succeeds does it publish the draft. It never creates a release or rebuilds different package bytes during publication.
 
 ## Result
 
@@ -58,10 +62,10 @@ Every published native installer, portable Linux package, and platform-specific 
 - Each run uses unique temporary user and server data directories and verifies the database and workspace are created there.
 - Startup waits are bounded by a timeout but succeed only on the explicit readiness signal, not elapsed time.
 - Installed packages are uninstalled and all temporary artifacts are removed after success or failure.
-- Any failed package smoke blocks release asset upload. The GitHub release itself is already published and may remain without assets if tests fail.
+- A candidate must pass all package smoke tests before publication. The publisher accepts only a draft release; missing, expired, mismatched, or failed candidates and incomplete/corrupt recipient archives leave the release unpublished. This asset check is not a legal-clearance decision.
 - Independent OS, architecture, and artifact smoke jobs run in parallel after the package matrix completes.
-- Manual runs execute the same build and smoke jobs for the selected commit without tag/version validation or release publication.
-- Asset upload is defined in a separate workflow and starts only after the package-and-smoke workflow succeeds. It never creates a release.
+- Manual runs execute the same build and smoke jobs for the selected commit. A supplied SemVer tag is propagated to every Gradle invocation, enabling review of the exact version before creating a GitHub release.
+- Candidate artifact upload is separate from GitHub release publication. The GitHub UI creates a draft release; a manually dispatched publisher reuses the successful matching candidate, attaches its verified recipient files, and then publishes the draft.
 - Release tags must be Semantic Versions, with an optional `v` prefix, such as `v1.2.3` or `v1.2.3-beta.1+build.7`.
   The prefix is removed for Gradle; prerelease/build metadata is preserved in runtime metadata and JAR versions.
 - All verification and packaging jobs receive the same `ORG_GRADLE_PROJECT_releaseTag` environment input.
@@ -93,7 +97,7 @@ verification checks the same JDK. No artificial version offset, custom packager,
 Regression tests preserve `v0.1.0` as application version `0.1.0`; an actual macOS DMG build
 exercises the jpackage path that failed in the release, including the unchanged installer version.
 
-CI installs Azul Zulu JDK 27 on every platform. [Temurin no longer publishes JDK 27 for Intel macOS](https://adoptium.net/news/2026/09/jdk27-macos-x64-removal),
+CI installs the pinned Azul Zulu JDK `27.0.1.0.3+1` on every platform. [Temurin no longer publishes JDK 27 for Intel macOS](https://adoptium.net/news/2026/09/jdk27-macos-x64-removal),
 whereas [Zulu provides JDK 27 for macOS x64 and ARM64, Linux x64, and Windows x64](https://www.azul.com/downloads/).
 This preserves JDK 27 throughout the matrix rather than downgrading one architecture or dropping its package.
 

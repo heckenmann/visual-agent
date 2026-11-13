@@ -1,5 +1,9 @@
 # UC-0000148 — Bounded independent bulk tool calls
 
+The JavaScript delegation behavior below describes the tool when that capability is available. The
+current JDK 27/GraalJS runtime cannot enforce the required untrusted-code policy, so the tool is
+currently excluded from all model requests; see [UC-0000104](uc_0000104_sandboxed_javascript_tool_execution.md).
+
 ## Goal
 
 Run independent enabled tools with lower latency while keeping authorization, cancellation,

@@ -1,5 +1,6 @@
 package de.heckenmann.visualagent
 
+import de.heckenmann.visualagent.protocol.ProjectMetadata
 import java.net.URL
 
 /**
@@ -12,7 +13,7 @@ object AppIdentity {
     /**
      * Human-readable application name shown in native menus, window titles, and the Dock.
      */
-    const val DISPLAY_NAME: String = "Visual Agent"
+    const val DISPLAY_NAME: String = ProjectMetadata.DISPLAY_NAME
 
     /**
      * Classpath resource path for the application icon.

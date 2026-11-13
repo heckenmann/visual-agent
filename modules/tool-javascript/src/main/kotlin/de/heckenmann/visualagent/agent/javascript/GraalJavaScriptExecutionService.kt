@@ -20,11 +20,9 @@ class GraalJavaScriptExecutionService(
         de.heckenmann.visualagent.agent.tools
             .ToolBatchExecutor(registryProvider())
     },
-    /** Retains the hardened constrained fallback when native isolates are deliberately unavailable. */
-    preferIsolate: Boolean = true,
 ) : AutoCloseable {
     private val executor = Executors.newCachedThreadPool()
-    private val contextFactory = JavaScriptContextFactory(preferIsolate)
+    private val contextFactory = JavaScriptContextFactory()
 
     /** Execute one script and return only its final value plus bounded diagnostics. */
     fun execute(request: JavaScriptExecutionRequest): JavaScriptExecutionResult {
@@ -111,7 +109,7 @@ class GraalJavaScriptExecutionService(
                 batchExecutor = batchExecutorProvider(),
                 onLogs = request.onLogs,
             )
-        val context = contextFactory.create(bridge, request.limits)
+        val context = contextFactory.create(bridge)
         contextReference.set(context)
         return try {
             val source = "(async function() {\n${request.source}\n})()"
@@ -225,9 +223,6 @@ class GraalJavaScriptExecutionService(
             request.limits.maxBatchItems !in 1..32
         ) {
             throw JavaScriptExecutionException(JavaScriptErrorCategory.INTERNAL, "Invalid JavaScript execution limits")
-        }
-        if (request.limits.maxGuestHeapBytes <= 0 || request.limits.maxIsolateMemoryBytes < request.limits.maxGuestHeapBytes) {
-            throw JavaScriptExecutionException(JavaScriptErrorCategory.INTERNAL, "Invalid JavaScript memory limits")
         }
         if (
             request.limits.maxResultCharacters <= 0 ||

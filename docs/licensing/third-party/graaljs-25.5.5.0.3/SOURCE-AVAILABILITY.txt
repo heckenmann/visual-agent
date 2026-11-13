@@ -1,0 +1,13 @@
+GraalJS language implementation 25.5.5.0.3 source availability
+
+The exact-version language implementation source archive is available from:
+https://repo.maven.apache.org/maven2/org/graalvm/js/js-language/25.5.5.0.3/js-language-25.5.5.0.3-sources.jar
+
+SHA-256:
+691844c58fa8efef16d550b9a7646674ca78f08751402c250ffc31857184e28b
+
+The accompanying LICENSE_GRAALJS and THIRD_PARTY_LICENSE_GRAALJS.txt retain
+the original upstream terms and copyright notices, including separately licensed
+code. Those components retain their respective license terms; Visual Agent's
+MIT license does not replace them. This archive is also included in the
+corresponding-source collection prepared for the release.

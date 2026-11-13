@@ -26,6 +26,7 @@ permissions:
 
 env:
   GRADLE_OPTS: -Dorg.gradle.daemon=false
+  ZULU_JDK_VERSION: "27.0.1.0.3+1"
 
 jobs:
   inventory:
@@ -55,7 +56,7 @@ jobs:
         uses: actions/setup-java@v6
         with:
           distribution: zulu
-          java-version: "27"
+          java-version: ${{ env.ZULU_JDK_VERSION }}
 
       - name: Read Gradle wrapper version
         id: gradle_wrapper
@@ -92,6 +93,8 @@ jobs:
           python3 scripts/collect-third-party-notices.py \
             --package-root modules/desktop/build/compose/binaries/main/app \
             --inventory modules/desktop/build/reports/dependency-license/packaged-artifacts.csv \
+            --license-report build/reports/dependency-license/licenses-all.json \
+            --project-license LICENSE \
             --output build/reports/dependency-license/third-party-notices \
             --supplements docs/licensing/third-party/sources.json
 

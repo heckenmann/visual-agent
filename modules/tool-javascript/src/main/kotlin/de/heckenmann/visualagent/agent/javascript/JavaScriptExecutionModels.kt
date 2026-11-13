@@ -7,10 +7,6 @@ import de.heckenmann.visualagent.agent.tools.api.ToolDefinition
 /** Limits applied to one untrusted JavaScript execution. */
 data class JavaScriptExecutionLimits(
     val timeoutMillis: Long = DEFAULT_TOOL_TIMEOUT_SECONDS * 1_000L,
-    /** Maximum retained guest heap for one execution. */
-    val maxGuestHeapBytes: Long = 512L * 1024L * 1024L,
-    /** Hard isolate heap ceiling for one execution. */
-    val maxIsolateMemoryBytes: Long = 768L * 1024L * 1024L,
     val maxResultCharacters: Int = 500_000,
     /** Maximum UTF-8 bytes copied from one workspace file into JavaScript. */
     val maxWorkspaceReadBytes: Long = 256L * 1024L * 1024L,

@@ -63,13 +63,13 @@ agent's `name` or `role` against the default templates:
   `workspace:layout`, `workspace:file`,
 `workspace:download`, `canvas`.
 
-Agents with `javascript:execute` enabled may use it for complex deterministic
-multi-tool filtering, aggregation, and large CSV, string, or Markdown assembly.
-The script must call only enabled canonical tools through `await tools.call(...)`,
-may use hardened `workspace.write/read/delete(...)` for workspace-relative text files,
-and return the complete final value; it cannot access the host directly. If the
-execution returns an exception, inspect the actionable category/message, correct
-the source or arguments, and retry without repeating the unchanged failure.
+`javascript:execute` is currently unavailable to all agents, including agents
+with a persisted per-agent grant, because the packaged JDK 27/GraalJS runtime
+cannot initialize the required Graal `UNTRUSTED` isolate. Do not enable or
+advertise it until a compatible sandbox and its resource limits are verified.
+When restored, its scripts must call only enabled canonical tools through
+`await tools.call(...)`, use only the hardened workspace APIs, and return the
+complete final value without direct host access.
 - `coder`: uses read-write `workspace:file` actions; raises the default
   `maxTurns` to 8.
 - `analyst`: same as `researcher` minus `browser` and `search`,
