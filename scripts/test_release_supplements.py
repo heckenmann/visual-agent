@@ -231,13 +231,18 @@ class SupplementalNoticesTest(unittest.TestCase):
         self.assertEqual("0eed39319f139afde8515010ff59baf24de9e47ea316a315398e8027d198202d",
                          mimalloc["sourceArtifactSha256"])
         self.assertTrue(mimalloc["materials"][0]["content"].startswith(b"MIT License\n"))
-        self.assertIn("runtime string identifies only upstream 2.1.7", " ".join(mimalloc["remaining"]))
-        self.assertIn("mimalloc2 2.1.7-r0 and its package patch", " ".join(mimalloc["remaining"]))
+        mimalloc_record = next(item for item in registry_data["components"]
+                               if "mimalloc2:2.1.7-r0" in item["sourceArtifacts"])
+        self.assertIn("workflow 43305484301", mimalloc_record["reviewNotes"])
+        self.assertIn("links -lmimalloc", mimalloc_record["reviewNotes"])
+        self.assertNotIn("original build log expired", " ".join(mimalloc_record["remaining"]))
         zstd = components["zstd:1.5.6"]
         self.assertEqual("BSD-3-Clause", zstd["proposedLicense"])
         self.assertTrue(zstd["materials"][0]["content"].startswith(b"BSD License\n"))
-        self.assertIn("zstd-static 1.5.6-r2", " ".join(zstd["remaining"]))
-        self.assertIn("which declared license option applies", " ".join(zstd["remaining"]))
+        zstd_record = next(item for item in registry_data["components"]
+                           if "zstd:1.5.6" in item["sourceArtifacts"])
+        self.assertIn("zstd-static 1.5.6-r2", zstd_record["reviewNotes"])
+        self.assertIn("which license option applies", " ".join(zstd_record["remaining"]))
         zlib = components["zlib:1.4"]
         self.assertEqual("Zlib", zlib["proposedLicense"])
         self.assertEqual(
@@ -246,6 +251,7 @@ class SupplementalNoticesTest(unittest.TestCase):
         )
         zlib_record = next(item for item in registry_data["components"] if "zlib:1.4" in item["sourceArtifacts"])
         self.assertEqual("unreviewed", zlib_record["reviewStatus"])
+        self.assertIn("workflow 43305484301", zlib_record["reviewNotes"])
         self.assertIn("zlib-static 1.4-r0", zlib_record["reviewNotes"])
         self.assertIn("050415c464375727d855a14abb0cdf2d549bda3b32ddc3c0017256e552b3ec09",
                       zlib_record["reviewNotes"])
@@ -255,7 +261,11 @@ class SupplementalNoticesTest(unittest.TestCase):
         self.assertEqual("f5fec23be76e50e2445ed2d018bac49b367490fc483c62c4637e99ec705d27ba",
                          runtime["sourceArtifactSha256"])
         self.assertIn(b"statically linked code", runtime["materials"][0]["content"])
-        self.assertIn("embeds the pinned upstream source commit", " ".join(runtime["remaining"]))
+        runtime_record = next(item for item in registry_data["components"]
+                              if "AppImage:type2-runtime:20251108" in item["sourceArtifacts"])
+        self.assertIn("workflow 43305484301", runtime_record["reviewNotes"])
+        self.assertIn("-lzstd -lz -lfuse3 -lmimalloc", runtime_record["reviewNotes"])
+        self.assertEqual(1, len(runtime_record["remaining"]))
         fuse = components["AppImage:libfuse:3.15.0"]
         self.assertEqual("LGPL-2.1-only", fuse["proposedLicense"])
         self.assertIn(b"GNU LESSER GENERAL PUBLIC LICENSE", fuse["materials"][1]["content"])
@@ -269,6 +279,7 @@ class SupplementalNoticesTest(unittest.TestCase):
         self.assertIn(b"musl as a whole is licensed", musl["materials"][0]["content"])
         musl_record = next(item for item in registry_data["components"] if "AppImage:musl:1.2.5" in item["sourceArtifacts"])
         self.assertEqual("unreviewed", musl_record["reviewStatus"])
+        self.assertIn("workflow 43305484301", musl_record["reviewNotes"])
         self.assertIn("musl-dev 1.2.5-r12", musl_record["reviewNotes"])
         self.assertIn("e63fe34178270d2d8cc74f1bab303ec1868150606e66f6da2c16221e6ec86034",
                       musl_record["reviewNotes"])
@@ -316,6 +327,17 @@ class SupplementalNoticesTest(unittest.TestCase):
         icu = components[f"org.graalvm.shadowed:icu4j:{version}"]
         self.assertEqual("Unicode/ICU License", icu["proposedLicense"])
         language = components[f"org.graalvm.js:js-language:{version}"]
+        language_record = next(
+            item for item in json.loads(
+                (root / "docs/licensing/third-party/sources.json").read_text()
+            )["components"]
+            if f"org.graalvm.js:js-language:{version}" in item["sourceArtifacts"]
+        )
+        self.assertEqual("unreviewed", language_record["reviewStatus"])
+        self.assertIn("attributing MIT to the JONI regexp engine", language_record["reviewNotes"])
+        self.assertIn("exact POM has no JONI dependency", language_record["reviewNotes"])
+        self.assertTrue(any("Resolve with authoritative upstream evidence" in item
+                            for item in language_record["remaining"]))
         self.assertIn(b"Copyright (c) 2010, 2022, Oracle", language["materials"][0]["content"])
         third_party = next(item for item in language["materials"]
                            if item["path"].endswith("THIRD_PARTY_LICENSE_GRAALJS.txt"))
@@ -419,7 +441,8 @@ class SupplementalNoticesTest(unittest.TestCase):
         self.assertEqual(3, len(resolver["materials"]))
         self.assertIn(b"Apple Public Source License", resolver["materials"][1]["content"])
         self.assertIn(b"APPLE PUBLIC SOURCE LICENSE", resolver["materials"][2]["content"])
-        self.assertTrue(any("authoritative determination" in item for item in resolver["remaining"]))
+        self.assertEqual(1, len(resolver["remaining"]))
+        self.assertIn("continue to exclude", resolver["remaining"][0])
         self.assertFalse(registry["redistributionApproved"])
 
     def test_skia_dependency_notices_and_required_credits_are_retained(self):
@@ -560,9 +583,16 @@ class SupplementalNoticesTest(unittest.TestCase):
                          notice["sha256"])
         self.assertIn(component["upstreamCommit"] + "/native/libffi/LICENSE", notice["url"])
         self.assertTrue(notice["content"].startswith(b"libffi - Copyright"))
-        self.assertTrue(any("source-file-specific attribution" in item for item in component["remaining"]))
-        self.assertTrue(any("libffi provenance" in item for item in component["remaining"]))
-        self.assertFalse(json.loads(registry.read_text())["redistributionApproved"])
+        self.assertEqual(2, len(component["remaining"]))
+        self.assertIn("section 4(b)", component["remaining"][0])
+        self.assertIn("source-file attribution", component["remaining"][1])
+        source_registry = json.loads(registry.read_text())
+        jna_record = next(
+            item for item in source_registry["components"]
+            if "net.java.dev.jna:jna:5.19.1" in item["sourceArtifacts"]
+        )
+        self.assertIn("do not require a corresponding-source or relink archive", jna_record["reviewNotes"])
+        self.assertFalse(source_registry["redistributionApproved"])
 
     def test_collector_includes_pinned_icu_license_for_exact_packaged_artifact(self):
         package, inventory = self.prepare_package()

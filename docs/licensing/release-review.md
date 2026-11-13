@@ -8,8 +8,99 @@ or organization that has not performed it.
 
 ## Current Candidate (Non-Publishing)
 
-- Source: `0ad834255a825fa7b4d7c7edee5962fd9a3fcd63` (PR #533).
-- Release version input: none. This is not a versioned release candidate.
+- Package/smoke source: `0ad834255a825fa7b4d7c7edee5962fd9a3fcd63` (PR #533).
+- Current inventory/documentation source: `dc43fbc1f8ebbed8b563112def3b56d6bdaed490` (PR #533).
+- Versioned non-publishing candidate: tag input `v0.1.0`, source
+  `dc43fbc1f8ebbed8b563112def3b56d6bdaed490`, workflow
+  [run 43305484301](https://github.com/heckenmann/visual-agent/actions/runs/43305484301).
+  Its uploaded candidate manifest confirms `candidate=true`. All ten platform
+  package jobs, all ten package smoke jobs, and the legal/source archive job
+  completed successfully. The workflow does not publish a release or create or
+  move a Git tag. Its corresponding-sources artifact is 126,393,816 bytes. It
+  was inspected through GitHub's remote artifact reference without storing the
+  archive on the host, whose free disk space is low.
+- The six platform manifests in the exact-run legal review artifact were
+  inspected from its remote file reference without extracting them to local
+  disk. The outer artifact SHA-256 `094449782c34110fe587139ffdbfd7d7bce1e5f0caba02960c0badd92fe894f5`
+  matches GitHub's artifact digest. Each inventory contains 261 components:
+  136 with retained package notices and 125 with no notice detected. All 261
+  component statuses and the runtime status are `unreviewed`, and every
+  manifest has `redistributionApproved: false`. The bundled-JDK legal-file
+  counts are 243 for Linux AppImage, Linux DEB, Linux RPM, and Windows, 242 for
+  macOS ARM64, and 241 for macOS x64. None contains a GraalJS `js-isolate`
+  artifact. Manifest SHA-256 values are Linux AppImage
+  `fb629aaef409d3c3a7fad28df0aadd48d7987812016644fe23041efa0f6c3eb1`, Linux DEB
+  `9ea71a56d4831ed241ee83fdb7a146b11eeec109685352cf9972b469194753a6`, Linux RPM
+  `1ab36dda764cb44e438d0613f04ad5f5fffeb0dc39f1be2bf75d4c3e3f0b6407`, macOS ARM64
+  `d25a11d8fed93f8efcee3ab9b7ceee22d2ca0274d7e0297409e9e320f074e77e`, macOS x64
+  `3f5c90519b3464da40718bc1a6e58a2ecc960bd04fb7459aee91c38ec32de566`, and Windows
+  `ce53f04cbbc823aa2e67f8a669043c6be9a26985ec77a071b6aed769097ff29d`. The
+  embedded `sources.json` hash `0e247649e18e0368b43a8f06b9b7cf82a85f684a2f6cf6f2cc241f8aa82c4500`
+  matches the repository file. The AppImage runtime SHA-256 is
+  `b9a99a36aa0fea7b850aef2726a6fbc805199edb62c854f8233bf5ba8b1713c5`, and its
+  source archive is hash-bound as
+  `f5fec23be76e50e2445ed2d018bac49b367490fc483c62c4637e99ec705d27ba`.
+  The corresponding-source archive is 127,365,083 bytes and contains 99 entries,
+  including a 98-row `MANIFEST.sha256`. Every listed file exists and matches its
+  SHA-256; no missing, extra, or mismatched files were found. It includes the
+  AppImage runtime sources and pinned source/packaging inputs for libfuse,
+  squashfuse, musl, mimalloc, zlib, and zstd, plus source archives for H2, JNA,
+  GraalJS, Logback, Skiko, and Liberation fonts. The embedded
+  `visual-agent-corresponding-sources.zip` SHA-256 is
+  `f7c0835faba0e9c0b2793aae04400cdc63fa33a1b7528d8a59ee9d9735fc64b1`; the
+  enclosing artifact SHA-256 is
+  `094449782c34110fe587139ffdbfd7d7bce1e5f0caba02960c0badd92fe894f5`.
+  The archive remains a review artifact, not a recipient-facing release asset.
+  Integrity and listed contents do not establish legal sufficiency, complete
+  coverage, or recipient delivery. All component and runtime statuses remain
+  `unreviewed`, and redistribution remains unapproved.
+- The six package manifests were also deduplicated by Maven coordinate to avoid
+  treating repeated platform copies as separate review work. They contain 260
+  unique coordinates: 255 are present in all six packages and five are
+  platform-specific Skiko runtime variants. Each manifest has 261 rows because
+  `io.netty:netty-codec-native-quic:4.2.20.Final` appears five times in each
+  package inventory. At the unique-coordinate level, 132 entries consistently
+  have a retained package notice and 128 consistently have `no-detected-notice`;
+  the latter is an inventory result, not proof that a legally required notice
+  is absent. Grouping those 128 by the declared license metadata (a triage aid,
+  not a legal determination) gives 100 Apache-related, 11 UPL-related, three
+  EPL/LGPL/MPL, four BSD-related, eight MIT-related, one Unicode/ICU, and one
+  without declared license metadata. This reduces the review to distinct
+  components and license families rather than six repeated package lists.
+- The recipient-candidate legal archive from this run, outer artifact
+  `visual-agent-legal` (SHA-256
+  `dc8789890684071dbef2070d9bc418cba7b682267a89b12548ed768ca263da76`), was
+  checked remotely. Its nested ZIP has 4,396 entries and 4,395 rows in
+  `MANIFEST.sha256`; all listed hashes match, with no missing entries. It
+  includes the generic Apache-2.0 text and the per-platform JDK legal trees.
+  The archive has no `REVIEW-ONLY.txt`, but it embeds internal
+  `licensing/README.md` and package manifests that explicitly say clearance is
+  incomplete. It is therefore a hash-verified candidate artifact, not yet a
+  clean recipient-facing legal packet and not a released asset.
+- The bundle builder has since been changed locally so recipient-candidate mode
+  emits only the project license, curated legal texts for coordinates present
+  in the package inventories, and hash-verified package/runtime notice files.
+  The corresponding-source candidate now contains the collected source archives
+  and a generated path/hash index instead of internal review notes and the full
+  curation registry. Both omit internal status manifests and historical
+  materials for components absent from the candidate. Repeated inventory rows
+  can map the same Maven coordinate to distinct notice bytes, so recipient paths
+  include the notice hash and identical repeated entries are deduplicated. The
+  22 focused bundle tests pass, including checks for these exclusions and
+  repeated-coordinate handling. This change is not in the current PR head and no
+  new archives have been generated; the artifacts above remain unsuitable until
+  the change is reviewed and a new workflow run confirms their contents.
+- The package-notice evidence further clarifies the 128 `no-detected-notice`
+  rows: 69 unique coordinates have exact supplemental material, 58 have
+  Apache-2.0 metadata and the full Apache license is included in each
+  distribution, and the remaining coordinate is bundled JDK `jrt-fs`, covered
+  by the captured JDK runtime legal tree. Apache's release guidance says one
+  full copy of the license per distribution is sufficient
+  ([Apache release policy](https://www.apache.org/legal/release-policy.html)).
+  This resolves the apparent missing-license-text count for this candidate's
+  collected evidence; it does not establish that the detected notice set or
+  license metadata is exhaustive, nor review other source, attribution, or
+  redistribution conditions.
 - The non-versioned [full package and smoke workflow](https://github.com/heckenmann/visual-agent/actions/runs/43282355080)
   completed successfully for this exact source. All ten package variants and
   all platform/container smoke jobs passed. The workflow received no
@@ -33,7 +124,7 @@ or organization that has not performed it.
   for this candidate. This is evidence that the archived inputs match those
   reported build revisions, not a qualified conclusion that LGPL-2.1 section
   6(a)'s static-link relinking/source delivery is sufficient.
-- The current PR head `0f95daaeecd8be9bccc89f51488d5802c64c26c2` also passed
+- The preceding PR head `0f95daaeecd8be9bccc89f51488d5802c64c26c2` passed
   the four-platform [license inventory workflow](https://github.com/heckenmann/visual-agent/actions/runs/43294540149).
   Its Linux, Windows x64, macOS ARM64, and macOS x64 manifests contain 261
   component records each. Each reports 136 records with retained notices,
@@ -48,13 +139,39 @@ or organization that has not performed it.
   `0e247649e18e0368b43a8f06b9b7cf82a85f684a2f6cf6f2cc241f8aa82c4500`,
   matching the registry in this commit. `no-detected-notice` is an inventory
   observation, not a finding that a component lacks a required notice.
-- The same current PR head passed its Gradle tests, release workflow contracts,
+- That preceding PR head passed its Gradle tests, release workflow contracts,
   package-and-launch check, and Windows smoke process contract in [workflow
   run 43294540166](https://github.com/heckenmann/visual-agent/actions/runs/43294540166).
   The only source changes since the full package/smoke candidate at
   `0ad834255a825fa7b4d7c7edee5962fd9a3fcd63` are this review document, the
   legal-material registry, and its regression tests; no application or package
   build inputs changed.
+- The latest four-platform inventory workflow, [run
+  43301076142](https://github.com/heckenmann/visual-agent/actions/runs/43301076142),
+  passed for current PR head `dc43fbc1f8ebbed8b563112def3b56d6bdaed490`.
+  Linux x64, Windows x64, macOS ARM64, and macOS x64 each contain 261
+  component records: 136 with a retained notice and 125 with no notice detected
+  in the package. Each also records 243 bundled-JDK legal files. The manifest
+  SHA-256 values are Linux `293b0a4646c01eeb9408607f8f0301235e0bf494241912aa3c05b95871a6edb7`,
+  Windows `c17b954b69bef1b81f0a9b473160799311848e0f2668bd15353e17697c4f2c1f`,
+  macOS ARM64 `02c7cc7b379042c8e8259839a413be9be0dfeaeb04e377d428e1fd6bb0e5e44b`,
+  and macOS x64 `01b68b0c68afa54f71c912353cd92462e2986f04b09d8f4b3572f0460d06f24f`.
+  All four manifests report `redistributionApproved: false`; all 261 component
+  records and the runtime legal section remain `unreviewed`.
+- None of the four current package manifests contains a
+  `org.graalvm.js:js-isolate-*` component. This verifies the removal of the
+  previously inventoried GFTC isolate artifacts for the current dependency
+  graph and removes the earlier isolate-specific macOS re-signing question from
+  this candidate. Ordinary GraalJS and Truffle artifacts remain in the packages
+  and retain their separate unresolved notice/source review. Historical GFTC
+  records and reference documents in the registry are evidence about earlier
+  candidates, not components present in these four inventories.
+- The current PR head also passed [Gradle and package/launch checks in run
+  43301075599](https://github.com/heckenmann/visual-agent/actions/runs/43301075599).
+  The dependency/build inputs are unchanged from the successful full package
+  and smoke run at `0ad834255a825fa7b4d7c7edee5962fd9a3fcd63`; changes since then
+  are limited to this review document, the legal-material registry, and its
+  regression tests.
 - The package/smoke success and source-archive match establish technical
   evidence for this non-versioned candidate only. They do not establish
   complete legal coverage, qualified review, final release-asset hashes,
@@ -283,16 +400,13 @@ libfuse `SOURCE-AND-RELINK.txt` is present. This verifies source retrieval and
 manifest integrity, not correspondence to a newly built AppImage or
 sufficiency under LGPL-2.1 section 6(a).
 
-PR #533's pushed head is `598366e803e8559640d6f8a20ed5a75449fc2bd2`. Its
-four-platform inventory workflow `43194021811` is green, but inspection of the
-uploaded `packaged-artifacts.csv` files shows that this pushed source still
-ships `js-isolate` on Linux x64, macOS ARM64, and Windows x64; macOS x64 has no
-such artifact. A local build made after the uncommitted dependency removal has
-no isolate on macOS ARM64, but the other platforms have not been built from
-that source state. Thus the old GFTC/macOS-signing question remains applicable
-to the pushed PR candidate and is only conditionally removed by the local
-change. All 38 component records remain unreviewed and the release registry
-still grants no redistribution clearance.
+At the historical PR #533 head `598366e803e8559640d6f8a20ed5a75449fc2bd2`,
+inventory workflow `43194021811` showed `js-isolate` on Linux x64, macOS ARM64,
+and Windows x64, but not macOS x64. That evidence predates the dependency
+removal. The current four-platform inventory for PR head `dc43fbc1` confirms
+that no platform `js-isolate-*` artifact is present. All 38 component records
+remain unreviewed and the release registry still grants no redistribution
+clearance.
 
 ### Verified Graal Evidence Gap and Local Correction
 
@@ -300,9 +414,9 @@ The Linux notice manifest from inventory workflow `42649987764` contains 14
 Graal `25.5.5.0.3` artifacts. Each has `no-detected-notice` and no matching
 supplement. This is a concrete missing-material mapping, not a conclusion based
 only on a POM license name. The corresponding Linux, macOS ARM64, and Windows
-inventories provide the original JAR hashes; the current PR #533 inventory
-still contains the isolate on Linux, macOS ARM64, and Windows, but not macOS
-x64.
+inventories provide the original JAR hashes. These are historical package
+records; the latest four-platform inventory for PR #533 at `dc43fbc1` confirms
+that no platform `js-isolate-*` artifact remains in the current package graph.
 
 The local registry retains the 16 coordinates observed in that historical
 candidate across those platforms, without deleting earlier records. The
@@ -334,11 +448,12 @@ A direct runtime probe on the required JDK 27 reproduced
 when creating GraalJS `SandboxPolicy.UNTRUSTED` contexts with the selected
 25.5.5.0.3 platform isolate. The service had caught that startup failure and
 continued with `SandboxPolicy.CONSTRAINED`, so ordinary service tests did not
-prove that the isolate was working. The current local change removes the
+prove that the isolate was working. The runtime configuration removes the
 platform isolate dependency and uses the same constrained host-access policy
-explicitly. This also removes the isolate's GFTC/macOS-signing question from the
-new runtime graph, but release-candidate package inventories must be regenerated
-to confirm the exclusion in every final artifact.
+explicitly. The latest four-platform inventory confirms no `js-isolate-*`
+artifact is present in the current package graph, resolving the isolate-
+specific GFTC/macOS-signing question for this candidate. It does not resolve
+the remaining GraalJS notices, source, or security-boundary review.
 
 The official GraalVM embedding guide documents Community Edition isolate
 artifacts (`*-isolate-community`) separately from Oracle's GFTC isolate
@@ -721,9 +836,11 @@ has confirmed this project's noncommercial distribution plan.
 
 The exact Zulu archives' `readme.txt` files give an actual three-year,
 physical-distribution-cost-limited OpenJDK source offer and a platform-specific
-request code. I inspected the original text in the AppImage inventory artifact
-and verified the retained readme hashes in all six package inventories from
-the current non-publishing workflow `43282355080`:
+request code. The current versioned, non-publishing candidate
+[run 43305484301](https://github.com/heckenmann/visual-agent/actions/runs/43305484301)
+was checked directly: all six platform inventories retain the original vendor
+readme, and each hash matches the corresponding previously inspected Zulu
+archive:
 
 | Package inventory | Retained vendor readme SHA-256 |
 | --- | --- |
@@ -731,6 +848,16 @@ the current non-publishing workflow `43282355080`:
 | macOS ARM64 | `ba5a54776c2990ee75398f258223515fee4f72bf3ce888603e42fe1f5947c7a3` |
 | macOS x64 | `b9748e40acbc0b4933f63e886f98ec629f7231645c0cd5caa471a01c902e85bf` |
 | Windows x64 | `8d0152e9611c44e4bce41ffa06a05befe4823a5ef48b35549a62246fed538312` |
+
+The `visual-agent-legal` candidate archive in that same run was also inspected:
+it contains all six files at
+`package-notice-evidence/<platform>/runtime-legal/vendor/readme.txt`, with
+hashes matching this table. This proves the offer text reached the CI archive,
+but not a recipient-ready layout: that archive also includes internal package
+manifests and review metadata. The local bundle-builder change places these
+files under `platforms/<platform>/java-runtime/vendor/readme.txt`; that revised
+archive still needs a new CI run and content review before it can be treated as
+the recipient bundle.
 
 **Evidence-supported delivery route for the covered portions:** pass through
 the received vendor offer for OpenJDK portions under GPLv2 with the Classpath
@@ -994,13 +1121,17 @@ the check.
 The exact Netty 4.2.20.Final source JAR contains `netty_resolver_dns_macos.c`
 and `dnsinfo.h`. The C source includes that header and calls
 `dns_configuration_copy()`. The header includes both Netty's Apache-2.0 notice
-and Apple's APSL-2.0 notice. Netty's public [licensing discussion](https://github.com/netty/netty/discussions/14956)
-remains unresolved: maintainers note that the header is only needed to compile,
-but do not determine whether the compiled native binary is affected. The source
-scope remains unresolved and is retained as historical evidence; the clean
-release path is to omit this optional binary and verify that all final packages
-do so. Noncommercial distribution alone would not resolve the terms if the
-binary were included.
+and Apple's APSL-2.0 notice. Apache Legal issue
+[LEGAL-700](https://issues.apache.org/jira/browse/LEGAL-700) was closed after a
+comment interpreted both licenses as applying to the header, likely because it
+began as APSL-covered material and received Apache-licensed modifications.
+Netty's public [licensing discussion](https://github.com/netty/netty/discussions/14956)
+still does not determine the effect on the compiled native binary. The prudent
+release path is to omit this optional binary rather than infer Apache-only
+coverage. The four-platform package and inventory checks passed for current PR
+head `dc43fbc1f8ebbed8b563112def3b56d6bdaed490`; the exact final release packages
+must be checked again. Noncommercial distribution alone would not resolve the
+terms if the binary were included.
 
 The exact source JAR was inspected and its source-artifact hash is retained in
 the registry. Netty's original `LICENSE.dnsinfo.txt` header notice and the full
@@ -1108,6 +1239,25 @@ retaining all assertions. Synthetic dependency-free fixtures remain offline.
   supplement class also passes, including the ANGLE revision/notice regression.
 - All 54 Graal artifact rows from the four current platform inventories match
   their registered original-artifact hashes.
+- The exact GraalJS 25.5.5.0.3 `js-language` binary and source-JAR SHA-256
+  values match the registry. Its `LICENSE_GRAALJS` and
+  `THIRD_PARTY_LICENSE_GRAALJS.txt` also byte-match the files at the pinned
+  upstream commit. The source repository's root `LICENSE` is a different file
+  and is not a substitute. The Maven binary JAR contains no license/NOTICE
+  entries, so the version-bound legal bundle must carry the implementation
+  texts explicitly. The POM and pinned GraalJS build metadata declare both
+  UPL-1.0 and MIT, with the build metadata attributing MIT to JONI. However,
+  the exact binary and source JARs contain no package/class names or source
+  references identifying JONI, the retained
+  third-party notice has no JONI attribution, and the upstream changelog says
+  JONI was removed in 20.1.0. This is an unresolved upstream metadata
+  discrepancy; do not infer that MIT is either applicable or irrelevant without
+  confirmation. Source/text provenance is verified, but the discrepancy,
+  applicable-license mapping, final recipient-archive inclusion, and final
+  artifact hash review remain open.
+  Evidence: [Maven POM](https://repo.maven.apache.org/maven2/org/graalvm/js/js-language/25.5.5.0.3/js-language-25.5.5.0.3.pom),
+  [pinned upstream build metadata](https://github.com/oracle/graaljs/blob/dd265d542fad72d0e7e1ae4032ef7c040911e700/graal-js/mx.graal-js/suite.py#L523-L528),
+  and [pinned upstream changelog](https://github.com/oracle/graaljs/blob/dd265d542fad72d0e7e1ae4032ef7c040911e700/CHANGELOG.md#L243-L255).
 - The rebuilt server JAR, desktop JAR, and local native application contain all
   four new GraalJS legal/source notices with their registered original bytes.
 - Temporary artifact-download directories were removed. Only small generated

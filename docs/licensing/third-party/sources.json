@@ -21,7 +21,7 @@
       "materialPaths": ["logback-1.6.6/LICENSE.txt", "logback-1.6.6/EPL-2.0.txt", "logback-1.6.6/SOURCE-AVAILABILITY.txt"],
       "reviewStatus": "unreviewed",
       "reviewNotes": "The exact logback-classic and logback-core 1.6.6 source JARs are included in the generated corresponding-sources candidate together with the EPL-2.0 text and version-specific source-availability notice. The candidate archive is not yet a reviewed final asset.",
-      "remaining": ["Review EPL-2.0 binary redistribution conditions and confirm both exact source JARs, license, and notices remain in the final hash-reviewed release materials"]
+      "remaining": ["Confirm both exact source JARs, the EPL-2.0 text, and the source-availability statement are present in the final hash-reviewed recipient materials"]
     },
     {
       "sourceArtifacts": {
@@ -32,11 +32,10 @@
       "upstreamCommit": "1a91122853f6ab6f1fb2a4a284a6cf2ed8af0a4d",
       "materialPaths": ["jna-5.19.1/LICENSE", "jna-5.19.1/AL2.0", "jna-5.19.1/libffi-LICENSE"],
       "reviewStatus": "unreviewed",
+      "reviewNotes": "The pinned JNA 5.19.1 upstream README and native source headers explicitly permit choosing Apache-2.0 instead of LGPL-2.1-or-later for JNA. The pinned build statically links libffi; its MIT copyright and permission notice is retained separately. Apache-2.0 and MIT do not require a corresponding-source or relink archive on the current evidence; the full upstream JNA archive remains provenance/build evidence, not a recipient source obligation. Final review must resolve source-specific notices and how macOS code-signing/repackaging interacts with Apache-2.0 section 4(b), then verify all materials against exact release payload hashes.",
       "remaining": [
-        "Independently review the Apache-2.0 option for the native dispatch sources and the libffi MIT notice against each final packaged JNA payload, including macOS code-signing transformations",
-        "Confirm source-delivery obligations for the exact final native payload and record the reviewer and evidence; the pinned source archive identifies native dispatch files as dual-licensed under LGPL-2.1-or-later or Apache-2.0 and libffi as MIT, while its separate GPL build-tools notice covers helpers not included in the JNA runtime JAR",
-        "Review any source-file-specific attribution that applies to the exact native payload",
-        "Retain the libffi provenance evidence separately from the final recipient-facing source bundle until its relationship to each packaged native payload is confirmed"
+        "Have a competent reviewer confirm the Apache-2.0 selection and libffi MIT notice cover each final JNA native payload, including macOS code-signing/repackaging and Apache-2.0 section 4(b) modification notices",
+        "Verify applicable source-file attribution, the JNA Apache license, and libffi copyright/permission notice in every final hash-reviewed recipient package"
       ]
     },
     {
@@ -175,10 +174,12 @@
       "upstreamCommit": "dd265d542fad72d0e7e1ae4032ef7c040911e700",
       "materialPaths": ["graaljs-25.5.5.0.3/LICENSE_GRAALJS", "graaljs-25.5.5.0.3/THIRD_PARTY_LICENSE_GRAALJS.txt", "graaljs-25.5.5.0.3/SOURCE-AVAILABILITY.txt"],
       "reviewStatus": "unreviewed",
-      "reviewNotes": "Retain this implementation's own original Oracle copyright and separately licensed code notices, not just the SDK UPL text. The exact source variant is included in the runtime-selected source collection.",
+      "reviewNotes": "The exact Maven binary SHA-256 matches the pinned artifact. The exact-version source JAR SHA-256 also matches its registered hash. LICENSE_GRAALJS and THIRD_PARTY_LICENSE_GRAALJS.txt were independently fetched from the pinned upstream commit and byte-matched to the retained files and registry hashes. The source-repository root LICENSE is a different file and must not replace these implementation-specific terms. The binary JAR contains no license/NOTICE entries. The Maven POM and pinned GraalJS build metadata declare UPL-1.0 and MIT, with the build metadata attributing MIT to the JONI regexp engine. The exact POM has no JONI dependency; its runtime dependencies are regex, truffle-api, polyglot, and shadowed ICU4J. The exact binary/source JARs contain no package/class names or source references identifying JONI; the retained third-party notice has no JONI attribution; and the upstream changelog says the JONI engine was removed in 20.1.0. Historical GraalJS issue #22 describes the former JONI compatibility module but does not clarify the 25.5.5.0.3 POM. Treat this as an unresolved upstream metadata discrepancy; do not infer that MIT is either applicable or safely irrelevant without confirmation.",
       "remaining": [
-        "Verify applicability of the upstream separately licensed code notices to the exact packaged language implementation",
-        "Verify source availability, original notices, and absence of additional restrictions in all final recipient packages"
+        "Resolve with authoritative upstream evidence why the 25.5.5.0.3 js-language metadata still declares MIT for JONI after its documented removal and whether any JONI-derived code or notice remains applicable",
+        "Review the file-to-license mapping for every separately licensed item in THIRD_PARTY_LICENSE_GRAALJS.txt",
+        "Verify the regenerated exact-release legal archive carries all three version-bound materials and the matching corresponding-source archive",
+        "Complete final package hash review; this provenance and license-text check does not grant redistribution approval"
       ]
     },
     {
@@ -228,9 +229,9 @@
       "materialPaths": ["mimalloc2-2.1.7/LICENSE"],
       "reviewStatus": "unreviewed",
       "remaining": [
-        "The hash-pinned Alpine aports snapshot contains mimalloc2 2.1.7-r0 and its package patch, but the runtime string identifies only upstream 2.1.7; because the original build log expired, verify whether this recipe produced the linked object and whether its source/build inputs are sufficient",
         "Review and preserve the applicable MIT attribution and source materials in recipient delivery"
-      ]
+      ],
+      "reviewNotes": "Versioned non-publishing candidate workflow 43305484301 records mimalloc2 2.1.7-r0 installed in the AppImage build environment and links -lmimalloc into runtime SHA-256 b9a99a36aa0fea7b850aef2726a6fbc805199edb62c854f8233bf5ba8b1713c5. The corresponding-sources archive SHA-256 f7c0835faba0e9c0b2793aae04400cdc63fa33a1b7528d8a59ee9d9735fc64b1 contains the pinned Alpine recipe/source inputs. This resolves the version uncertainty for this candidate; review and preserve the applicable MIT attribution and source materials in recipient delivery."
     },
     {
       "sourceArtifacts": {
@@ -241,9 +242,10 @@
       "materialPaths": ["zstd-1.5.6/LICENSE"],
       "reviewStatus": "unreviewed",
       "remaining": [
-        "The hash-pinned Alpine aports snapshot contains zstd-static 1.5.6-r2, but the runtime string identifies only upstream 1.5.6; because the original build log expired, verify whether this recipe produced the linked object and which declared license option applies",
+        "Review the Alpine package's alternative license metadata and determine which license option applies to the linked zstd code",
         "Review and preserve the Alpine package's alternative license metadata and relevant source attribution"
-      ]
+      ],
+      "reviewNotes": "Versioned non-publishing candidate workflow 43305484301 records zstd-static 1.5.6-r2 installed and links -lzstd into AppImage runtime SHA-256 b9a99a36aa0fea7b850aef2726a6fbc805199edb62c854f8233bf5ba8b1713c5. The corresponding-sources archive SHA-256 f7c0835faba0e9c0b2793aae04400cdc63fa33a1b7528d8a59ee9d9735fc64b1 contains the pinned zstd source and Alpine recipe inputs. This resolves the package-version uncertainty for this candidate; the Alpine alternative-license metadata and applicable notice still require review."
     },
     {
       "sourceArtifacts": {
@@ -256,7 +258,7 @@
       "remaining": [
         "Review the applicable Zlib notice and determine whether the source/relink materials meet obligations for the exact AppImage; recipient delivery and final release hash binding remain open"
       ],
-      "reviewNotes": "Package and smoke workflow 43282355080 records zlib-static 1.4-r0 in the AppImage build log. The matching corresponding-sources candidate (SHA-256 fb633971382be640243fe00b0a7095c3bbcbdaccc26ad457fbf30b4a8d317a9f) contains the exact Alpine recipe archive (SHA-256 050415c464375727d855a14abb0cdf2d549bda3b32ddc3c0017256e552b3ec09). This resolves the prior candidate's source-version mismatch only; license review and recipient/final-release verification remain open."
+      "reviewNotes": "Versioned non-publishing candidate workflow 43305484301 built AppImage package SHA-256 56aa8a45524079fed429d0ac4bc7aad43a2aea537798e14375027f95b7fe6819. Its build log records zlib-static 1.4-r0, and its corresponding-sources archive SHA-256 f7c0835faba0e9c0b2793aae04400cdc63fa33a1b7528d8a59ee9d9735fc64b1 contains the exact Alpine recipe archive (SHA-256 050415c464375727d855a14abb0cdf2d549bda3b32ddc3c0017256e552b3ec09). The matching source input is zlib 1.4, not the stale zlib 1.3.1 found in historical candidate 43187339406. License review and recipient/final-release verification remain open."
     },
     {
       "sourceArtifacts": {
@@ -267,9 +269,9 @@
       "materialPaths": ["appimage-runtime-20251108/LICENSE"],
       "reviewStatus": "unreviewed",
       "remaining": [
-        "The exact runtime hash embeds the pinned upstream source commit, and the matching debug companion identifies its linked static components/versions; resolve Alpine package revisions and build inputs where they affect source obligations",
         "Complete the linked components' notice/source review and validate recipient-facing corresponding-source/relink delivery"
-      ]
+      ],
+      "reviewNotes": "Versioned non-publishing candidate workflow 43305484301 records AppImage package SHA-256 56aa8a45524079fed429d0ac4bc7aad43a2aea537798e14375027f95b7fe6819, runtime SHA-256 b9a99a36aa0fea7b850aef2726a6fbc805199edb62c854f8233bf5ba8b1713c5, and corresponding source archive SHA-256 f7c0835faba0e9c0b2793aae04400cdc63fa33a1b7528d8a59ee9d9735fc64b1. Its build log records musl-dev 1.2.5-r12, mimalloc2 2.1.7-r0, zlib-static 1.4-r0, and zstd-static 1.5.6-r2, and links -lzstd -lz -lfuse3 -lmimalloc. The matching source archive contains the pinned source and Alpine recipe inputs. This resolves the package-version/source-input mismatch found in historical candidate 43187339406, not the legal sufficiency of source/relink delivery or the license review of linked components."
     },
     {
       "sourceArtifacts": {
@@ -279,7 +281,7 @@
       "upstreamCommit": "6d08472ea47db895748d5ca7d3daf032c3fefcf8",
       "materialPaths": ["libfuse-3.15.0/LICENSE", "libfuse-3.15.0/LGPL2.txt", "libfuse-3.15.0/SOURCE-AND-RELINK.txt"],
       "reviewStatus": "unreviewed",
-      "reviewNotes": "The recipient guide describes the LGPL-2.1 section 6(a) source-and-relink route. Workflow 42651138364 built the retained runtime recipe with its mount.c patch applied to libfuse. Non-publishing workflow 43187339406 built and smoke-tested an AppImage candidate; its corresponding-source archive is internally hash-valid, but the build log records zlib-static 1.4-r0 and musl-dev 1.2.5-r12 while that archive contains zlib 1.3.1 and the Alpine musl r9 recipe. The current local source-material task now retrieves checksum-pinned zlib 1.4 and Alpine zlib-static 1.4-r0, plus Alpine musl 1.2.5-r12; the archived APKBUILD files confirm those package versions. A new non-publishing package/source workflow is still required to bind these corrected inputs to an AppImage candidate and its corresponding-source archive. This technical evidence does not establish that the materials legally suffice for relinking. Final recipient archive/package review and qualified obligation review remain open.",
+      "reviewNotes": "The recipient guide describes the LGPL-2.1 section 6(a) source-and-relink route. Workflow 42651138364 built the retained runtime recipe with its mount.c patch applied to libfuse. Versioned non-publishing candidate workflow 43305484301 built and smoke-tested AppImage package SHA-256 56aa8a45524079fed429d0ac4bc7aad43a2aea537798e14375027f95b7fe6819. Its runtime SHA-256 b9a99a36aa0fea7b850aef2726a6fbc805199edb62c854f8233bf5ba8b1713c5 embeds the pinned source commit, and the corresponding-sources archive SHA-256 f7c0835faba0e9c0b2793aae04400cdc63fa33a1b7528d8a59ee9d9735fc64b1 contains the corrected zlib 1.4, Alpine musl r12, mimalloc, zstd, and libfuse source/build inputs with a verified file-hash manifest. This supersedes the historical zlib/musl mismatch in candidate 43187339406. It does not establish that the materials legally suffice for relinking; final recipient-archive review and qualified obligation review remain open.",
       "remaining": [
         "Have a qualified reviewer confirm that the exact candidate source archive and build inputs satisfy the LGPL-2.1 section 6(a) static-link relinking/source-and-relink requirements for the packaged runtime",
         "Bind recipient delivery and the completed review to the exact final AppImage and corresponding-source archive hashes"
@@ -309,7 +311,7 @@
       "remaining": [
         "Review the applicable MIT notice and determine whether the source/relink materials meet obligations for the exact AppImage; recipient delivery and final release hash binding remain open"
       ],
-      "reviewNotes": "Package and smoke workflow 43282355080 records musl-dev 1.2.5-r12 in the AppImage build log. The matching corresponding-sources candidate (SHA-256 fb633971382be640243fe00b0a7095c3bbcbdaccc26ad457fbf30b4a8d317a9f) contains the exact Alpine recipe archive (SHA-256 e63fe34178270d2d8cc74f1bab303ec1868150606e66f6da2c16221e6ec86034). This resolves the prior candidate's source-revision mismatch only; license review and recipient/final-release verification remain open."
+      "reviewNotes": "Versioned non-publishing candidate workflow 43305484301 records musl-dev 1.2.5-r12 in the AppImage build log. Its corresponding-sources archive SHA-256 f7c0835faba0e9c0b2793aae04400cdc63fa33a1b7528d8a59ee9d9735fc64b1 contains the exact Alpine recipe archive (SHA-256 e63fe34178270d2d8cc74f1bab303ec1868150606e66f6da2c16221e6ec86034). This resolves the source-revision mismatch found in historical candidate 43187339406; license review and recipient/final-release verification remain open."
     },
     {
       "sourceArtifacts": {
@@ -525,11 +527,9 @@
         "netty-4.2.20.Final/APSL-2.0.txt"
       ],
       "reviewStatus": "unreviewed",
-      "reviewNotes": "The published source JAR contains dnsinfo.h with an Apple APSL-2.0 notice and netty_resolver_dns_macos.c includes that header. Netty's public discussion does not resolve whether this affects the compiled native artifact. The full APSL text is provisionally retained from SPDX license-list-data at a pinned commit; no license-scope conclusion is asserted.",
+      "reviewNotes": "The published source JAR contains dnsinfo.h with both Apache-2.0 and Apple APSL-2.0 notices, and netty_resolver_dns_macos.c includes that header. Apache Legal issue LEGAL-700 was closed after a comment interpreting both licenses as applying to the file; Netty's public discussion remains inconclusive about the compiled native artifact. The current release build excludes this optional resolver, and the current four-platform non-publishing package workflow passed its exclusion checks at dc43fbc1f8ebbed8b563112def3b56d6bdaed490. The full APSL text remains retained as historical evidence; no Apache-only conclusion is asserted.",
       "remaining": [
-        "Obtain an authoritative determination whether the native resolver binary is subject to APSL-2.0, Apache-2.0, or both; the public Netty discussion is inconclusive",
-        "If APSL applies, independently confirm that the corresponding source, license copy, and executable-source-availability notice are complete and delivered with the exact macOS package",
-        "Verify all materials in the final hash-reviewed macOS recipient packages"
+        "Verify that the exact final, hash-reviewed release packages continue to exclude this optional resolver; if it is reintroduced, reopen the license-scope and source-delivery review before release"
       ]
     },
     {
