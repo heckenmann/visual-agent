@@ -160,9 +160,9 @@
       "upstreamCommit": "dd265d542fad72d0e7e1ae4032ef7c040911e700",
       "materialPaths": ["graaljs-25.5.5.0.3/GFTC-TERMS-REFERENCE.md"],
       "reviewStatus": "unreviewed",
-      "reviewNotes": "Source artifact hashes and the macOS ad-hoc re-signing transformation were verified for the historical package candidate in workflow 43187339406 at source commit 62896caf507abd29a8f992d1ce5dd65b59e6f655. A new local macOS package built after removing the explicit js-isolate runtime dependency contains no js-isolate artifact, but the other three platform inventories have not been regenerated from this source state. Preserve the historical transformation evidence, then use fresh four-platform inventories to establish whether any GFTC artifact remains in the release candidate. This is package evidence, not legal approval.",
+      "reviewNotes": "Source artifact hashes and the macOS ad-hoc re-signing transformation were verified for the historical package candidate in workflow 43187339406 at source commit 62896caf507abd29a8f992d1ce5dd65b59e6f655. The versioned non-publishing candidate in workflow 43368865856 at source commit 30232f4318c5fd594c1166822a2f832b78120821 has six platform manifests, none containing a js-isolate artifact. Preserve the historical transformation evidence; regenerate inventories from the final release source before deciding whether any GFTC artifact remains in the release. This is candidate-package evidence, not legal approval.",
       "remaining": [
-        "Regenerate all platform inventories from the final release source and confirm whether any GFTC artifact remains; if present, review the exact binary and transformations against the GFTC",
+        "Regenerate all platform inventories from the final release source and reconfirm that no GFTC artifact remains; if one is present, review the exact binary and transformations against the GFTC",
         "For any GFTC artifacts in the final candidate, verify recipient access to the complete Oracle terms, proprietary-rights markings, and separately licensed technology"
       ]
     },
@@ -946,7 +946,7 @@
     },
     {
       "path": "graaljs-25.5.5.0.3/GFTC-TERMS-REFERENCE.md",
-      "sha256": "88202724d5d546f7ec66eaa62a24423bf34b9a75b04be1c4cd033269e4aeff11",
+      "sha256": "d674c6d6650a194b018c83e58a5bc31373f17bb7fbfe38023a5c67b5dfcbc82e",
       "url": "https://www.oracle.com/downloads/licenses/graal-free-license.html"
     },
     {

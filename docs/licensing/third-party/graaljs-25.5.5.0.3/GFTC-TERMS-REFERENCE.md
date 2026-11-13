@@ -13,12 +13,14 @@ workflow `43187339406`:
 - `org.graalvm.js:js-isolate-darwin-aarch64:25.5.5.0.3`
 - `org.graalvm.js:js-isolate-windows-amd64:25.5.5.0.3`
 
-The current local macOS package inventory contains no `js-isolate` artifact.
-That local result does not establish the contents of a future cross-platform
-release candidate; regenerate and inspect all four platform inventories before
-deciding whether these terms apply to a release. Retain this file as historical
-evidence for the earlier candidate, not as proof that the current package
-contains these components.
+The versioned, non-publishing candidate in workflow
+[`43368865856`](https://github.com/heckenmann/visual-agent/actions/runs/43368865856)
+used source commit `30232f4318c5fd594c1166822a2f832b78120821`; all six platform
+package manifests contain no `js-isolate` artifact. Retain this file and the
+artifact hashes as historical evidence for the earlier candidate, not as proof
+that a final release contains these components. Regenerate and inspect all
+platform inventories from the final release source before deciding whether
+these terms apply to the release.
 
 Oracle's current GFTC permits redistribution of the unmodified Program without
 charging recipients fees associated with the Program, bundled products, or
