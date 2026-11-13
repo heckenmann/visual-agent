@@ -242,10 +242,9 @@
       "materialPaths": ["zstd-1.5.6/LICENSE"],
       "reviewStatus": "unreviewed",
       "remaining": [
-        "Review the Alpine package's alternative license metadata and determine which license option applies to the linked zstd code",
-        "Review and preserve the Alpine package's alternative license metadata and relevant source attribution"
+        "Reconfirm the BSD-3-Clause notice and exact zstd/runtime hashes in the final release artifacts"
       ],
-      "reviewNotes": "Versioned non-publishing candidate workflow 43305484301 records zstd-static 1.5.6-r2 installed and links -lzstd into AppImage runtime SHA-256 b9a99a36aa0fea7b850aef2726a6fbc805199edb62c854f8233bf5ba8b1713c5. The corresponding-sources archive SHA-256 f7c0835faba0e9c0b2793aae04400cdc63fa33a1b7528d8a59ee9d9735fc64b1 contains the pinned zstd source and Alpine recipe inputs. This resolves the package-version uncertainty for this candidate; the Alpine alternative-license metadata and applicable notice still require review."
+      "reviewNotes": "The exact zstd 1.5.6 upstream release identifies the code as BSD-3-Clause OR GPLv2, and Alpine v3.21's zstd-static 1.5.6-r2 package metadata declares BSD-3-Clause OR GPL-2.0-or-later. The candidate's pinned Alpine recipe/source and runtime provenance identify this static zstd dependency; the reviewed license choice is BSD-3-Clause, with the original zstd LICENSE retained. The versioned non-publishing candidate workflow 43368865856 records zstd:1.5.6 in the Linux AppImage and maps its notice to SHA-256 7055266497633c9025b777c78eb7235af13922117480ed5c674677adc381c9d8; the runtime SHA-256 is 8c33bf1ac8a1145c0289a56781806835253a8dc81f7378cf9e742c195505a299. This scoped license-option review is not legal advice or release clearance. Final AppImage and legal/source archive hashes still require review."
     },
     {
       "sourceArtifacts": {

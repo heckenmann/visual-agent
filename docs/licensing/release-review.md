@@ -910,6 +910,29 @@ object mapping and whether all retained sources are sufficient for recipient
 relinking still require review. This evidence is technical, not redistribution
 approval.
 
+#### Zstandard License Choice
+
+The candidate runtime provenance and corresponding-source archive identify
+`zstd-static 1.5.6-r2`, statically linked as `-lzstd`. Alpine v3.21's package
+record declares `BSD-3-Clause OR GPL-2.0-or-later`; the exact upstream
+[Zstandard 1.5.6 release](https://github.com/facebook/zstd/tree/794ea1b0afca0f020f4e57b6732332231fb23c70)
+also offers BSD or GPLv2. This project selects BSD-3-Clause and retains the
+original upstream `LICENSE`, avoiding reliance on the GPL alternative for this
+component. The versioned candidate's AppImage manifest binds the retained
+notice to SHA-256
+`7055266497633c9025b777c78eb7235af13922117480ed5c674677adc381c9d8` and the
+runtime to SHA-256
+`8c33bf1ac8a1145c0289a56781806835253a8dc81f7378cf9e742c195505a299`.
+This closes the license-option question for that candidate only. Recheck the
+exact final AppImage and recipient legal archive hashes after the source is
+merged; the separate LGPL-2.1 review for statically linked libfuse remains
+open. This scoped engineering assessment is not legal advice or release
+clearance.
+
+References: [Alpine v3.21 zstd package record](https://pkgs.alpinelinux.org/package/v3.21/main/x86/zstd),
+[Zstandard 1.5.6 upstream README](https://github.com/facebook/zstd/blob/794ea1b0afca0f020f4e57b6732332231fb23c70/README.md),
+[Zstandard 1.5.6 upstream LICENSE](https://github.com/facebook/zstd/blob/794ea1b0afca0f020f4e57b6732332231fb23c70/LICENSE).
+
 #### Direct Candidate Source-Archive Inspection (2026-11-12)
 
 I downloaded `visual-agent-corresponding-sources.zip` from the same non-publishing
@@ -945,10 +968,13 @@ has confirmed this project's noncommercial distribution plan.
 The exact Zulu archives' `readme.txt` files give an actual three-year,
 physical-distribution-cost-limited OpenJDK source offer and a platform-specific
 request code. The current versioned, non-publishing candidate
-[run 43305484301](https://github.com/heckenmann/visual-agent/actions/runs/43305484301)
+[run 43368865856](https://github.com/heckenmann/visual-agent/actions/runs/43368865856)
 was checked directly: all six platform inventories retain the original vendor
 readme, and each hash matches the corresponding previously inspected Zulu
-archive:
+archive. The matching source archive contains the supplementary
+`zulu27-ca-src_27.0.1.0.3-5_amd64.deb`; its `lib/src.zip` has 15,166 Java files
+but no C/C++ files or OpenJDK build metadata. It is therefore not treated as
+complete corresponding source for the native JDK runtime:
 
 | Package inventory | Retained vendor readme SHA-256 |
 | --- | --- |
@@ -1265,6 +1291,18 @@ Native Image output clarification does not explicitly authorize later
 re-signing. A changed packaged hash alone proves changed bytes, not whether
 the contractual unmodified condition is satisfied. Do not infer permission or
 a prohibition solely from that hash.
+
+**Historical conditional finding:** the signing analysis below applies to the
+older package workflow and source revision identified there, which contained
+the GFTC `js-isolate` artifacts. The later non-publishing candidate
+[`43368865856`](https://github.com/heckenmann/visual-agent/actions/runs/43368865856)
+reported no `js-isolate` artifact in any of its six platform package
+inventories. Therefore the older re-signing finding is retained as evidence,
+not treated as proof that the later candidate contains a GFTC component or as
+an independently current blocker. Regenerate and inspect all inventories from
+the exact final release source: if a GFTC artifact is present, repeat this
+conditional review for its exact package transformation; if absent, record that
+absence against the final artifact hashes.
 
 The exact macOS packaging transformation is confirmed both in the pinned
 Compose Multiplatform 1.12.2 implementation and in the non-publishing package

@@ -242,7 +242,10 @@ class SupplementalNoticesTest(unittest.TestCase):
         zstd_record = next(item for item in registry_data["components"]
                            if "zstd:1.5.6" in item["sourceArtifacts"])
         self.assertIn("zstd-static 1.5.6-r2", zstd_record["reviewNotes"])
-        self.assertIn("which license option applies", " ".join(zstd_record["remaining"]))
+        self.assertEqual("unreviewed", zstd_record["reviewStatus"])
+        self.assertIn("BSD-3-Clause OR GPLv2", zstd_record["reviewNotes"])
+        self.assertIn("BSD-3-Clause", zstd_record["proposedLicense"])
+        self.assertIn("final release artifacts", " ".join(zstd_record["remaining"]))
         zlib = components["zlib:1.4"]
         self.assertEqual("Zlib", zlib["proposedLicense"])
         self.assertEqual(
