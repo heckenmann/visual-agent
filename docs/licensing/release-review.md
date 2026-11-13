@@ -681,6 +681,18 @@ treated as LGPL-only merely because it is native code. The existing original
 libffi license is retained separately. Selecting Apache-2.0 for JNA does not
 replace libffi's MIT notices or cover unrelated runtime components.
 
+JNA's 5.19.1 upstream [`LICENSE`](https://github.com/java-native-access/jna/blob/5.19.1/LICENSE)
+states the same Apache-2.0-or-LGPL-2.1-or-later choice. Upstream
+[PR #1739](https://github.com/java-native-access/jna/pull/1739) separately
+proposes adding libffi's copyright and permission notice to JNA binary
+distributions; it remains open. The candidate recipient bundle already
+contains the pinned 5.19.1 `native/libffi/LICENSE` bytes as
+`third-party/jna-5.19.1/libffi-LICENSE`, matching the locally recorded SHA-256
+`2c9c2acb9743e6b007b91350475308aee44691d96aa20eacef8e199988c8c388`. This
+confirms the notice is delivered in the candidate bundle, not that the open
+upstream proposal has been merged or that every final native payload has been
+reviewed.
+
 [Apache section 4](https://www.apache.org/licenses/LICENSE-2.0) requires a license
 copy, applicable notices, and prominent notices of modifications. It does not
 impose a general corresponding-source or relinking-kit requirement. Likewise,
