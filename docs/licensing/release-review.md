@@ -6,7 +6,75 @@ review of license conditions and distribution evidence, not an external legal
 opinion or an OpenChain certification. Do not attribute this review to a human
 or organization that has not performed it.
 
-## Current Candidate (Non-Publishing)
+## Candidate Evidence
+
+### Latest Versioned Candidate (Non-Publishing)
+
+- Candidate workflow [run 43368865856](https://github.com/heckenmann/visual-agent/actions/runs/43368865856)
+  used tag input `v0.1.0` and source commit
+  `30232f4318c5fd594c1166822a2f832b78120821`. Its uploaded metadata says
+  `candidate=true`. All ten package jobs, all ten artifact smoke tests, and
+  legal/source material generation passed. This workflow does not create or move
+  a Git tag, attach public release assets, or publish a release.
+- The six platform manifests in `visual-agent-legal-review` were inspected
+  remotely. The artifact SHA-256 is
+  `66c8dcc1327dbac81d66f358ffc8cdf7accd4ffa12ed0a62c6098d27204538ae` and its
+  nested review ZIP SHA-256 is
+  `de3b14be776e58ca213b4a0c2d1ee5212565815e4bea0bd645e43836a4935ac1`. Each
+  platform has 261 component rows and 257 unique Maven coordinates; all 1,566
+  component rows remain `unreviewed`, and all six manifests set
+  `redistributionApproved: false`. The manifests contain no GraalJS
+  `js-isolate` artifacts. JDK legal-file counts are 243 for Linux AppImage, DEB,
+  RPM, and Windows, 242 for macOS ARM64, and 241 for macOS x64. These are
+  inventory facts, not legal approval.
+- Across the six manifests, 260 distinct coordinates occur: 256 are common to
+  all platforms and four are platform-specific Skiko runtime variants. Of the
+  260 distinct entries, 128 have no notice detected in the packaged artifact.
+  The evidence maps 69 of those to exact curated supplemental materials, 58 to
+  Apache-2.0 metadata with the Apache license text present in the recipient
+  bundle, and one to bundled-JDK `jrt-fs` legal materials. These are inventory
+  and document-presence checks only; they do not validate every license
+  declaration, required attribution, or legal obligation.
+- The recipient-candidate legal artifact `visual-agent-legal` has outer SHA-256
+  `2e03a757ee0c7d13148f759ffaa8689b6117c814f3e3f0a855be77bd148bd413`. Its
+  nested `visual-agent-legal.zip` SHA-256 is
+  `70084cf0754e0c3bb822f53e32c73f63db5633c9c651ae718447a91c045bc3cf`; the ZIP
+  has 3,557 entries and 3,556 manifest rows, with every listed file present and
+  hash-correct. It contains six platform-specific folders, the project license,
+  and third-party materials; no internal review documents or package manifests
+  were found. This verifies archive integrity and separation, not whether every
+  legal obligation is fulfilled.
+- The recipient-candidate corresponding-sources artifact has outer SHA-256
+  `b992b28c0ac19ae3e4a112e3ca7252501b1789066a594c7a781c54af019e752c`. Its
+  nested `visual-agent-corresponding-sources.zip` SHA-256 is
+  `4c0bd9ace054e91d60b621565bb90f1b82c8b4aed1e880733668cc5f0ccee101`; all 20
+  listed files match its manifest. It contains the pinned AppImage runtime,
+  libfuse, squashfuse, musl, mimalloc, zlib, and zstd inputs, plus the selected
+  Maven sources, Liberation Fonts sources, and supplementary Zulu source
+  package. No internal registry, review document, or package-notice manifest
+  is present. Its contents and hashes do not establish that the source is
+  legally sufficient for every component.
+- The Linux AppImage job's retained workflow log confirms that this candidate
+  rebuilt, rather than reused, the upstream `20251108` runtime binary. It built
+  from pinned `type2-runtime` commit `dd6cebedcbddde9c82f89b011e8e1d40b6e43868`,
+  recorded the linked FUSE 3/Squashfuse/mimalloc/zstd/zlib libraries and Alpine
+  package versions (musl `1.2.5-r12`, mimalloc `2.1.7-r0`, zstd `1.5.6-r2`,
+  zlib `1.4-r0`), and passed the binary-level check that the AppImage embeds
+  the source-built runtime except for the generated MD5 section. The recipient
+  source candidate includes the source archives and pinned Alpine recipe
+  snapshots for these runtime dependencies. This narrows the old-runtime source
+  gap documented in `source-delivery.md`; it does not constitute an LGPL review
+  or establish legal sufficiency of the relinking materials.
+- The review archive is deliberately separate from the recipient candidate:
+  it contains internal review notes, the curation registry, and unreviewed
+  package inventories. It must not be distributed as the recipient legal
+  packet. The candidate run is not the final published artifact set; final
+  release files still require exact-hash review after the release source is
+  merged and the trusted publisher builds them.
+- `release-approvals.json` remains empty. No redistribution approval is
+  recorded, and no release is cleared.
+
+### Previous Candidate Details (Run 43305484301)
 
 - Package/smoke source: `0ad834255a825fa7b4d7c7edee5962fd9a3fcd63` (PR #533).
 - Current inventory/documentation source: `dc43fbc1f8ebbed8b563112def3b56d6bdaed490` (PR #533).
@@ -77,19 +145,20 @@ or organization that has not performed it.
   `licensing/README.md` and package manifests that explicitly say clearance is
   incomplete. It is therefore a hash-verified candidate artifact, not yet a
   clean recipient-facing legal packet and not a released asset.
-- The bundle builder has since been changed locally so recipient-candidate mode
-  emits only the project license, curated legal texts for coordinates present
-  in the package inventories, and hash-verified package/runtime notice files.
-  The corresponding-source candidate now contains the collected source archives
-  and a generated path/hash index instead of internal review notes and the full
-  curation registry. Both omit internal status manifests and historical
-  materials for components absent from the candidate. Repeated inventory rows
-  can map the same Maven coordinate to distinct notice bytes, so recipient paths
-  include the notice hash and identical repeated entries are deduplicated. The
-  22 focused bundle tests pass, including checks for these exclusions and
-  repeated-coordinate handling. This change is not in the current PR head and no
-  new archives have been generated; the artifacts above remain unsuitable until
-  the change is reviewed and a new workflow run confirms their contents.
+- At the time of this historical candidate, the bundle-builder change had only
+  been made locally and no new archives had been generated. It was subsequently
+  committed in PR #533 and validated by the latest versioned candidate above.
+  Recipient-candidate mode emits only the project license, curated legal texts
+  for coordinates present in package inventories, and hash-verified
+  package/runtime notice files. Its corresponding-source candidate contains
+  collected source archives and a generated path/hash index rather than internal
+  review notes and the full curation registry. Both omit internal status
+  manifests and historical materials for components absent from the candidate.
+  Repeated inventory rows can map the same Maven coordinate to distinct notice
+  bytes, so recipient paths include the notice hash and identical repeated
+  entries are deduplicated. The focused bundle tests pass, including checks for
+  these exclusions and repeated-coordinate handling. This does not clear the
+  historical artifacts above or establish legal completeness of the new ones.
 - The package-notice evidence further clarifies the 128 `no-detected-notice`
   rows: 69 unique coordinates have exact supplemental material, 58 have
   Apache-2.0 metadata and the full Apache license is included in each
@@ -188,7 +257,7 @@ as describing the current candidate above.
 
 ## Existing GitHub Pre-release
 
-Checked on 2026-11-12, the public [`v0.1.0` pre-release](https://github.com/heckenmann/visual-agent/releases/tag/v0.1.0)
+Checked on 2026-11-13, the public [`v0.1.0` pre-release](https://github.com/heckenmann/visual-agent/releases/tag/v0.1.0)
 has no attached release assets. Its tag points to source commit
 `355c256ed493a4a8e8acaa38e53b298d66c7c7f5`. Therefore that GitHub release
 currently offers no installer, executable JAR, legal bundle, or corresponding-
@@ -196,6 +265,15 @@ source archive for download. This observation does not establish whether anyone
 obtained binaries through another channel or an expired CI artifact, and it is
 not a redistribution approval. Any future binary release still requires the
 exact-artifact review and approval described in `README.md` in this directory.
+
+The current `master` workflow order is also unsafe for a future publication:
+`package-smoke.yml` starts on the GitHub `release.published` event, so the
+release is public before package verification and the license-approval gate in
+`release.yml` runs. A failed gate cannot undo that publication. PR #533 contains
+a draft-first publisher that performs verification before making the release
+public, but it remains open and has not changed the current `master` workflow.
+Do not publish another release until that ordering is fixed on the default
+branch and the exact release candidate has passed the gate.
 
 The branch was rebased onto newer dependencies before this review. In
 particular, GraalJS is now `25.5.5.0.3`, while the retained Graal supplements
@@ -658,9 +736,12 @@ corresponding-source requirement. Final review still verifies original notices
 in the actual packages containing the DNG code; an unknown Windows symbol
 table must not be treated as proof of absence.
 
-Adobe's current [DNG SDK and specification page](https://www.adobe.com/support/downloads/dng/dng_sdk.html#dng-specification-patent-license)
-publishes a separate royalty-free patent grant for software that reads or writes
-DNG-compliant files. The exact Skia revision bundled through Skiko contains
+Adobe's [DNG SDK and specification page](https://www.adobe.com/support/downloads/dng/dng_sdk.html)
+was checked on 2026-11-13; Adobe lists it as updated on 2026-11-10. It publishes
+a separate royalty-free patent grant for software that reads or writes
+DNG-compliant files. Its required prominent notice is byte-for-byte the same
+sentence retained in `third-party/dng-sdk-dbe0a676/DNG-PATENT-NOTICE.txt` and
+placed in project source and documentation below. The exact Skia revision bundled through Skiko contains
 `SkRawCodec`, which uses Adobe's SDK to parse and validate DNG files and render
 their raw image data ([pinned source](https://github.com/google/skia/blob/a3f509bf52564dc8b27940bebe599d77ac0c4ae3/src/codec/SkRawCodec.cpp)).
 Visual Agent calls Skia's encoded-image decoder for canvas image content, so
@@ -769,14 +850,15 @@ the corresponding-source/relink materials or license clearance. The upstream
 Dockerfile still uses unpinned Alpine package revisions; recipient source/relink
 review, exact final-package review, and the LGPL obligation review remain open.
 
-The local prepared source-material directory contains all eleven archives
-declared for this runtime; each archive's SHA-256 matches the registry. The
-source-built Linux runtime and AppImage package exist as artifacts of workflow
-`43187339406`, not in this macOS workspace. Their existence does not settle
-whether the candidate's materials are sufficient to modify and relink the
-embedded LGPL library; that remains part of the recipient-source review.
+The source-material directory prepared for workflow `43187339406` was
+historical evidence and is no longer retained locally. The later versioned
+candidate `43368865856` rebuilt the runtime and generated a new source archive;
+its remote contents and manifest hashes are documented in the latest candidate
+section above. That evidence supersedes this candidate's source-input mismatch,
+but does not settle whether the exact source/relink materials satisfy LGPL-2.1
+section 6(a).
 
-#### Candidate Alpine Inputs Found in the Retained CI Log
+#### Historical Candidate Alpine Inputs Found in the Retained CI Log
 
 Unlike the expired upstream 2025 build log, the AppImage job log for candidate
 workflow [`43187339406`](https://github.com/heckenmann/visual-agent/actions/runs/43187339406)
@@ -791,12 +873,12 @@ commit `5245849e14d213abe18d589b4b80d65793327940` and zlib recipe commit
 the official zlib 1.4 source archive are now pinned in the local source
 catalogue.
 
-This exposed a real mismatch in the earlier candidate: its downloaded
+This exposed a real mismatch in this historical candidate: its downloaded
 `visual-agent-corresponding-sources.zip` contains zlib 1.3.1 and the musl r9
 recipe, not the zlib 1.4 and musl r12 sources/recipe reported by its build log.
-The local catalogue correction does not repair that already-produced archive.
-A new package-and-source candidate must be built and downloaded, then its
-artifact hashes and internal manifests rechecked before it can be considered.
+The local catalogue correction did not repair that already-produced archive;
+only the later candidate's newly generated source archive addresses this
+mismatch.
 The log records package versions but not APK archive hashes; the exact static
 object mapping and whether all retained sources are sufficient for recipient
 relinking still require review. This evidence is technical, not redistribution
@@ -817,12 +899,12 @@ AppImage build log subsequently revealed that two of those pinned candidate
 inputs are stale: zlib 1.3.1 and Alpine musl recipe r9 do not match the actual
 zlib-static 1.4-r0 and musl-dev 1.2.5-r12 installed for that package build.
 
-This confirms the archive's internal integrity, not source completeness against
-the candidate's actual static runtime inputs. A new package-and-source candidate
-using the corrected source catalogue is required. Even after that rebuild, a
-qualified reviewer must determine whether the exact package/source pair
-satisfies every LGPL-2.1 section 6(a) condition; it has not been published or
-bound to a versioned release tag or final release asset hash.
+This confirms that historical archive's integrity, not source completeness
+against its actual static runtime inputs. The later candidate run
+`43368865856` rebuilt the runtime with the matching pinned source/recipe inputs
+and verified the generated archive remotely, as described above. It improves
+the evidence for that candidate only. A qualified review of LGPL-2.1 section
+6(a) and exact final release package/source hashes remains outstanding.
 
 ### Zulu OpenJDK Portions: Vendor Offer Pass-Through
 
@@ -943,7 +1025,15 @@ candidate manifests remain `unreviewed` and `redistributionApproved: false`.
 
 ## Remaining Decisions Before Exact-Hash Approval
 
-### Candidate Inventory: Unreviewed Permissive Dependencies
+### Historical Candidate Inventory (2026-11-11)
+
+The detailed inventory below preserves the earlier 2026-11-11 triage and is
+not the current candidate count. It covers older workflow runs `42678989326`,
+`42688634430`, and `43064376109`. For the current six-variant candidate, use
+the counts and archive hashes in [Latest Versioned Candidate](#latest-versioned-candidate-non-publishing)
+above. In particular, the older 110/96/14 counts must not be treated as current
+package contents. Current component rows remain unreviewed until an actual
+obligation review is recorded.
 
 The four platform inventory artifacts for PR head
 `b8f2204316d4cb41ce7a386bb09d4de2f1323b5d` (workflow `42678989326`) were

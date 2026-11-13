@@ -35,13 +35,15 @@ A competent review must establish the following before recording an approval:
 - Identify the reviewer, date, source commit, exact file hashes, evidence document,
   and its SHA-256. Never manufacture a legal opinion or approval attribution.
 
-This gate is the initial safety boundary, not completion of #410. CI now creates
-review-only legal and source archives. The legal evidence archive includes
-byte-verified license/notice files extracted from runtime JARs on Linux x64,
-macOS ARM64/x64, and Windows x64, with package hashes and unreviewed status
-manifests. It does not cover every platform-specific native payload or make the
-archive recipient-ready. Complete artifact-level license/source review and final
-package-content checks remain open.
+This gate is the initial safety boundary, not completion of #410. The latest
+versioned, non-publishing candidate (workflow run 43368865856) generated review
+evidence for Linux AppImage/DEB/RPM, macOS ARM64/x64, and Windows, plus separate
+recipient-candidate legal and corresponding-source archives. Its package
+manifests record exact package hashes and retained notices; all component rows
+remain unreviewed and redistribution is unapproved. The candidate archive
+integrity checks do not establish complete native-component coverage, legal
+sufficiency, or final-release approval. Final package-content checks remain
+required after the release source is merged and rebuilt.
 
 The release publisher is manually dispatched from the trusted default branch for
 an existing GitHub draft release. It accepts only a successful versioned package
