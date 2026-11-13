@@ -1,6 +1,7 @@
 """Regression checks for release smoke dispatch and failure handling without timed assertions."""
 
 import importlib.util
+import io
 import os
 import pathlib
 import re
@@ -15,6 +16,44 @@ SPEC.loader.exec_module(SMOKE)
 
 
 class ReleaseSmokeTest(unittest.TestCase):
+    def test_busy_disk_image_detach_is_retried_until_success(self):
+        busy = subprocess.CompletedProcess([], 16, stdout="", stderr='hdiutil: Resource busy\n')
+        detached = subprocess.CompletedProcess([], 0, stdout="", stderr="")
+        with patch.object(SMOKE.subprocess, "run", side_effect=(busy, detached)) as execute:
+            with patch.object(SMOKE.time, "sleep") as delay:
+                SMOKE.detach_disk_image("/dev/disk2")
+        self.assertEqual(2, execute.call_count)
+        delay.assert_called_once_with(1)
+
+    def test_disk_image_detach_does_not_retry_unrelated_errors(self):
+        failed = subprocess.CompletedProcess([], 1, stdout="", stderr="Invalid device\n")
+        with patch.object(SMOKE.subprocess, "run", return_value=failed) as execute:
+            with patch.object(SMOKE.time, "sleep") as delay:
+                with patch.object(SMOKE.sys, "stderr", new=io.StringIO()):
+                    with self.assertRaises(subprocess.CalledProcessError):
+                        SMOKE.detach_disk_image("/dev/disk2")
+        execute.assert_called_once()
+        delay.assert_not_called()
+
+    def test_invalid_disk_image_contents_use_bounded_detach_cleanup(self):
+        attached = subprocess.CompletedProcess([], 0, stdout="/dev/disk2\tGUID_partition_scheme\n", stderr="")
+        with tempfile.TemporaryDirectory() as temporary:
+            with patch.object(SMOKE, "run_checked", return_value=attached):
+                with patch.object(SMOKE, "detach_disk_image") as detach:
+                    with self.assertRaisesRegex(RuntimeError, "did not contain a \.app bundle"):
+                        SMOKE.macos_command("dmg", pathlib.Path("/artifact.dmg"), pathlib.Path(temporary))
+        detach.assert_called_once_with("/dev/disk2")
+
+    def test_detach_failure_does_not_mask_invalid_disk_image_error(self):
+        attached = subprocess.CompletedProcess([], 0, stdout="/dev/disk2\tGUID_partition_scheme\n", stderr="")
+        cleanup_error = subprocess.CalledProcessError(16, ["hdiutil", "detach"], stderr="Resource busy")
+        with tempfile.TemporaryDirectory() as temporary:
+            with patch.object(SMOKE, "run_checked", return_value=attached):
+                with patch.object(SMOKE, "detach_disk_image", side_effect=cleanup_error):
+                    with self.assertRaisesRegex(RuntimeError, "did not contain a \.app bundle") as raised:
+                        SMOKE.macos_command("dmg", pathlib.Path("/artifact.dmg"), pathlib.Path(temporary))
+        self.assertIs(raised.exception.__cause__, cleanup_error)
+
     def test_linux_jar_launches_java_without_installing_a_native_package(self):
         artifact = pathlib.Path("/packages/release.jar")
         with patch.object(SMOKE, "run_checked") as execute:

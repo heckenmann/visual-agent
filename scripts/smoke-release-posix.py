@@ -17,10 +17,28 @@ import time
 READY_MARKER = "VISUAL_AGENT_DESKTOP_READY"
 STARTUP_TIMEOUT_SECONDS = 180
 SHUTDOWN_TIMEOUT_SECONDS = 30
+HDIUTIL_DETACH_ATTEMPTS = 5
 
 
 def run_checked(command: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
     return subprocess.run(command, check=True, text=True, **kwargs)
+
+
+def detach_disk_image(device: str) -> None:
+    command = ["hdiutil", "detach", device, "-force"]
+    for attempt in range(HDIUTIL_DETACH_ATTEMPTS):
+        result = subprocess.run(command, capture_output=True, text=True)
+        if result.returncode == 0:
+            return
+        if "Resource busy" not in result.stderr or attempt == HDIUTIL_DETACH_ATTEMPTS - 1:
+            print(result.stderr, file=sys.stderr, end="")
+            raise subprocess.CalledProcessError(
+                result.returncode,
+                command,
+                output=result.stdout,
+                stderr=result.stderr,
+            )
+        time.sleep(2**attempt)
 
 
 def install_linux_artifact(kind: str, artifact: pathlib.Path) -> list[str]:
@@ -68,8 +86,11 @@ def macos_command(
         if len(binaries) != 1:
             raise RuntimeError(f"Expected one app executable, found {len(binaries)}")
         return [str(binaries[0])], device
-    except Exception:
-        run_checked(["hdiutil", "detach", device, "-force"])
+    except Exception as error:
+        try:
+            detach_disk_image(device)
+        except Exception as cleanup_error:
+            raise error from cleanup_error
         raise
 
 
@@ -247,7 +268,7 @@ def main() -> int:
                             uninstall_linux_artifact(args.kind)
                     finally:
                         if mount_device is not None:
-                            run_checked(["hdiutil", "detach", mount_device, "-force"])
+                            detach_disk_image(mount_device)
     return 0
 
 
