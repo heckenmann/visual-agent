@@ -29,7 +29,8 @@ metadata and absolute JDK installation paths are not added to the provenance fil
 
 The materials identify and retain inputs; they are not complete corresponding
 source, a dependency-wide notice bundle, or automatic redistribution clearance.
-The release approval registry remains unchanged and #410 remains open.
+Issue #410 remains open while component coverage and source obligations are
+reviewed.
 
 ## Tool Calls
 

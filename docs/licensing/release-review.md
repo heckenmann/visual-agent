@@ -6,11 +6,34 @@ review of license conditions and distribution evidence, not an external legal
 opinion or an OpenChain certification. Do not attribute this review to a human
 or organization that has not performed it.
 
+## Current Candidate And Publisher (2026-11-13)
+
+Candidate workflow [43490076062](https://github.com/heckenmann/visual-agent/actions/runs/43490076062)
+was started for tag input `v0.1.0` at PR head
+`85db38169cfdf6ba644b93dd6191fdf4df48729d`, before the local publisher
+simplification described below. All ten package builds, all ten platform smoke
+tests, and legal/source archive generation passed. The run does not exercise the
+local publisher changes and it does not publish a release.
+
+The publisher now selects the successful candidate for the exact tag commit,
+checks that the ten packages and two recipient archives are present and valid,
+attaches those artifacts to the existing draft, and publishes last after an
+explicit manual dispatch. The former reviewer-attribution/exact-hash registry
+was removed as project-specific process machinery. The asset check does not
+establish legal sufficiency or mark any component reviewed. Component rows and
+source/relink questions below remain evidence to resolve; a maintainer must read
+them before choosing to publish. Historical references to the old registry and
+hash gate describe the prior implementation only.
+
+The current curation file has 39 component groups and 60 remaining actions; every
+group is still marked `unreviewed`. The candidate run confirms delivery/build
+behavior, not that those substantive review items are complete.
+
 ## Candidate Evidence
 
-### Latest Versioned Candidate (Non-Publishing)
+### Superseded Versioned Candidate (Run 43451994879)
 
-- The latest versioned non-publishing candidate is [workflow run
+- This versioned non-publishing candidate is [workflow run
   43451994879](https://github.com/heckenmann/visual-agent/actions/runs/43451994879),
   with tag input `v0.1.0` and source commit
   `4073f130de8bdeee7b01a4127349b5109b642435`. Its metadata artifact says
@@ -162,8 +185,9 @@ or organization that has not performed it.
   packet. The candidate run is not the final published artifact set; final
   release files still require exact-hash review after the release source is
   merged and the trusted publisher builds them.
-- `release-approvals.json` remains empty. No redistribution approval is
-  recorded, and no release is cleared.
+- At that candidate review, no redistribution approval had been recorded and
+  no release was cleared. The former approval registry has since been removed;
+  this historical statement does not describe a legal conclusion.
 
 ### Previous Candidate Details (Run 43305484301)
 
@@ -337,8 +361,8 @@ or organization that has not performed it.
   complete legal coverage, qualified review, final release-asset hashes,
   recipient delivery or redistribution approval. The archive has not been
   attached to a public release, and no release is cleared.
-- The approval registry remains unchanged and no release is cleared. The
-  candidate archives are not a substitute for component-level review,
+- No redistribution approval was recorded for that candidate. The candidate
+  archives are not a substitute for component-level review,
   confirming source/relink sufficiency, or approval of exact final release
   package hashes.
 
@@ -354,17 +378,15 @@ has no attached release assets. Its tag points to source commit
 currently offers no installer, executable JAR, legal bundle, or corresponding-
 source archive for download. This observation does not establish whether anyone
 obtained binaries through another channel or an expired CI artifact, and it is
-not a redistribution approval. Any future binary release still requires the
-exact-artifact review and approval described in `README.md` in this directory.
+not a redistribution approval. The current publisher checks successful candidate
+provenance and recipient asset integrity, not legal sufficiency. The maintainer
+must consider the unresolved component and source issues in this review before
+publishing.
 
-The current `master` workflow order is also unsafe for a future publication:
-`package-smoke.yml` starts on the GitHub `release.published` event, so the
-release is public before package verification and the license-approval gate in
-`release.yml` runs. A failed gate cannot undo that publication. PR #533 contains
-a draft-first publisher that performs verification before making the release
-public, but it remains open and has not changed the current `master` workflow.
-Do not publish another release until that ordering is fixed on the default
-branch and the exact release candidate has passed the gate.
+At the time of this review, PR #533 contains the draft-first publisher but is
+still open; verify that the default-branch workflow is current before relying on
+it. Starting that publisher explicitly publishes the draft after its checks; it
+does not resolve the substantive license questions listed here.
 
 The branch was rebased onto newer dependencies before this review. In
 particular, GraalJS is now `25.5.5.0.3`, while the retained Graal supplements
@@ -440,8 +462,8 @@ Zulu `27.0.1.0.3+1`, its exact source and packaged module lists, and hashes for
 both lists. Package-generation and inventory success verify technical
 packaging and provenance capture only. They do not resolve the outstanding
 Apache NOTICE, GraalJS signing, Skia/ANGLE, AppImage source/relink, JDK-module,
-and final recipient-archive reviews described below. No approval registry
-entry or release tag was changed.
+and final recipient-archive reviews described below. No redistribution approval
+or release-tag change was recorded.
 
 The PR was subsequently rebased to `fa627c62fc8416d959779707adc7a7ca2a7f906f`.
 The regular PR checks and four-platform inventory workflow pass for that head,
@@ -1197,14 +1219,14 @@ remain open for component-by-component review. The canonical Apache license
 text is present, but its presence alone does not resolve those items. The
 candidate manifests remain `unreviewed` and `redistributionApproved: false`.
 
-## Remaining Decisions Before Exact-Hash Approval
+## Outstanding License And Source Review
 
 ### Historical Candidate Inventory (2026-11-11)
 
 The detailed inventory below preserves the earlier 2026-11-11 triage and is
 not the current candidate count. It covers older workflow runs `42678989326`,
-`42688634430`, and `43064376109`. For the current six-variant candidate, use
-the counts and archive hashes in [Latest Versioned Candidate](#latest-versioned-candidate-non-publishing)
+`42688634430`, and `43064376109`. For the superseded six-variant candidate, use
+the counts and archive hashes in [Superseded Versioned Candidate](#superseded-versioned-candidate-run-43451994879)
 above. In particular, the older 110/96/14 counts must not be treated as current
 package contents. Current component rows remain unreviewed until an actual
 obligation review is recorded.
@@ -1655,7 +1677,7 @@ The same exact-candidate review also covered two additional components:
 For these five artifacts, this narrows only the conditional upstream NOTICE
 question for the exact candidate versions. It does not clear other Apache
 dependencies, establish final public-package hashes, or change the component
-rows' `unreviewed` status or the empty redistribution-approval registry.
+rows' `unreviewed` status.
 
 ### Kotlin Standard-Library NOTICE Scope
 

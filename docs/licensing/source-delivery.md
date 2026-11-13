@@ -1,7 +1,8 @@
 # Corresponding-source delivery worklist
 
 Refs #410. This document records verified source inputs and remaining work, not
-redistribution approval. The publication gate remains closed.
+redistribution approval. The publisher checks candidate provenance and delivery
+archive integrity; it does not determine legal sufficiency.
 
 ## Embedded Font Asset
 
@@ -469,8 +470,9 @@ metadata inventory; its reports are not a substitute for source delivery.
    materials and legal bundle. Point to the actual versioned release asset only
    after that asset is assembled and checked. Do not claim an unpublished file
    is available or make a source offer the project cannot fulfill.
-5. Verify source and legal bundles against the same exact package set before
-   recording a genuine review in `release-approvals.json`.
+5. Verify the final source and legal bundles against the packages that will be
+   attached to the draft release, and document unresolved obligations in
+   `release-review.md`.
 
 ## License-Specific Review
 

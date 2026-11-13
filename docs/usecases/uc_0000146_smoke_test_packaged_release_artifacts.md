@@ -13,7 +13,7 @@ Release workflow.
 - The package-and-smoke workflow builds all platform artifacts and uploads them as workflow artifacts.
 - Linux package tests run in Ubuntu or Fedora containers with a virtual display; macOS and Windows tests run on matching hosted runners.
 - A maintainer can manually dispatch the package-and-smoke workflow for a commit, optionally supplying a SemVer release tag. Without a tag it is an unversioned smoke run; with a tag it creates a versioned candidate and never publishes assets.
-- The maintainer creates a GitHub draft release for a SemVer tag on a commit contained in the trusted default branch. A separate manually dispatched publisher, run from that branch, accepts only that draft, finds a successful versioned candidate for the tag's exact commit, and publishes the draft only after the trusted license-clearance gate passes.
+- The maintainer creates a GitHub draft release for a SemVer tag on a commit contained in the trusted default branch. A separate manually dispatched publisher, run from that branch, accepts only that draft, finds a successful versioned candidate for the tag's exact commit, verifies the recipient asset set, and publishes the draft last.
 - Candidate artifacts expire with the GitHub Actions artifact-retention period; an expired or missing candidate blocks asset publication and must be rebuilt.
 - No model provider credentials or configured external endpoints are required.
 
@@ -30,7 +30,7 @@ Release workflow.
 8. A tagged manual run stores its tag and source commit in candidate metadata. The run completes only after every package, legal-material, and smoke job succeeds; it does not create or publish a GitHub release.
 9. The maintainer creates a GitHub draft release for the candidate tag, then manually dispatches the publisher with that tag.
 10. The publisher requires the release to remain a draft, resolves its tag to a commit, and selects the newest successful, unexpired candidate for that exact tag and commit.
-11. It checks candidate metadata, downloads the candidate artifacts, and runs the trusted exact-hash license-clearance gate before attaching anything. Only after attachment succeeds does it publish the draft. It never creates a release or rebuilds different package bytes during publication.
+11. It checks candidate metadata, downloads the candidate artifacts, and verifies the ten packages plus legal/source archives before attaching anything. Only after attachment succeeds does it publish the draft. It never creates a release or rebuilds different package bytes during publication.
 
 ## Result
 
@@ -62,10 +62,10 @@ Every published native installer, portable Linux package, and platform-specific 
 - Each run uses unique temporary user and server data directories and verifies the database and workspace are created there.
 - Startup waits are bounded by a timeout but succeed only on the explicit readiness signal, not elapsed time.
 - Installed packages are uninstalled and all temporary artifacts are removed after success or failure.
-- A candidate must pass all package smoke tests before publication. The publisher accepts only a draft release; missing, expired, mismatched, or failed candidates and missing license clearance leave the release unpublished.
+- A candidate must pass all package smoke tests before publication. The publisher accepts only a draft release; missing, expired, mismatched, or failed candidates and incomplete/corrupt recipient archives leave the release unpublished. This asset check is not a legal-clearance decision.
 - Independent OS, architecture, and artifact smoke jobs run in parallel after the package matrix completes.
 - Manual runs execute the same build and smoke jobs for the selected commit. A supplied SemVer tag is propagated to every Gradle invocation, enabling review of the exact version before creating a GitHub release.
-- Candidate artifact upload is separate from GitHub release publication. The GitHub UI creates a draft release; a manually dispatched publisher reuses the successful matching candidate, attaches it after clearance, and then publishes the draft.
+- Candidate artifact upload is separate from GitHub release publication. The GitHub UI creates a draft release; a manually dispatched publisher reuses the successful matching candidate, attaches its verified recipient files, and then publishes the draft.
 - Release tags must be Semantic Versions, with an optional `v` prefix, such as `v1.2.3` or `v1.2.3-beta.1+build.7`.
   The prefix is removed for Gradle; prerelease/build metadata is preserved in runtime metadata and JAR versions.
 - All verification and packaging jobs receive the same `ORG_GRADLE_PROJECT_releaseTag` environment input.

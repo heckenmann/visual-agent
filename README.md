@@ -64,10 +64,11 @@ prefix (`v` is recommended).
 Native installer versions use the numeric `1.2.3` core; application metadata and JARs retain the full version.
 Development, compilation, tests, CI, and packaging use JDK 27, including its corrected `jpackage`
 and bundled native runtime. Bytecode/API targets stay at Java 24 for standalone JAR compatibility.
-Assets are attached only after package smoke tests and the trusted license-clearance gate pass. A
-tag or GitHub draft release does not start the package workflow; maintainers dispatch the tagged
-candidate and publisher workflows explicitly. Local builds and untagged smoke tests use the
-catalog's default version.
+Assets are attached only after package smoke tests and the recipient asset check pass. That check
+verifies package/archive presence and integrity; it does not certify legal clearance. A tag or
+GitHub draft release does not start the package workflow; maintainers dispatch the tagged candidate
+and publisher workflows explicitly. Local builds and untagged smoke tests use the catalog's
+default version.
 See [Release Versions](docs/setup.md#release-versions) for examples, installer limits, and local reproduction.
 
 ## Features

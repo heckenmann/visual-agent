@@ -63,9 +63,10 @@ scope includes build/test artifacts and does not imply that every entry is shipp
     hash-bound recipient-candidate archives, plus the platform packages, as
     workflow artifacts; neither is published as a release. Candidate archive
     generation omits only the review marker and does not update or grant the
-    source registry's approval state. The release publisher requires a successful
-    candidate for the exact release tag and source commit, then applies the
-    trusted clearance gate before attaching those exact candidate artifacts.
+    source registry. The release publisher requires a successful candidate for
+    the exact release tag and source commit, then verifies the expected recipient
+    assets before attaching those candidate artifacts. This does not determine
+    whether all license obligations have been satisfied.
 
 ## Failure Flow
 

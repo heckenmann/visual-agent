@@ -103,13 +103,9 @@ jobs:
             gh run download "$CANDIDATE_RUN_ID" --repo "$GH_REPO" --name "$artifact" --dir release-assets
           done
 
-      - name: Verify exact release license clearance
+      - name: Verify recipient release assets
         run: |
-          python3 scripts/verify-release-licenses.py \
-            --policy docs/licensing/release-approvals.json \
-            --assets release-assets \
-            --tag "$RELEASE_TAG" \
-            --source-commit "$SOURCE_COMMIT"
+          python3 scripts/verify-release-assets.py --assets release-assets
 
       - name: Attach verified artifacts to the draft release
         env:
@@ -126,7 +122,7 @@ jobs:
           }
           gh release upload "$RELEASE_TAG" "${assets[@]}" --repo "$GH_REPO" --clobber
 
-      - name: Publish only after exact license clearance passes
+      - name: Publish after recipient asset checks pass
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}

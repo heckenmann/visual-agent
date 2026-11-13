@@ -330,10 +330,10 @@ class ReleaseWorkflowTest(unittest.TestCase):
         self.assertIn('gh run download "$CANDIDATE_RUN_ID"', release)
         self.assertIn("gh release upload", release)
         self.assertIn("--method PATCH", release)
-        self.assertLess(release.index("scripts/verify-release-licenses.py"), release.index("gh release upload"))
+        self.assertLess(release.index("scripts/verify-release-assets.py"), release.index("gh release upload"))
         self.assertLess(release.index("gh release upload"), release.index("--method PATCH"))
         self.assertNotIn("gh release create", release)
-        self.assertIn("scripts/verify-release-licenses.py", release)
+        self.assertIn("scripts/verify-release-assets.py", release)
 
 
 if __name__ == "__main__":

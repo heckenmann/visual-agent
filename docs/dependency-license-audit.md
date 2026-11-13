@@ -4,10 +4,10 @@ Audit date: 2026-09-28. Scope: Issue [#47](https://github.com/heckenmann/visual-
 
 ## October 29 Release Safety Work
 
-Issue #410 is now in progress. The [publication clearance gate](licensing/README.md)
-requires a reviewed source commit, exact release-file hashes, a legal bundle, and
-corresponding-source archive before upload. No release is currently approved.
-This safety gate does not mean the historical package obligations below are solved.
+Issue #410 is in progress. The [release publisher](licensing/README.md) requires
+a successful candidate for the exact tag commit and checks that all recipient
+packages and legal/source archives are present and readable. This is not legal
+clearance, and the historical package obligations below are not thereby solved.
 CI now uses Zulu CA JDK 27; the older Temurin observations remain historical only.
 The owner confirmed project-generated asset provenance on October 29; the exact
 current inputs and conversion process are recorded in [project assets](licensing/project-assets.md).
