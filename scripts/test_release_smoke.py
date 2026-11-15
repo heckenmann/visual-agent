@@ -144,7 +144,7 @@ class ReleaseWorkflowTest(unittest.TestCase):
 
     def test_native_smoke_fixtures_include_desktop_menus_and_process_tree_checks(self):
         root = pathlib.Path(__file__).parents[1]
-        smoke = (root / ".github/workflows/package-smoke.yml").read_text()
+        smoke = (root / ".github/workflows/release.yml").read_text()
         ubuntu = re.search(
             r"- name: Install Ubuntu desktop runtime dependencies\n(.*?)(?=\n      - name:)", smoke, re.S
         )
@@ -161,7 +161,7 @@ class ReleaseWorkflowTest(unittest.TestCase):
 
     def test_gradle_quality_gates_and_package_verification_do_not_use_a_display(self):
         root = pathlib.Path(__file__).parents[1]
-        for name in ("test.yml", "package-smoke.yml"):
+        for name in ("test.yml", "release.yml"):
             workflow = (root / ".github/workflows" / name).read_text()
             commands = re.findall(r"^        run: (.*\./gradlew (?:ktlintCheck|verifyPackages).*)$", workflow, re.M)
             self.assertTrue(commands, f"No verification command found in {name}")
@@ -184,58 +184,11 @@ class ReleaseWorkflowTest(unittest.TestCase):
             r'launch_command=\(xvfb-run -a "\$java_cmd" -Dskiko.renderApi=SOFTWARE\)',
         )
 
-    def metadata_script(self):
-        workflow = (pathlib.Path(__file__).parents[1] / ".github/workflows/package-smoke.yml").read_text()
-        block = re.search(r"      - name: Prepare release workflow metadata\n.*?        run: \|\n(.*?)(?=\n      - name:)", workflow, re.S)
-        self.assertIsNotNone(block)
-        return "\n".join(line[10:] for line in block.group(1).splitlines())
-
-    def run_metadata(self, tag):
-        with tempfile.TemporaryDirectory() as temporary:
-            root = pathlib.Path(temporary)
-            result = subprocess.run(
-                ["bash", "-c", "gh() { return 0; }\n" + self.metadata_script()],
-                cwd=root,
-                env={**os.environ, "RELEASE_TAG": tag, "GITHUB_SHA": "a" * 40},
-                capture_output=True,
-                text=True,
-            )
-            manifest = root / "release-metadata/manifest"
-            return result, manifest.read_text() if manifest.is_file() else ""
-
-    def test_manual_smoke_without_a_tag_remains_an_unversioned_non_candidate(self):
-        result, manifest = self.run_metadata("")
-        self.assertEqual(0, result.returncode, result.stderr)
-        self.assertIn("tag=\n", manifest)
-        self.assertIn("candidate=false\n", manifest)
-        self.assertIn(f"source_commit={'a' * 40}\n", manifest)
-
-    def test_valid_semver_tag_builds_a_candidate_without_enabling_publication(self):
-        result, manifest = self.run_metadata("v1.0.0")
-        self.assertEqual(0, result.returncode, result.stderr)
-        self.assertIn("tag=v1.0.0\n", manifest)
-        self.assertIn("candidate=true\n", manifest)
-        self.assertNotIn("publish=true", manifest)
-        for tag in ("master", "", "v1.0.0/unsafe"):
-            if not tag:
-                continue
-            with self.subTest(tag=tag):
-                result, manifest = self.run_metadata(tag)
-                self.assertNotEqual(0, result.returncode)
-                self.assertEqual("", manifest)
-
-    def test_semver_prerelease_and_build_metadata_keep_the_candidate_tag(self):
-        for tag in ("v2.3.4-beta.1+build.7", "2.3.4"):
-            with self.subTest(tag=tag):
-                result, manifest = self.run_metadata(tag)
-                self.assertEqual(0, result.returncode, result.stderr)
-                self.assertIn(f"tag={tag}\n", manifest)
-
     def test_release_version_input_applies_to_every_gradle_job_without_shell_interpolation(self):
-        workflow = (pathlib.Path(__file__).parents[1] / ".github/workflows/package-smoke.yml").read_text()
+        workflow = (pathlib.Path(__file__).parents[1] / ".github/workflows/release.yml").read_text()
         environment = workflow.split("\njobs:", 1)[0]
         self.assertIn(
-            "ORG_GRADLE_PROJECT_releaseTag: ${{ inputs.release_tag || '' }}",
+            "ORG_GRADLE_PROJECT_releaseTag: ${{ github.event_name == 'push' && github.ref_name || '' }}",
             environment,
         )
         self.assertNotIn('expected_tag="v${gradle_version}"', workflow)
@@ -281,7 +234,7 @@ class ReleaseWorkflowTest(unittest.TestCase):
         self.assertIn("dependsOn(verifyJavaToolchains)", build)
 
     def test_native_package_failures_show_and_preserve_jpackage_logs(self):
-        workflow = (pathlib.Path(__file__).parents[1] / ".github/workflows/package-smoke.yml").read_text()
+        workflow = (pathlib.Path(__file__).parents[1] / ".github/workflows/release.yml").read_text()
         block = re.search(
             r"      - name: Show native packaging failure logs\n(.*?)(?=\n      - name: Preserve)", workflow, re.S
         )
@@ -299,73 +252,6 @@ class ReleaseWorkflowTest(unittest.TestCase):
         self.assertRegex(workflow, r"name: Preserve native packaging failure logs\n\s+if: failure\(\)")
         self.assertIn("name: packaging-logs-${{ matrix.platform }}", workflow)
 
-    def test_publication_requires_explicit_input_and_the_default_branch(self):
-        workflow = (pathlib.Path(__file__).parents[1] / ".github/workflows/release.yml").read_text()
-        block = re.search(
-            r"      - name: Select successful candidate for this tag and commit\n.*?        run: \|\n(.*?)(?=\n      - name:)",
-            workflow,
-            re.S,
-        )
-        self.assertIsNotNone(block)
-        script = "\n".join(line[10:] for line in block.group(1).splitlines())
-        for publish, branch, expected in (("false", "topic", 77), ("true", "topic", 1), ("true", "master", 77)):
-            with self.subTest(publish=publish, branch=branch):
-                result = subprocess.run(
-                    ["bash", "-c", "gh() { return 77; }\n" + script],
-                    env={
-                        **os.environ,
-                        "PUBLISH_RELEASE": publish,
-                        "GITHUB_REF": f"refs/heads/{branch}",
-                        "GITHUB_DEFAULT_BRANCH": "master",
-                        "RELEASE_TAG": "v1.2.3",
-                        "GH_REPO": "owner/repo",
-                    },
-                    capture_output=True,
-                    text=True,
-                )
-                self.assertEqual(expected, result.returncode, result.stderr)
-        self.assertIn("type: boolean\n        default: false", workflow)
-        self.assertIn("- name: Publish after recipient asset checks pass\n        if: inputs.publish_release", workflow)
-
-    def test_candidate_build_and_release_publication_are_separate_workflows(self):
-        root = pathlib.Path(__file__).parents[1] / ".github/workflows"
-        smoke = (root / "package-smoke.yml").read_text()
-        self.assertIn("release_tag:", smoke)
-        self.assertIn("type: string", smoke)
-        self.assertIn("inputs.release_tag", smoke)
-        self.assertNotIn("  release:\n", smoke)
-        self.assertIn("format('release-candidate-{0}', inputs.release_tag)", smoke)
-        self.assertIn("path: release-metadata/manifest", smoke)
-        self.assertEqual(7, smoke.count("ref: ${{ github.sha }}"))
-        release = (root / "release.yml").read_text()
-        self.assertIn("  workflow_dispatch:\n    inputs:\n      release_tag:", release)
-        self.assertIn("  workflow_run:", release)
-        self.assertNotRegex(release, r"(?m)^  release:")
-        self.assertIn('GITHUB_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}', release)
-        self.assertIn('refs/heads/$GITHUB_DEFAULT_BRANCH', release)
-        self.assertIn(".tag_name == $tag and .draft == true", release)
-        self.assertIn('compare/$RELEASE_TAG...$GITHUB_DEFAULT_BRANCH', release)
-        self.assertIn('"$branch_relation" == "ahead"', release)
-        self.assertIn('"$branch_relation" == "identical"', release)
-        self.assertIn('gh api --paginate --method GET "repos/$GH_REPO/actions/artifacts"', release)
-        self.assertIn('read -r _created_at run_id candidate_sha', release)
-        self.assertIn('"$candidate_sha" == "$source_commit"', release)
-        self.assertIn(".workflowName == \"Build and smoke release packages\"", release)
-        self.assertIn(".conclusion == \"success\"", release)
-        self.assertIn(".headSha == $sha", release)
-        self.assertIn('gh run download "$candidate_run" --repo "$GH_REPO" --name "$artifact_name" --dir candidate-metadata', release)
-        self.assertIn('grep -Fx "tag=$RELEASE_TAG" candidate-metadata/manifest', release)
-        self.assertNotIn("candidate-metadata/release-metadata/manifest", release)
-        self.assertIn('gh run download "$CANDIDATE_RUN_ID"', release)
-        self.assertIn("gh release upload", release)
-        self.assertIn("--method PATCH", release)
-        self.assertLess(release.index("scripts/verify-release-assets.py"), release.index("gh release upload"))
-        self.assertLess(release.index("gh release upload"), release.index("--method PATCH"))
-        self.assertIn("gh release create", release)
-        self.assertIn('--prerelease="$prerelease"', release)
-        self.assertIn('--json databaseId,tagName,isDraft', release)
-        self.assertNotIn('releases/tags/$RELEASE_TAG', release)
-        self.assertIn("scripts/verify-release-assets.py", release)
 
 
 if __name__ == "__main__":

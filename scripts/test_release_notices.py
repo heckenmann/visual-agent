@@ -416,7 +416,7 @@ class PackagedNoticesTest(unittest.TestCase):
 
     def test_platform_workflow_collects_and_uploads_original_notices(self):
         workflow = (pathlib.Path(__file__).parents[1] / ".github/workflows/license-inventory.yml").read_text()
-        package_workflow = (pathlib.Path(__file__).parents[1] / ".github/workflows/package-smoke.yml").read_text()
+        package_workflow = (pathlib.Path(__file__).parents[1] / ".github/workflows/release.yml").read_text()
         self.assertIn("python3 scripts/collect-third-party-notices.py", workflow)
         self.assertIn("--inventory modules/desktop/build/reports/dependency-license/packaged-artifacts.csv", workflow)
         self.assertIn("--license-report build/reports/dependency-license/licenses-all.json", workflow)

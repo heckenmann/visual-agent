@@ -218,7 +218,7 @@ class LibrarySourceMaterialsTest(unittest.TestCase):
         self.assertIn("instructions verified against a working build", delivery)
 
     def test_release_workflow_rebuilds_the_pinned_appimage_runtime(self):
-        workflow = (ROOT / ".github/workflows/package-smoke.yml").read_text()
+        workflow = (ROOT / ".github/workflows/release.yml").read_text()
         verifier = (ROOT / "scripts/verify-appimage-runtime-build.sh").read_text()
         desktop_build = (ROOT / "modules/desktop/build.gradle.kts").read_text()
         embedded_verifier = (ROOT / "scripts/verify_appimage_runtime_embedded.py").read_text()

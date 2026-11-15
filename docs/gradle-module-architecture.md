@@ -82,7 +82,7 @@ environment variable; local builds may use `-PreleaseTag=v1.2.3`. The optional `
 but the complete SemVer, including prerelease/build metadata, reaches application/JAR metadata.
 Native installer metadata uses the numeric core because not all package formats support SemVer
 suffixes. The source catalog and dependency/plugin versions remain unchanged. Manual smoke runs
-without a release tag retain the checked-in default. See [release version instructions](setup.md#release-versions).
+without a release tag retain the checked-in default. See [release guide](releases.md).
 
 The `java-toolchain` catalog entry selects the same JDK 27 for compilation, tests, CI, native
 tooling and the bundled runtime. This includes the upstream JDK-8380634 fix accepting zero-major

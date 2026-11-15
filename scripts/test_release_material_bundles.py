@@ -481,7 +481,7 @@ class ReleaseMaterialBundleTest(unittest.TestCase):
             self.build()
 
     def test_package_workflow_uploads_both_review_only_archives(self):
-        workflow = (ROOT / ".github/workflows/package-smoke.yml").read_text()
+        workflow = (ROOT / ".github/workflows/release.yml").read_text()
         self.assertIn("prepareReleaseSourceMaterials", workflow)
         self.assertEqual(
             2,

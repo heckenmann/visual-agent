@@ -2,11 +2,20 @@
 
 Audit date: 2026-09-28. Scope: Issue [#47](https://github.com/heckenmann/visual-agent/issues/47), repository `master` at the start of the audit, macOS arm64 dependency resolution. This is an engineering compliance inventory, not a legal opinion.
 
+## Release Process and Availability (2026-11-15)
+
+The [release guide](releases.md) documents the tag-driven release workflow.
+[v0.1.1](https://github.com/heckenmann/visual-agent/releases/tag/v0.1.1) is published
+with ten packages and both recipient archives. The historical statements below
+about unavailable downloads, worktree-only archives, and the former publisher
+refer to their dated evidence snapshots. They are not current download status.
+Publication and technical checks do not resolve the outstanding obligation reviews.
+
 ## October 29 Release Safety Work
 
-Issue #410 is in progress. The [release publisher](licensing/README.md) requires
-a successful candidate for the exact tag commit and checks that all recipient
-packages and legal/source archives are present and readable. This is not legal
+Issue #410 tracks unresolved obligation reviews. The [release workflow](releases.md)
+checks the exact tag commit and verifies all recipient packages and legal/source
+archives after successful same-run builds and smoke tests. This is not legal
 clearance, and the historical package obligations below are not thereby solved.
 CI now uses Zulu CA JDK 27; the older Temurin observations remain historical only.
 The owner confirmed project-generated asset provenance on October 29; the exact
@@ -163,7 +172,7 @@ No repository-tracked TTF/OTF/WOFF font or external JAR was found. This does not
 
 **Source:** The project may remain MIT-licensed. Third-party libraries keep their own licenses; the root `LICENSE` applies only to Visual Agent's own material. Source publication is acceptable provided third-party files are not relabeled as MIT and asset ownership is confirmed.
 
-**Current binary release posture:** Do **not** describe the DMG/MSI/DEB/RPM/AppImage/JAR matrix as cleared. PR #518 added retained original curated license/NOTICE texts to executable JARs and native application resources. The current worktree also generates legal and corresponding-source archives, but they are explicitly review-only, are not recipient-ready, and are not on the default branch. The four-platform [package and smoke run](https://github.com/heckenmann/visual-agent/actions/runs/42388152203) completed all 21 jobs successfully for `master` commit `c754df8ee2b8dd0235d6ffe355c30cc1c10be017`; that demonstrates packaging and launch behavior, not complete license/source coverage. The separate four-platform [license-inventory run](https://github.com/heckenmann/visual-agent/actions/runs/42385467454) is historical package evidence, not an inventory of the eventual release candidate. GitHub release `v0.1.0` currently has no downloadable assets. AppImage's statically linked libfuse remains a consequential unresolved source/relink issue. All package reports and curated materials still require artifact-level review; none grants redistribution clearance.
+**Historical binary release posture (before v0.1.1 publication):** Do **not** describe the DMG/MSI/DEB/RPM/AppImage/JAR matrix as cleared. PR #518 added retained original curated license/NOTICE texts to executable JARs and native application resources. The current worktree also generates legal and corresponding-source archives, but they are explicitly review-only, are not recipient-ready, and are not on the default branch. The four-platform [package and smoke run](https://github.com/heckenmann/visual-agent/actions/runs/42388152203) completed all 21 jobs successfully for `master` commit `c754df8ee2b8dd0235d6ffe355c30cc1c10be017`; that demonstrates packaging and launch behavior, not complete license/source coverage. The separate four-platform [license-inventory run](https://github.com/heckenmann/visual-agent/actions/runs/42385467454) is historical package evidence, not an inventory of the eventual release candidate. GitHub release `v0.1.0` currently has no downloadable assets. AppImage's statically linked libfuse remains a consequential unresolved source/relink issue. All package reports and curated materials still require artifact-level review; none grants redistribution clearance.
 
 - [ ] Regenerate the license inventory on macOS arm64/x64, Windows x64, and Linux x64 using the exact release dependency graph; diff platform-specific classifiers and package contents against the report.
 - [ ] Inspect every packaged JAR and native payload for LICENSE/NOTICE/COPYING files, especially Skiko/Skia, JNA, Netty, GraalJS, PDFBox, Tika, and the trimmed JDK. Preserve required notices, copyright and modification statements.

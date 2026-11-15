@@ -6,7 +6,15 @@ review of license conditions and distribution evidence, not an external legal
 opinion or an OpenChain certification. Do not attribute this review to a human
 or organization that has not performed it.
 
-## Current Candidate And Publisher (2026-11-13)
+## Current Process and Published Delivery (2026-11-15)
+
+The [release guide](../releases.md) describes tag-driven builds and draft
+attachment followed by publication through GitHub's UI. The earlier process below
+is historical. [v0.1.1](https://github.com/heckenmann/visual-agent/releases/tag/v0.1.1)
+was published with all twelve assets on November 15 using the former publisher.
+This delivery does not resolve or approve the substantive findings in this review.
+
+## Historical Candidate And Publisher (2026-11-13)
 
 Candidate workflow [43490076062](https://github.com/heckenmann/visual-agent/actions/runs/43490076062)
 was started for tag input `v0.1.0` at PR head

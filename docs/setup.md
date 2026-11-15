@@ -17,10 +17,10 @@
 
 ## Supported Operating Systems and Release Packages
 
-Binary downloads are temporarily unavailable while the beta packages and their required
-third-party license/source materials are completed and reviewed. The existing `v0.1.0`
-prerelease has no downloadable assets. The platform matrix below describes the planned formats;
-check [GitHub Releases](https://github.com/heckenmann/visual-agent/releases) for availability.
+[v0.1.1](https://github.com/heckenmann/visual-agent/releases/tag/v0.1.1) is available
+with ten application packages and two legal/source archives (verified November 15,
+2026). See the [README download table](../README.md#download-and-run). Publication
+is not a determination that the distribution audit's open findings are resolved.
 
 | Operating system | Architecture | Release package | Installation |
 | --- | --- | --- | --- |
@@ -47,9 +47,8 @@ Build the executable JAR staged for a GitHub release with:
 ./gradlew :desktop:stageReleaseJar
 ```
 
-The package-and-smoke workflow builds a JAR on every supported platform; the separate release
-workflow attaches the matching asset alongside the native packages to an existing GitHub release
-only after all smoke checks pass:
+The [release workflow](releases.md) builds a JAR on every supported platform and
+attaches it alongside native packages to a draft only after all smoke checks pass:
 
 - `visual-agent-linux-x64-jar.jar`
 - `visual-agent-macos-arm64-jar.jar`
@@ -61,24 +60,15 @@ their target systems. DEB and AppImage are tested in Ubuntu containers; RPM is t
 container; DMGs and MSI are tested on matching macOS and Windows runners. Platform JARs are launched
 with Java 27. Smoke runs use isolated temporary data and require an explicit desktop-ready signal,
 database/workspace creation, and orderly shutdown. Native packages are tested without a system JDK.
-These platform checks run in parallel after packaging. Maintainers can manually dispatch the
-package-and-smoke workflow for a selected commit. For a release candidate, provide its SemVer tag
-as `release_tag`; this builds versioned candidate artifacts but does not create or publish a GitHub
-release. Manual runs without a tag are unversioned smoke tests, and all jobs test the same selected
-commit.
-
-After a tagged candidate succeeds, create a GitHub draft release for that tag and commit. Then
-manually dispatch `Publish verified desktop release` from the trusted default branch with the same
-tag. The publisher reuses the successful candidate, verifies its exact commit and the trusted
-license-clearance record, attaches the packages, and only then publishes the draft. Creating or
-publishing a release does not automatically start the package workflow; a failed or unapproved
-candidate leaves the draft without published assets.
+These platform checks run in parallel after packaging. See the central
+[release guide](releases.md) for tag pushes, draft preparation, publication and
+retry behavior. Manual dispatch runs the same validation jobs without release writes.
 
 ### Release Versions
 
-Create a GitHub draft release with a Semantic Version tag after the matching candidate has passed.
-An optional `v` prefix is accepted;
-`v1.2.3`, `v1.2.3-beta.1`, and `v1.2.3-beta.1+build.7` are valid examples.
+Release automation accepts `v`-prefixed Semantic Version tags, for example
+`v1.2.3`, `v1.2.3-beta.1`, and `v1.2.3-beta.1+build.7`.
+The Gradle property used for local reproduction also accepts an unprefixed version.
 The workflow supplies the tag to every Gradle build through `ORG_GRADLE_PROJECT_releaseTag`.
 `gradle/release-version.settings.gradle.kts` validates it, removes the optional `v`, and overrides
 the shared `visual-agent` catalog entry. No source file or Git commit is changed by the release build.
@@ -108,8 +98,9 @@ To reproduce a release build locally without publishing anything:
 ./gradlew :desktop:stageReleaseJar -PreleaseTag=v1.2.3-beta.1 --no-daemon
 ```
 
-Creating or pushing a tag alone does not start release packaging. See
-[UC-0000146](usecases/uc_0000146_smoke_test_packaged_release_artifacts.md) for the full pipeline and constraints.
+Pushing a new `v`-prefixed version tag starts release packaging automatically;
+creating a local tag without pushing it does not. See the [release guide](releases.md)
+and [UC-0000146](usecases/uc_0000146_smoke_test_packaged_release_artifacts.md) for the pipeline and constraints.
 
 Each JAR requires Java 24 and must be used only on the platform for which it was built. It does
 not provide native launcher or package-manager integration.
