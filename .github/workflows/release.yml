@@ -1,20 +1,160 @@
 name: Publish verified desktop release
 
 on:
+  workflow_run:
+    workflows:
+      - Build and smoke release packages
+    types:
+      - completed
   workflow_dispatch:
     inputs:
       release_tag:
-        description: SemVer tag of the existing draft release to verify and publish
+        description: SemVer tag of the existing draft release to receive verified assets
         required: true
         type: string
+      publish_release:
+        description: Publish the draft after attaching verified assets (default branch only)
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   actions: read
   contents: write
 
 jobs:
+  attach:
+    name: Attach verified candidate assets to draft release
+    if: >-
+      github.event_name == 'workflow_run' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'workflow_dispatch' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out trusted publication policy
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+
+      - name: Select and verify versioned candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          SOURCE_COMMIT: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          artifacts="$(gh api "repos/$GH_REPO/actions/runs/$RUN_ID/artifacts?per_page=100")"
+          mapfile -t candidate_artifacts < <(
+            jq -r '.artifacts[] | select(.expired == false) | .name | select(startswith("release-candidate-"))' <<< "$artifacts"
+          )
+          if [[ "${#candidate_artifacts[@]}" -eq 0 ]]; then
+            echo "This successful manual package run has no versioned release candidate; nothing to attach."
+            exit 0
+          fi
+          [[ "${#candidate_artifacts[@]}" -eq 1 ]] || {
+            echo "Expected exactly one versioned release candidate artifact." >&2
+            exit 1
+          }
+          artifact_name="${candidate_artifacts[0]}"
+          release_tag="${artifact_name#release-candidate-}"
+          [[ "$release_tag" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.-]+)?(\+[a-zA-Z0-9.-]+)?$ ]] || {
+            echo "Invalid SemVer release-candidate tag: $release_tag" >&2
+            exit 1
+          }
+          gh run download "$RUN_ID" --repo "$GH_REPO" --name "$artifact_name" --dir candidate-metadata
+          grep -Fx "tag=$release_tag" candidate-metadata/manifest
+          grep -Fx 'candidate=true' candidate-metadata/manifest
+          grep -Fx "source_commit=$SOURCE_COMMIT" candidate-metadata/manifest
+          tag_commit="$(gh api "repos/$GH_REPO/commits/$release_tag" --jq .sha)"
+          [[ "$tag_commit" == "$SOURCE_COMMIT" ]] || {
+            echo "Release tag does not point to the candidate source commit." >&2
+            exit 1
+          }
+          branch_relation="$(gh api "repos/$GH_REPO/compare/$release_tag...$DEFAULT_BRANCH" --jq .status)"
+          [[ "$branch_relation" == "ahead" || "$branch_relation" == "identical" ]] || {
+            echo "The release tag must point to a commit contained in the trusted default branch." >&2
+            exit 1
+          }
+          printf 'RELEASE_TAG=%s\n' "$release_tag" >> "$GITHUB_ENV"
+
+      - name: Download candidate release assets
+        if: env.RELEASE_TAG != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+        run: |
+          set -euo pipefail
+          mkdir release-assets
+          for artifact in \
+            visual-agent-linux-deb \
+            visual-agent-linux-rpm \
+            visual-agent-linux-appimage \
+            visual-agent-linux-x64-jar \
+            visual-agent-macos-arm64-jar \
+            visual-agent-macos-x64-jar \
+            visual-agent-windows-x64-jar \
+            visual-agent-macos-arm64 \
+            visual-agent-macos-x64 \
+            visual-agent-windows \
+            visual-agent-legal \
+            visual-agent-corresponding-sources; do
+            gh run download "$RUN_ID" --repo "$GH_REPO" --name "$artifact" --dir release-assets
+          done
+
+      - name: Verify release assets
+        if: env.RELEASE_TAG != ''
+        run: python3 scripts/verify-release-assets.py --assets release-assets
+
+      - name: Create or verify the tagged draft release
+        if: env.RELEASE_TAG != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          if release="$(gh release view "$RELEASE_TAG" --repo "$GH_REPO" --json databaseId,tagName,isDraft 2>/dev/null)"; then
+            jq -e --arg tag "$RELEASE_TAG" '.tagName == $tag and .isDraft == true' <<< "$release" >/dev/null || {
+              echo "The matching release must remain a draft before candidate assets can be attached." >&2
+              exit 1
+            }
+          else
+            prerelease=false
+            [[ "${RELEASE_TAG%%+*}" != *-* ]] || prerelease=true
+            gh release create "$RELEASE_TAG" \
+              --repo "$GH_REPO" \
+              --verify-tag \
+              --draft \
+              --prerelease="$prerelease" \
+              --title "Visual Agent $RELEASE_TAG" \
+              --generate-notes
+          fi
+
+      - name: Attach verified assets to the draft release
+        if: env.RELEASE_TAG != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          release="$(gh release view "$RELEASE_TAG" --repo "$GH_REPO" --json databaseId,tagName,isDraft)"
+          jq -e --arg tag "$RELEASE_TAG" '.tagName == $tag and .isDraft == true' <<< "$release" >/dev/null || {
+            echo "The matching release stopped being a draft before assets could be attached." >&2
+            exit 1
+          }
+          mapfile -t assets < <(find release-assets -maxdepth 1 -type f -print | sort)
+          test "${#assets[@]}" -eq 12
+          gh release upload "$RELEASE_TAG" "${assets[@]}" --repo "$GH_REPO" --clobber
+
   publish:
     name: Verify and publish draft release
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -30,10 +170,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           RELEASE_TAG: ${{ inputs.release_tag }}
+          PUBLISH_RELEASE: ${{ inputs.publish_release }}
           GITHUB_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
         run: |
           set -euo pipefail
-          [[ "$GITHUB_REF" == "refs/heads/$GITHUB_DEFAULT_BRANCH" ]] || {
+          [[ "$PUBLISH_RELEASE" != "true" || "$GITHUB_REF" == "refs/heads/$GITHUB_DEFAULT_BRANCH" ]] || {
             echo "Run the publisher from the trusted default branch." >&2
             exit 1
           }
@@ -41,12 +182,12 @@ jobs:
             echo "Invalid SemVer release tag: $RELEASE_TAG" >&2
             exit 1
           }
-          release="$(gh api "repos/$GH_REPO/releases/tags/$RELEASE_TAG")"
-          jq -e --arg tag "$RELEASE_TAG" '.tag_name == $tag and .draft == true' <<< "$release" >/dev/null || {
+          release="$(gh release view "$RELEASE_TAG" --repo "$GH_REPO" --json databaseId,tagName,isDraft)"
+          jq -e --arg tag "$RELEASE_TAG" '.tagName == $tag and .isDraft == true' <<< "$release" >/dev/null || {
             echo "The matching GitHub release must exist as a draft; published releases are not accepted." >&2
             exit 1
           }
-          release_id="$(jq -r .id <<< "$release")"
+          release_id="$(jq -r .databaseId <<< "$release")"
           source_commit="$(gh api "repos/$GH_REPO/commits/$RELEASE_TAG" --jq .sha)"
           branch_relation="$(gh api "repos/$GH_REPO/compare/$RELEASE_TAG...$GITHUB_DEFAULT_BRANCH" --jq .status)"
           [[ "$branch_relation" == "ahead" || "$branch_relation" == "identical" ]] || {
@@ -123,6 +264,7 @@ jobs:
           gh release upload "$RELEASE_TAG" "${assets[@]}" --repo "$GH_REPO" --clobber
 
       - name: Publish after recipient asset checks pass
+        if: inputs.publish_release
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
