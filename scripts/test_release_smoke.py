@@ -310,7 +310,8 @@ class ReleaseWorkflowTest(unittest.TestCase):
         self.assertIn("path: release-metadata/manifest", smoke)
         self.assertEqual(7, smoke.count("ref: ${{ github.sha }}"))
         release = (root / "release.yml").read_text()
-        self.assertRegex(release, r"on:\n  workflow_dispatch:\n    inputs:\n      release_tag:")
+        self.assertIn("  workflow_dispatch:\n    inputs:\n      release_tag:", release)
+        self.assertIn("  workflow_run:", release)
         self.assertNotRegex(release, r"(?m)^  release:")
         self.assertIn('GITHUB_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}', release)
         self.assertIn('refs/heads/$GITHUB_DEFAULT_BRANCH', release)
@@ -332,7 +333,10 @@ class ReleaseWorkflowTest(unittest.TestCase):
         self.assertIn("--method PATCH", release)
         self.assertLess(release.index("scripts/verify-release-assets.py"), release.index("gh release upload"))
         self.assertLess(release.index("gh release upload"), release.index("--method PATCH"))
-        self.assertNotIn("gh release create", release)
+        self.assertIn("gh release create", release)
+        self.assertIn('--prerelease="$prerelease"', release)
+        self.assertIn('--json databaseId,tagName,isDraft', release)
+        self.assertNotIn('releases/tags/$RELEASE_TAG', release)
         self.assertIn("scripts/verify-release-assets.py", release)
 
 
