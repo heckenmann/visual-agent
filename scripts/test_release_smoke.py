@@ -299,6 +299,34 @@ class ReleaseWorkflowTest(unittest.TestCase):
         self.assertRegex(workflow, r"name: Preserve native packaging failure logs\n\s+if: failure\(\)")
         self.assertIn("name: packaging-logs-${{ matrix.platform }}", workflow)
 
+    def test_publication_requires_explicit_input_and_the_default_branch(self):
+        workflow = (pathlib.Path(__file__).parents[1] / ".github/workflows/release.yml").read_text()
+        block = re.search(
+            r"      - name: Select successful candidate for this tag and commit\n.*?        run: \|\n(.*?)(?=\n      - name:)",
+            workflow,
+            re.S,
+        )
+        self.assertIsNotNone(block)
+        script = "\n".join(line[10:] for line in block.group(1).splitlines())
+        for publish, branch, expected in (("false", "topic", 77), ("true", "topic", 1), ("true", "master", 77)):
+            with self.subTest(publish=publish, branch=branch):
+                result = subprocess.run(
+                    ["bash", "-c", "gh() { return 77; }\n" + script],
+                    env={
+                        **os.environ,
+                        "PUBLISH_RELEASE": publish,
+                        "GITHUB_REF": f"refs/heads/{branch}",
+                        "GITHUB_DEFAULT_BRANCH": "master",
+                        "RELEASE_TAG": "v1.2.3",
+                        "GH_REPO": "owner/repo",
+                    },
+                    capture_output=True,
+                    text=True,
+                )
+                self.assertEqual(expected, result.returncode, result.stderr)
+        self.assertIn("type: boolean\n        default: false", workflow)
+        self.assertIn("- name: Publish after recipient asset checks pass\n        if: inputs.publish_release", workflow)
+
     def test_candidate_build_and_release_publication_are_separate_workflows(self):
         root = pathlib.Path(__file__).parents[1] / ".github/workflows"
         smoke = (root / "package-smoke.yml").read_text()

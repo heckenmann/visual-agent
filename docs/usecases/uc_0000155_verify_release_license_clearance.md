@@ -18,15 +18,17 @@ Automatically attach the exact packages and recipient-facing legal/source archiv
    Draft lookup uses the GitHub CLI's pending-tag support. Newly created drafts
    retain a SemVer prerelease suffix as GitHub's prerelease flag; build metadata
    alone does not mark a release as a prerelease.
-5. A maintainer manually dispatches the publisher from the trusted default branch. The publisher re-verifies the matching draft and candidate, attaches the verified assets, then publishes the draft.
+5. A maintainer can dispatch the release workflow with `release_tag` to attach or replace verified assets from an existing successful candidate. This defaults to attachment only and can be exercised from a topic branch. The candidate's tag and commit must still belong to the trusted default branch.
+6. To publish the draft, the maintainer dispatches from the trusted default branch with `publish_release=true`. The workflow re-verifies the matching draft and candidate, attaches the verified assets, then publishes the draft.
 
 ## Failure Flow
 
 Missing legal/source archives, extra files, symlinks, invalid archives, mismatched
 or expired candidates, tag/commit mismatches, or a published release stop
 attachment/publication. Manual smoke runs never attach assets. Automatic
-attachment creates or updates a draft only; publication remains a manual workflow
-dispatch. These checks establish asset presence and build provenance only; they do
+attachment creates or updates a draft only; dispatch also leaves the draft
+unpublished unless `publish_release=true` is explicitly selected from the default
+branch. These checks establish asset presence and build provenance only; they do
 not determine whether every license condition has been satisfied. GitHub users
 with repository write access can still publish releases directly.
 

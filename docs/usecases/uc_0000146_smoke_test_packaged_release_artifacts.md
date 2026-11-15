@@ -30,7 +30,7 @@ Release workflow.
 8. A tagged manual run stores its tag and source commit in candidate metadata. The run completes only after every package, legal-material, and smoke job succeeds; it does not create or publish a GitHub release.
 9. On successful completion of a tagged manual run, the release workflow verifies that the tag points to the candidate commit and that the commit is contained in the trusted default branch.
 10. The workflow creates a draft release for the exact tag when one does not exist, downloads the candidate artifacts, and verifies the ten packages plus legal/source archives before attaching them. It leaves the draft unpublished.
-11. A maintainer manually dispatches the publisher from the trusted default branch with the tag. The publisher re-verifies the matching draft and successful candidate before publishing; it never rebuilds different package bytes during publication.
+11. A maintainer can dispatch the release workflow with the tag to repeat verified attachment from the existing candidate. It leaves the draft unpublished by default. Publication requires `publish_release=true` and a dispatch from the trusted default branch; the workflow never rebuilds different package bytes during publication.
 
 ## Result
 
