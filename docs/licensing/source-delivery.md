@@ -1,8 +1,13 @@
 # Corresponding-source delivery worklist
 
 Refs #410. This document records verified source inputs and remaining work, not
-redistribution approval. The publisher checks candidate provenance and delivery
+redistribution approval. The [release workflow](../releases.md) checks tag provenance and delivery
 archive integrity; it does not determine legal sufficiency.
+
+Candidate and workflow references below describe the specific run or commit cited
+in each evidence record. They are historical observations, not a rolling statement
+about the latest published release. Use the [release guide](../releases.md) for the
+operational process and GitHub Releases for current downloads.
 
 ## Embedded Font Asset
 
