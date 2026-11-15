@@ -2,7 +2,7 @@
 
 ## Goal
 
-Verify actual packages on their supported operating systems without requiring a release, and attach verified assets to an existing GitHub release when requested through GitHub's release UI.
+Verify actual packages on their supported operating systems and prepare a complete draft after a version tag push. Operational instructions are in the [release guide](../releases.md).
 
 ## Primary Actor
 
@@ -12,9 +12,10 @@ Release workflow.
 
 - The package-and-smoke workflow builds all platform artifacts and uploads them as workflow artifacts.
 - Linux package tests run in Ubuntu or Fedora containers with a virtual display; macOS and Windows tests run on matching hosted runners.
-- A maintainer can manually dispatch the package-and-smoke workflow for a commit, optionally supplying a SemVer release tag. Without a tag it is an unversioned smoke run; with a tag it creates a versioned candidate and never publishes assets.
-- After a successful versioned candidate run, the release workflow creates or finds a draft release for the exact SemVer tag, verifies the recipient asset set, and attaches the candidate assets. The draft remains unpublished until a maintainer manually dispatches the publisher from the trusted default branch.
-- Candidate artifacts expire with the GitHub Actions artifact-retention period; an expired or missing candidate blocks asset publication and must be rebuilt.
+- A pushed `v`-prefixed SemVer tag points to a commit contained in `master`.
+- All jobs build and test the exact event commit in one workflow run.
+- Manual dispatch performs the same validation with the catalog version, without release writes.
+- Workflow artifacts remain available only for their configured retention period.
 - No model provider credentials or configured external endpoints are required.
 
 ## Main Flow
@@ -27,10 +28,10 @@ Release workflow.
    Automatic onboarding is hidden for this launch without changing its stored status, so the main workspace can be verified without provider credentials.
 6. The workflow verifies that the application created a non-empty H2 database and a workspace in the isolated data root.
 7. It closes the application, verifies orderly process exit, uninstalls installed packages, and removes temporary data.
-8. A tagged manual run stores its tag and source commit in candidate metadata. The run completes only after every package, legal-material, and smoke job succeeds; it does not create or publish a GitHub release.
-9. On successful completion of a tagged manual run, the release workflow verifies that the tag points to the candidate commit and that the commit is contained in the trusted default branch.
-10. The workflow creates a draft release for the exact tag when one does not exist, downloads the candidate artifacts, and verifies the ten packages plus legal/source archives before attaching them. It leaves the draft unpublished.
-11. A maintainer can dispatch the release workflow with the tag to repeat verified attachment from the existing candidate. It leaves the draft unpublished by default. Publication requires `publish_release=true` and a dispatch from the trusted default branch; the workflow never rebuilds different package bytes during publication.
+8. The draft job waits for every quality, package, legal/source-material, and smoke job to succeed.
+9. It revalidates the tag and commit and downloads exactly twelve recipient files from this same run.
+10. It verifies the asset set, creates or reuses the matching draft, and attaches only the verified files. Existing notes and unrelated assets survive retries; published releases are rejected.
+11. The maintainer inspects the populated draft and publishes using GitHub's UI. Manual dispatch never executes the draft job.
 
 ## Result
 
@@ -42,7 +43,6 @@ Every published native installer, portable Linux package, and platform-specific 
 
 ## Code Entry Points
 
-- `.github/workflows/package-smoke.yml`
 - `.github/workflows/release.yml`
 - `gradle/release-version.settings.gradle.kts`
 - `build.gradle.kts` (`verifyJavaToolchains`)
@@ -62,12 +62,11 @@ Every published native installer, portable Linux package, and platform-specific 
 - Each run uses unique temporary user and server data directories and verifies the database and workspace are created there.
 - Startup waits are bounded by a timeout but succeed only on the explicit readiness signal, not elapsed time.
 - Installed packages are uninstalled and all temporary artifacts are removed after success or failure.
-- A candidate must pass all package smoke tests before publication. The publisher accepts only a draft release; missing, expired, mismatched, or failed candidates and incomplete/corrupt recipient archives leave the release unpublished. This asset check is not a legal-clearance decision.
-- Independent OS, architecture, and artifact smoke jobs run in parallel after the package matrix completes.
-- Manual runs execute the same build and smoke jobs for the selected commit. A supplied SemVer tag is propagated to every Gradle invocation, enabling review of the exact version before creating a GitHub release.
-- Candidate artifact upload is separate from GitHub release publication. A successful tagged candidate automatically creates or updates its exact-tagged draft release with verified recipient files; a manually dispatched publisher reuses the matching candidate and publishes the draft.
-- Release tags must be Semantic Versions, with an optional `v` prefix, such as `v1.2.3` or `v1.2.3-beta.1+build.7`.
-  The prefix is removed for Gradle; prerelease/build metadata is preserved in runtime metadata and JAR versions.
+- A tag run must pass all required jobs before draft attachment. Missing, expired, mismatched or corrupt files stop attachment. This is not a legal-clearance decision.
+- Independent OS, architecture, and artifact smoke jobs run in parallel after packaging.
+- Manual dispatch validates the selected commit with the catalog version and cannot create, modify, or publish releases.
+- Same-tag runs are serialized without cancelling the active run. Failed jobs can be retried using successful same-run artifacts while they remain available.
+- Release tags are `v`-prefixed Semantic Versions such as `v1.2.3` or `v1.2.3-beta.1+build.7`. Gradle removes the prefix and preserves the suffix in runtime and JAR metadata.
 - All verification and packaging jobs receive the same `ORG_GRADLE_PROJECT_releaseTag` environment input.
   Gradle's Provider/version-catalog API overrides the shared `visual-agent` version before any module is configured;
   the source catalog remains unchanged. Local and manual smoke builds retain its checked-in default.

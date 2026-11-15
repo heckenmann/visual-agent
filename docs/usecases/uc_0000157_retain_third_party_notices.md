@@ -58,15 +58,11 @@ scope includes build/test artifacts and does not imply that every entry is shipp
     package (`linux-deb`, `linux-rpm`, `linux-appimage`, `macos-arm64`,
     `macos-x64`, and `windows`). Missing or unexpected platform evidence fails
     the assembly rather than producing a misleading partial archive.
-12. A tagged manual package-and-smoke run may build a SemVer release candidate
-    before a GitHub release exists. It uploads separate review-only archives and
-    hash-bound recipient-candidate archives, plus the platform packages, as
-    workflow artifacts; neither is published as a release. Candidate archive
-    generation omits only the review marker and does not update or grant the
-    source registry. The release publisher requires a successful candidate for
-    the exact release tag and source commit, then verifies the expected recipient
-    assets before attaching those candidate artifacts. This does not determine
-    whether all license obligations have been satisfied.
+12. A version tag push builds separate review-only and recipient archives in the
+    same workflow as the packages and smoke tests. The draft job checks and attaches
+    only the two recipient archives together with all ten packages after every job
+    passes. A maintainer publishes the completed draft through GitHub's UI. Archive
+    presence does not establish legal clearance; see the [release guide](../releases.md).
 
 ## Failure Flow
 

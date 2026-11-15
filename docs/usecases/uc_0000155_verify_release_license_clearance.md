@@ -1,36 +1,34 @@
-# UC 0000155: Attach and Publish Verified Release Assets
+# UC 0000155: Prepare a Verified Draft Release
 
 ## Goal
 
-Automatically attach the exact packages and recipient-facing legal/source archives from a successful versioned candidate to its draft release, then publish that draft only after a maintainer manually dispatches the publisher.
+Prepare a draft with all twelve recipient files after a version tag push. The
+maintainer publishes the completed draft through GitHub. See the [release guide](../releases.md).
 
 ## Preconditions
 
-- A successful versioned package-and-smoke candidate exists for a valid SemVer tag.
-- The tag points to the candidate commit and that commit is contained in the trusted default branch.
+- The original push creates the exact `v`-prefixed SemVer tag without force or deletion, and its commit is contained in `master`.
+- Every required job in the same release workflow run has succeeded.
 
 ## Main Flow
 
-1. When the tagged package-and-smoke run succeeds, the release workflow selects its versioned candidate artifact and verifies its tag, source commit, and trusted-branch ancestry.
-2. It creates a draft release for the exact tag if one does not exist; a matching published release is rejected.
-3. It downloads the ten application artifacts plus the legal/source archives and verifies the exact expected asset set, rejects empty files, and checks that both recipient archives are readable and not marked review-only.
-4. It attaches the candidate assets to the draft and leaves it unpublished.
-   Draft lookup uses the GitHub CLI's pending-tag support. Newly created drafts
-   retain a SemVer prerelease suffix as GitHub's prerelease flag; build metadata
-   alone does not mark a release as a prerelease.
-5. A maintainer can dispatch the release workflow with `release_tag` to attach or replace verified assets from an existing successful candidate. This defaults to attachment only and can be exercised from a topic branch. The candidate's tag and commit must still belong to the trusted default branch.
-6. To publish the draft, the maintainer dispatches from the trusted default branch with `publish_release=true`. The workflow re-verifies the matching draft and candidate, attaches the verified assets, then publishes the draft.
+1. The draft job checks that the remote tag still resolves to the exact build commit.
+2. It downloads the ten packages and two recipient archives from this same run.
+3. It rejects missing, empty, extra, linked, corrupt or review-only recipient files.
+4. It creates a draft or reuses the existing matching draft, setting its title to the exact tag. Prerelease flags must match the SemVer prerelease suffix; build metadata alone does not indicate a prerelease.
+5. It uploads only the twelve verified files, replacing those names on retry while preserving notes and unrelated assets.
+6. It reads all pages of uploaded asset metadata and compares the twelve files' states, sizes, and SHA-256 digests with the build. Missing, partial, duplicate or changed uploads fail the job.
+7. The maintainer inspects the completed draft and clicks **Publish release** on GitHub. Automation never publishes it.
 
 ## Failure Flow
 
-Missing legal/source archives, extra files, symlinks, invalid archives, mismatched
-or expired candidates, tag/commit mismatches, or a published release stop
-attachment/publication. Manual smoke runs never attach assets. Automatic
-attachment creates or updates a draft only; dispatch also leaves the draft
-unpublished unless `publish_release=true` is explicitly selected from the default
-branch. These checks establish asset presence and build provenance only; they do
-not determine whether every license condition has been satisfied. GitHub users
-with repository write access can still publish releases directly.
+Failed required jobs prevent draft attachment. Tag movement, a commit outside
+`master`, invalid assets, API failures, or an already published release stop the
+operation. A partially completed upload remains a draft and can be retried in the
+same workflow run while its artifacts remain available. Concurrency prevents two
+workflow runs for the same tag from updating the draft simultaneously. Repository
+writers must wait for workflow success before publishing; GitHub's UI does not
+enforce this job dependency. These checks do not determine legal clearance.
 
 ## Tool Calls
 
@@ -39,4 +37,6 @@ with repository write access can still publish releases directly.
 ## Code Entry Points
 
 - `.github/workflows/release.yml`
+- `scripts/verify-release-ref.sh`
+- `scripts/attach-release-draft.sh`
 - `scripts/verify-release-assets.py`

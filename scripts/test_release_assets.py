@@ -1,6 +1,7 @@
 """Tests for the small recipient-asset check used by the publisher."""
 
 import importlib.util
+import hashlib
 import pathlib
 import sys
 import tempfile
@@ -30,6 +31,32 @@ class ReleaseAssetTest(unittest.TestCase):
 
     def test_complete_candidate_is_accepted(self):
         CHECK.verify(self.assets)
+
+    def uploaded(self):
+        records = []
+        for file in self.assets.iterdir():
+            records.append({"name": file.name, "state": "uploaded", "size": file.stat().st_size,
+                            "digest": "sha256:" + hashlib.sha256(file.read_bytes()).hexdigest()})
+        return [records[:6], records[6:]]
+
+    def test_uploaded_files_match_across_pages_and_allow_unrelated_assets(self):
+        pages = self.uploaded()
+        pages.append([{"name": "maintainer-notes.txt"}])
+        CHECK.verify_uploaded(self.assets, pages)
+
+    def test_missing_duplicate_or_changed_uploaded_files_are_rejected(self):
+        for field, value in (("state", "starter"), ("size", 0), ("digest", None)):
+            pages = self.uploaded()
+            pages[0][0][field] = value
+            with self.subTest(field=field), self.assertRaisesRegex(ValueError, "does not match"):
+                CHECK.verify_uploaded(self.assets, pages)
+        for duplicate in (False, True):
+            pages = self.uploaded()
+            removed = pages[0].pop()
+            if duplicate:
+                pages[0].extend([removed, removed])
+            with self.subTest(duplicate=duplicate), self.assertRaisesRegex(ValueError, "Missing or duplicate"):
+                CHECK.verify_uploaded(self.assets, pages)
 
     def test_missing_or_extra_assets_are_rejected(self):
         (self.assets / "visual-agent-windows.msi").unlink()
@@ -73,15 +100,12 @@ class ReleaseAssetTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "symbolic-link"):
             CHECK.verify(self.assets)
 
-    def test_publisher_checks_assets_before_upload_and_publishes_last(self):
-        workflow = (ROOT / ".github/workflows/release.yml").read_text()
-        check = workflow.index("scripts/verify-release-assets.py")
-        upload = workflow.index("gh release upload")
-        publish = workflow.index("--method PATCH")
-        self.assertLess(check, upload)
-        self.assertLess(upload, publish)
-        self.assertNotIn("release-approvals.json", workflow)
-        self.assertIn("visual-agent-corresponding-sources", workflow)
+    def test_draft_attachment_checks_assets_and_never_publishes(self):
+        script = (ROOT / "scripts/attach-release-draft.sh").read_text()
+        self.assertLess(script.index("scripts/verify-release-assets.py"), script.index("gh release upload"))
+        self.assertIn("--draft", script)
+        self.assertNotIn("draft=false", script)
+        self.assertNotIn("release-approvals.json", script)
 
 
 if __name__ == "__main__":

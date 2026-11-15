@@ -1,230 +1,553 @@
-name: Publish verified desktop release
+name: Build and prepare desktop release
 
 on:
-  workflow_run:
-    workflows:
-      - Build and smoke release packages
-    types:
-      - completed
+  push:
+    tags:
+      - 'v*'
   workflow_dispatch:
-    inputs:
-      release_tag:
-        description: SemVer tag of the existing draft release to receive verified assets
-        required: true
-        type: string
-      publish_release:
-        description: Publish the draft after attaching verified assets (default branch only)
-        required: false
-        type: boolean
-        default: false
+
+concurrency:
+  group: desktop-release-${{ github.ref }}
+  cancel-in-progress: false
 
 permissions:
-  actions: read
-  contents: write
+  contents: read
+
+env:
+  GRADLE_OPTS: -Dorg.gradle.daemon=false
+  ZULU_JDK_VERSION: "27.0.1.0.3+1"
+  # Every Gradle invocation, including matrix packaging jobs, resolves the same candidate version.
+  ORG_GRADLE_PROJECT_releaseTag: ${{ github.event_name == 'push' && github.ref_name || '' }}
 
 jobs:
-  attach:
-    name: Attach verified candidate assets to draft release
-    if: >-
-      github.event_name == 'workflow_run' &&
-      github.event.workflow_run.conclusion == 'success' &&
-      github.event.workflow_run.event == 'workflow_dispatch' &&
-      github.event.workflow_run.head_repository.full_name == github.repository
+  verify:
+    name: Verify release source
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
+    outputs:
+      gradle_version: ${{ steps.gradle_wrapper.outputs.version }}
 
     steps:
-      - name: Check out trusted publication policy
+      - name: Check out repository
         uses: actions/checkout@v7
         with:
-          ref: ${{ github.event.repository.default_branch }}
-          persist-credentials: false
+          lfs: true
+          ref: ${{ github.sha }}
 
-      - name: Select and verify versioned candidate
+      - name: Validate release tag and source
+        if: github.event_name == 'push'
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          RUN_ID: ${{ github.event.workflow_run.id }}
-          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
-          SOURCE_COMMIT: ${{ github.event.workflow_run.head_sha }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          SOURCE_COMMIT: ${{ github.sha }}
+        run: bash scripts/verify-release-ref.sh
+
+      - name: Set up Java
+        uses: actions/setup-java@v6
+        with:
+          distribution: zulu
+          java-version: ${{ env.ZULU_JDK_VERSION }}
+
+      - name: Read Gradle wrapper version
+        id: gradle_wrapper
+        shell: bash
         run: |
           set -euo pipefail
-          artifacts="$(gh api "repos/$GH_REPO/actions/runs/$RUN_ID/artifacts?per_page=100")"
-          mapfile -t candidate_artifacts < <(
-            jq -r '.artifacts[] | select(.expired == false) | .name | select(startswith("release-candidate-"))' <<< "$artifacts"
+          version="$(sed -n 's#.*gradle-\([0-9][0-9.]*\)-[^/]*\.zip.*#\1#p' gradle/wrapper/gradle-wrapper.properties)"
+          test -n "$version"
+          printf 'version=%s\n' "$version" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6.4.1
+        with:
+          gradle-version: ${{ steps.gradle_wrapper.outputs.version }}
+
+      - name: Generate Gradle wrapper
+        run: gradle wrapper --gradle-version "${{ steps.gradle_wrapper.outputs.version }}" --no-daemon
+
+      - name: Validate generated Gradle wrapper
+        uses: gradle/actions/wrapper-validation@v6.4.1
+
+      - name: Resolve Gradle version from candidate tag
+        if: github.event_name == 'push'
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          test -n "$RELEASE_TAG"
+          ./gradlew --quiet printProjectVersion --no-daemon --no-configuration-cache
+
+      - name: Run offscreen quality gates without a display server
+        run: env -u DISPLAY -u WAYLAND_DISPLAY ./gradlew ktlintCheck check test verifyPackages --no-daemon --parallel --max-workers=4 -PtestMaxParallelForks=4
+
+      - name: Verify package smoke runner contracts
+        run: python3 -m unittest discover -s scripts -p 'test_release_*.py'
+
+
+  package:
+    name: Package ${{ matrix.platform }}
+    needs: verify
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux-deb
+            runner: ubuntu-latest
+            task: packageLinuxDeb
+            extension: deb
+            install_rpm: false
+            collect_notice_evidence: true
+          - platform: linux-rpm
+            runner: ubuntu-latest
+            task: packageLinuxRpm
+            extension: rpm
+            install_rpm: true
+            collect_notice_evidence: true
+          - platform: linux-appimage
+            runner: ubuntu-latest
+            task: verifyAppImageRuntimeInPackage
+            extension: AppImage
+            install_rpm: false
+            collect_notice_evidence: true
+          - platform: linux-x64-jar
+            runner: ubuntu-latest
+            task: stageReleaseJar
+            extension: jar
+            install_rpm: false
+            collect_notice_evidence: false
+          - platform: macos-arm64-jar
+            runner: macos-latest
+            task: stageReleaseJar
+            extension: jar
+            install_rpm: false
+            collect_notice_evidence: false
+          - platform: macos-x64-jar
+            runner: macos-15-intel
+            task: stageReleaseJar
+            extension: jar
+            install_rpm: false
+            collect_notice_evidence: false
+          - platform: windows-x64-jar
+            runner: windows-latest
+            task: stageReleaseJar
+            extension: jar
+            install_rpm: false
+            collect_notice_evidence: false
+          - platform: macos-arm64
+            runner: macos-latest
+            task: packageDmg
+            extension: dmg
+            install_rpm: false
+            collect_notice_evidence: true
+          - platform: macos-x64
+            runner: macos-15-intel
+            task: packageDmg
+            extension: dmg
+            install_rpm: false
+            collect_notice_evidence: true
+          - platform: windows
+            runner: windows-latest
+            task: packageMsi
+            extension: msi
+            install_rpm: false
+            collect_notice_evidence: true
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+        with:
+          lfs: true
+          ref: ${{ github.sha }}
+
+      - name: Set up Java
+        uses: actions/setup-java@v6
+        with:
+          distribution: zulu
+          java-version: ${{ env.ZULU_JDK_VERSION }}
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6.4.1
+        with:
+          gradle-version: ${{ needs.verify.outputs.gradle_version }}
+
+      - name: Bootstrap repository Gradle wrapper
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(sed -n 's#.*gradle-\([0-9][0-9.]*\)-[^/]*\.zip.*#\1#p' gradle/wrapper/gradle-wrapper.properties)"
+          test -n "$version"
+          gradle wrapper --gradle-version "$version" --no-daemon
+
+      - name: Install RPM packaging tools
+        if: matrix.install_rpm
+        run: sudo apt-get update && sudo apt-get install --yes rpm
+
+      - name: Build native package
+        run: ./gradlew :desktop:${{ matrix.task }} --no-daemon --no-configuration-cache
+        shell: bash
+
+      - name: Set up Python for packaged notice collection
+        if: matrix.collect_notice_evidence
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+
+      - name: Generate platform package inventory for licensing
+        if: matrix.collect_notice_evidence
+        run: ./gradlew -I scripts/license-settings.init.gradle.kts generateLicenseReport :desktop:generateDistributionArtifactInventory --no-daemon --no-configuration-cache
+        shell: bash
+
+      - name: Collect original notices from packaged runtime JARs
+        if: matrix.collect_notice_evidence
+        env:
+          PACKAGE_PLATFORM: ${{ matrix.platform }}
+        run: |
+          args=(
+            --package-root modules/desktop/build/compose/binaries/main/app
+            --inventory modules/desktop/build/reports/dependency-license/packaged-artifacts.csv
+            --license-report build/reports/dependency-license/licenses-all.json
+            --project-license LICENSE
+            --output notice-evidence
+            --supplements docs/licensing/third-party/sources.json
           )
-          if [[ "${#candidate_artifacts[@]}" -eq 0 ]]; then
-            echo "This successful manual package run has no versioned release candidate; nothing to attach."
-            exit 0
+          if [[ "$PACKAGE_PLATFORM" == "linux-appimage" ]]; then
+            mapfile -t appimage_packages < <(find modules/desktop/build/compose/binaries/main/packages -maxdepth 1 -type f -name '*.AppImage' -print)
+            test "${#appimage_packages[@]}" -eq 1
+            args+=(
+              --appimage-package "${appimage_packages[0]}"
+              --appimage-runtime modules/desktop/build/appimage/tools/runtime-dd6cebed-x86_64
+              --appimage-source-archive modules/desktop/build/reports/dependency-license/appimage-runtime-sources/type2-runtime-dd6cebed.tar.gz
+            )
           fi
-          [[ "${#candidate_artifacts[@]}" -eq 1 ]] || {
-            echo "Expected exactly one versioned release candidate artifact." >&2
-            exit 1
-          }
-          artifact_name="${candidate_artifacts[0]}"
-          release_tag="${artifact_name#release-candidate-}"
-          [[ "$release_tag" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.-]+)?(\+[a-zA-Z0-9.-]+)?$ ]] || {
-            echo "Invalid SemVer release-candidate tag: $release_tag" >&2
-            exit 1
-          }
-          gh run download "$RUN_ID" --repo "$GH_REPO" --name "$artifact_name" --dir candidate-metadata
-          grep -Fx "tag=$release_tag" candidate-metadata/manifest
-          grep -Fx 'candidate=true' candidate-metadata/manifest
-          grep -Fx "source_commit=$SOURCE_COMMIT" candidate-metadata/manifest
-          tag_commit="$(gh api "repos/$GH_REPO/commits/$release_tag" --jq .sha)"
-          [[ "$tag_commit" == "$SOURCE_COMMIT" ]] || {
-            echo "Release tag does not point to the candidate source commit." >&2
-            exit 1
-          }
-          branch_relation="$(gh api "repos/$GH_REPO/compare/$release_tag...$DEFAULT_BRANCH" --jq .status)"
-          [[ "$branch_relation" == "ahead" || "$branch_relation" == "identical" ]] || {
-            echo "The release tag must point to a commit contained in the trusted default branch." >&2
-            exit 1
-          }
-          printf 'RELEASE_TAG=%s\n' "$release_tag" >> "$GITHUB_ENV"
+          python scripts/collect-third-party-notices.py "${args[@]}"
+        shell: bash
 
-      - name: Download candidate release assets
-        if: env.RELEASE_TAG != ''
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          RUN_ID: ${{ github.event.workflow_run.id }}
+      - name: Upload platform notice evidence
+        if: matrix.collect_notice_evidence
+        uses: actions/upload-artifact@v7
+        with:
+          name: license-notices-${{ matrix.platform }}
+          overwrite: true
+          if-no-files-found: error
+          path: notice-evidence/
+
+      - name: Show native packaging failure logs
+        if: failure()
+        shell: bash
+        run: |
+          if [[ -d modules/desktop/build/compose/logs ]]; then
+            find modules/desktop/build/compose/logs -type f -name '*.txt' -print -exec cat {} \;
+          fi
+
+      - name: Preserve native packaging failure logs
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: packaging-logs-${{ matrix.platform }}
+          overwrite: true
+          if-no-files-found: ignore
+          path: modules/desktop/build/compose/logs/
+
+      - name: Stage release asset
+        shell: bash
         run: |
           set -euo pipefail
+          package_file="$(find modules/desktop/build/compose/binaries -type f -name '*.${{ matrix.extension }}' -print -quit)"
+          test -n "$package_file"
           mkdir release-assets
-          for artifact in \
-            visual-agent-linux-deb \
-            visual-agent-linux-rpm \
-            visual-agent-linux-appimage \
-            visual-agent-linux-x64-jar \
-            visual-agent-macos-arm64-jar \
-            visual-agent-macos-x64-jar \
-            visual-agent-windows-x64-jar \
-            visual-agent-macos-arm64 \
-            visual-agent-macos-x64 \
-            visual-agent-windows \
-            visual-agent-legal \
-            visual-agent-corresponding-sources; do
-            gh run download "$RUN_ID" --repo "$GH_REPO" --name "$artifact" --dir release-assets
-          done
+          cp "$package_file" "release-assets/visual-agent-${{ matrix.platform }}.${{ matrix.extension }}"
 
-      - name: Verify release assets
-        if: env.RELEASE_TAG != ''
-        run: python3 scripts/verify-release-assets.py --assets release-assets
+      - name: Upload native package
+        uses: actions/upload-artifact@v7
+        with:
+          name: visual-agent-${{ matrix.platform }}
+          overwrite: true
+          if-no-files-found: error
+          path: release-assets/
 
-      - name: Create or verify the tagged draft release
-        if: env.RELEASE_TAG != ''
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
+      - name: Preserve native runtime provenance
+        if: matrix.extension != 'jar'
+        uses: actions/upload-artifact@v7
+        with:
+          name: runtime-provenance-${{ matrix.platform }}
+          overwrite: true
+          if-no-files-found: error
+          path: modules/desktop/build/reports/dependency-license/runtime-provenance.properties
+
+  legal-materials:
+    name: Package legal and source review materials
+    needs: [verify, package]
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+        with:
+          lfs: true
+          ref: ${{ github.sha }}
+
+      - name: Set up Java
+        uses: actions/setup-java@v6
+        with:
+          distribution: zulu
+          java-version: ${{ env.ZULU_JDK_VERSION }}
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6.4.0
+        with:
+          gradle-version: ${{ needs.verify.outputs.gradle_version }}
+
+      - name: Bootstrap repository Gradle wrapper
+        shell: bash
         run: |
           set -euo pipefail
-          if release="$(gh release view "$RELEASE_TAG" --repo "$GH_REPO" --json databaseId,tagName,isDraft 2>/dev/null)"; then
-            jq -e --arg tag "$RELEASE_TAG" '.tagName == $tag and .isDraft == true' <<< "$release" >/dev/null || {
-              echo "The matching release must remain a draft before candidate assets can be attached." >&2
-              exit 1
-            }
-          else
-            prerelease=false
-            [[ "${RELEASE_TAG%%+*}" != *-* ]] || prerelease=true
-            gh release create "$RELEASE_TAG" \
-              --repo "$GH_REPO" \
-              --verify-tag \
-              --draft \
-              --prerelease="$prerelease" \
-              --title "Visual Agent $RELEASE_TAG" \
-              --generate-notes
-          fi
+          version="$(sed -n 's#.*gradle-\([0-9][0-9.]*\)-[^/]*\.zip.*#\1#p' gradle/wrapper/gradle-wrapper.properties)"
+          test -n "$version"
+          gradle wrapper --gradle-version "$version" --no-daemon
 
-      - name: Attach verified assets to the draft release
-        if: env.RELEASE_TAG != ''
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
+      - name: Collect pinned source and legal inputs
+        run: ./gradlew :desktop:prepareReleaseSourceMaterials --no-daemon --no-configuration-cache
+
+      - name: Download per-platform package notice evidence
+        uses: actions/download-artifact@v8
+        with:
+          pattern: license-notices-*
+          path: release-materials/package-notices
+          merge-multiple: false
+
+      - name: Build review-only legal and source archives
         run: |
-          set -euo pipefail
-          release="$(gh release view "$RELEASE_TAG" --repo "$GH_REPO" --json databaseId,tagName,isDraft)"
-          jq -e --arg tag "$RELEASE_TAG" '.tagName == $tag and .isDraft == true' <<< "$release" >/dev/null || {
-            echo "The matching release stopped being a draft before assets could be attached." >&2
-            exit 1
-          }
-          mapfile -t assets < <(find release-assets -maxdepth 1 -type f -print | sort)
-          test "${#assets[@]}" -eq 12
-          gh release upload "$RELEASE_TAG" "${assets[@]}" --repo "$GH_REPO" --clobber
+          python3 scripts/build_release_material_bundles.py \
+            --project-root . \
+            --source-materials modules/desktop/build/reports/dependency-license/release-source-materials \
+            --notice-evidence release-materials/package-notices \
+            --output-directory release-materials/review-only
 
-  publish:
-    name: Verify and publish draft release
-    if: github.event_name == 'workflow_dispatch'
+      - name: Build hash-bound recipient candidates
+        run: |
+          python3 scripts/build_release_material_bundles.py \
+            --project-root . \
+            --source-materials modules/desktop/build/reports/dependency-license/release-source-materials \
+            --notice-evidence release-materials/package-notices \
+            --output-directory release-materials/recipient-candidates \
+            --recipient-candidate
+
+      - name: Upload recipient-candidate legal archive
+        uses: actions/upload-artifact@v7
+        with:
+          name: visual-agent-legal
+          overwrite: true
+          if-no-files-found: error
+          path: release-materials/recipient-candidates/visual-agent-legal.zip
+
+      - name: Upload recipient-candidate source archive
+        uses: actions/upload-artifact@v7
+        with:
+          name: visual-agent-corresponding-sources
+          overwrite: true
+          if-no-files-found: error
+          path: release-materials/recipient-candidates/visual-agent-corresponding-sources.zip
+
+      - name: Upload review-only legal archive
+        uses: actions/upload-artifact@v7
+        with:
+          name: visual-agent-legal-review
+          overwrite: true
+          if-no-files-found: error
+          path: release-materials/review-only/visual-agent-legal.zip
+
+      - name: Upload review-only source archive
+        uses: actions/upload-artifact@v7
+        with:
+          name: visual-agent-corresponding-sources-review
+          overwrite: true
+          if-no-files-found: error
+          path: release-materials/review-only/visual-agent-corresponding-sources.zip
+
+  smoke-linux-native:
+    name: Smoke ${{ matrix.platform }} in ${{ matrix.image }}
+    needs: package
+    runs-on: ubuntu-latest
+    container:
+      image: ${{ matrix.image }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux-deb
+            image: ubuntu:24.04
+            kind: deb
+          - platform: linux-appimage
+            image: ubuntu:24.04
+            kind: appimage
+          - platform: linux-rpm
+            image: fedora:latest
+            kind: rpm
+
+    steps:
+      - name: Check out smoke-test scripts
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Download native package
+        uses: actions/download-artifact@v8
+        with:
+          name: visual-agent-${{ matrix.platform }}
+          path: artifact
+
+      - name: Install Ubuntu desktop runtime dependencies
+        if: matrix.image == 'ubuntu:24.04'
+        run: |
+          apt-get update
+          apt-get install --yes python3 xvfb xauth dbus-x11 gnome-menus libgtk-3-0t64 libasound2t64 libx11-xcb1 libxrender1 libxtst6 libxi6 libxrandr2 libfuse2t64
+
+      - name: Install Fedora desktop runtime dependencies
+        if: matrix.image == 'fedora:latest'
+        run: dnf install --assumeyes python3 gtk3 alsa-lib libX11-xcb libXrender libXtst libXi libXrandr mesa-libgbm xorg-x11-server-Xvfb xorg-x11-xauth dbus-x11
+
+      - name: Install, launch, and verify native package
+        run: python3 scripts/smoke-release-posix.py linux "${{ matrix.kind }}" "artifact/visual-agent-${{ matrix.platform }}.${{ matrix.kind == 'appimage' && 'AppImage' || matrix.kind }}"
+
+  smoke-linux-jar:
+    name: Smoke Linux executable JAR
+    needs: package
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
     steps:
-      - name: Check out trusted publication policy
+      - name: Check out smoke-test scripts
         uses: actions/checkout@v7
         with:
-          ref: ${{ github.event.repository.default_branch }}
+          ref: ${{ github.sha }}
+
+      - name: Set up Java
+        uses: actions/setup-java@v6
+        with:
+          distribution: zulu
+          java-version: ${{ env.ZULU_JDK_VERSION }}
+
+      - name: Download Linux JAR
+        uses: actions/download-artifact@v8
+        with:
+          name: visual-agent-linux-x64-jar
+          path: artifact
+
+      - name: Install virtual display
+        run: sudo apt-get update && sudo apt-get install --yes xvfb xauth
+
+      - name: Launch and verify Linux JAR
+        run: python3 scripts/smoke-release-posix.py linux jar artifact/visual-agent-linux-x64-jar.jar
+
+  smoke-macos:
+    name: Smoke ${{ matrix.platform }} ${{ matrix.kind }}
+    needs: package
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-arm64
+            runner: macos-latest
+            kind: dmg
+          - platform: macos-arm64-jar
+            runner: macos-latest
+            kind: jar
+          - platform: macos-x64
+            runner: macos-15-intel
+            kind: dmg
+          - platform: macos-x64-jar
+            runner: macos-15-intel
+            kind: jar
+
+    steps:
+      - name: Check out smoke-test scripts
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Set up Java for executable JAR
+        if: matrix.kind == 'jar'
+        uses: actions/setup-java@v6
+        with:
+          distribution: zulu
+          java-version: ${{ env.ZULU_JDK_VERSION }}
+
+      - name: Download release artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: visual-agent-${{ matrix.platform }}
+          path: artifact
+
+      - name: Launch and verify macOS artifact
+        run: python3 scripts/smoke-release-posix.py macos "${{ matrix.kind }}" "artifact/visual-agent-${{ matrix.platform }}.${{ matrix.kind }}"
+
+  smoke-windows:
+    name: Smoke Windows ${{ matrix.kind }}
+    needs: package
+    runs-on: windows-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        kind: [msi, jar]
+
+    steps:
+      - name: Check out smoke-test scripts
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Set up Java for executable JAR
+        if: matrix.kind == 'jar'
+        uses: actions/setup-java@v6
+        with:
+          distribution: zulu
+          java-version: ${{ env.ZULU_JDK_VERSION }}
+
+      - name: Download release artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: visual-agent-windows${{ matrix.kind == 'jar' && '-x64-jar' || '' }}
+          path: artifact
+
+      - name: Install, launch, and verify Windows artifact
+        shell: pwsh
+        run: |
+          ./scripts/test-windows-smoke-processes.ps1
+          ./scripts/smoke-release-windows.ps1 -Kind "${{ matrix.kind }}" -Artifact "artifact/visual-agent-windows${{ matrix.kind == 'jar' && '-x64-jar.jar' || '.msi' }}"
+
+  draft:
+    name: Attach verified assets to draft release
+    if: github.event_name == 'push'
+    needs: [verify, package, legal-materials, smoke-linux-native, smoke-linux-jar, smoke-macos, smoke-windows]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      actions: read
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      RELEASE_TAG: ${{ github.ref_name }}
+      SOURCE_COMMIT: ${{ github.sha }}
+    steps:
+      - name: Check out exact release source
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
           persist-credentials: false
 
-      - name: Select successful candidate for this tag and commit
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          RELEASE_TAG: ${{ inputs.release_tag }}
-          PUBLISH_RELEASE: ${{ inputs.publish_release }}
-          GITHUB_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
-        run: |
-          set -euo pipefail
-          [[ "$PUBLISH_RELEASE" != "true" || "$GITHUB_REF" == "refs/heads/$GITHUB_DEFAULT_BRANCH" ]] || {
-            echo "Run the publisher from the trusted default branch." >&2
-            exit 1
-          }
-          [[ "$RELEASE_TAG" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.-]+)?(\+[a-zA-Z0-9.-]+)?$ ]] || {
-            echo "Invalid SemVer release tag: $RELEASE_TAG" >&2
-            exit 1
-          }
-          release="$(gh release view "$RELEASE_TAG" --repo "$GH_REPO" --json databaseId,tagName,isDraft)"
-          jq -e --arg tag "$RELEASE_TAG" '.tagName == $tag and .isDraft == true' <<< "$release" >/dev/null || {
-            echo "The matching GitHub release must exist as a draft; published releases are not accepted." >&2
-            exit 1
-          }
-          release_id="$(jq -r .databaseId <<< "$release")"
-          source_commit="$(gh api "repos/$GH_REPO/commits/$RELEASE_TAG" --jq .sha)"
-          branch_relation="$(gh api "repos/$GH_REPO/compare/$RELEASE_TAG...$GITHUB_DEFAULT_BRANCH" --jq .status)"
-          [[ "$branch_relation" == "ahead" || "$branch_relation" == "identical" ]] || {
-            echo "The release tag must point to a commit contained in the trusted default branch." >&2
-            exit 1
-          }
-          artifact_name="release-candidate-$RELEASE_TAG"
-          candidate_run=""
-          while IFS=$'\t' read -r _created_at run_id candidate_sha; do
-            [[ "$candidate_sha" == "$source_commit" ]] || continue
-            run="$(gh run view "$run_id" --repo "$GH_REPO" --json workflowName,event,status,conclusion,headSha)"
-            if jq -e --arg sha "$source_commit" \
-              '.workflowName == "Build and smoke release packages" and .event == "workflow_dispatch" and .status == "completed" and .conclusion == "success" and .headSha == $sha' \
-              <<< "$run" >/dev/null; then
-              candidate_run="$run_id"
-              break
-            fi
-          done < <(gh api --paginate --method GET "repos/$GH_REPO/actions/artifacts" \
-            -f name="$artifact_name" \
-            --jq '.artifacts[] | select(.expired == false) | [.created_at, .workflow_run.id, .workflow_run.head_sha] | @tsv' \
-            | sort -r)
-          [[ -n "$candidate_run" ]] || {
-            echo "No successful versioned package-and-smoke candidate exists for $RELEASE_TAG at $source_commit." >&2
-            exit 1
-          }
-          mkdir candidate-metadata
-          gh run download "$candidate_run" --repo "$GH_REPO" --name "$artifact_name" --dir candidate-metadata
-          grep -Fx "tag=$RELEASE_TAG" candidate-metadata/manifest
-          grep -Fx 'candidate=true' candidate-metadata/manifest
-          grep -Fx "source_commit=$source_commit" candidate-metadata/manifest
-          printf 'RELEASE_TAG=%s\nRELEASE_ID=%s\nSOURCE_COMMIT=%s\nCANDIDATE_RUN_ID=%s\n' \
-            "$RELEASE_TAG" "$release_id" "$source_commit" "$candidate_run" >> "$GITHUB_ENV"
+      - name: Revalidate release tag and source
+        run: bash scripts/verify-release-ref.sh
 
-      - name: Download preflighted release artifacts
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
+      - name: Download this run's recipient assets
         run: |
           set -euo pipefail
           mkdir release-assets
@@ -241,38 +564,8 @@ jobs:
             visual-agent-windows \
             visual-agent-legal \
             visual-agent-corresponding-sources; do
-            gh run download "$CANDIDATE_RUN_ID" --repo "$GH_REPO" --name "$artifact" --dir release-assets
+            gh run download "$GITHUB_RUN_ID" --repo "$GH_REPO" --name "$artifact" --dir release-assets
           done
 
-      - name: Verify recipient release assets
-        run: |
-          python3 scripts/verify-release-assets.py --assets release-assets
-
-      - name: Attach verified artifacts to the draft release
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-        run: |
-          set -euo pipefail
-          mapfile -t assets < <(find release-assets -maxdepth 1 -type f -print | sort)
-          test "${#assets[@]}" -eq 12
-          release="$(gh api "repos/$GH_REPO/releases/$RELEASE_ID")"
-          jq -e --arg tag "$RELEASE_TAG" '.tag_name == $tag and .draft == true' <<< "$release" >/dev/null || {
-            echo "The release stopped being a draft before verified assets could be attached." >&2
-            exit 1
-          }
-          gh release upload "$RELEASE_TAG" "${assets[@]}" --repo "$GH_REPO" --clobber
-
-      - name: Publish after recipient asset checks pass
-        if: inputs.publish_release
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-        run: |
-          set -euo pipefail
-          release="$(gh api "repos/$GH_REPO/releases/$RELEASE_ID")"
-          jq -e --arg tag "$RELEASE_TAG" '.tag_name == $tag and .draft == true' <<< "$release" >/dev/null || {
-            echo "The release stopped being a draft before publication." >&2
-            exit 1
-          }
-          gh api --method PATCH "repos/$GH_REPO/releases/$RELEASE_ID" -F draft=false >/dev/null
+      - name: Prepare draft and attach verified assets
+        run: bash scripts/attach-release-draft.sh release-assets
