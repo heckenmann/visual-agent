@@ -297,7 +297,7 @@ jobs:
           java-version: ${{ env.ZULU_JDK_VERSION }}
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v6.4.0
+        uses: gradle/actions/setup-gradle@v6.4.1
         with:
           gradle-version: ${{ needs.verify.outputs.gradle_version }}
 
