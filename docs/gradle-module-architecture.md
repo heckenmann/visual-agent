@@ -4,13 +4,58 @@
 
 This document records the current Gradle module boundaries and dependency rules, building on the modularisation introduced in issues #157, #165, #178, and #65.
 
-## Current module graph
+## Release tooling
 
 `:release-tools` is an isolated build-time CLI and test module for issue #546.
 It has no project dependencies and must not appear on application runtime
 classpaths or inside release packages. Structured processing uses compiled Kotlin
 sources and Gradle-managed dependencies; native smoke orchestration remains
 independent of any system Java/Kotlin installation.
+
+Build and run the CLI through the configured JDK and Gradle wrapper:
+
+```bash
+./gradlew :release-tools:installDist
+bash scripts/release-tools.sh verify-assets --assets DIRECTORY [--uploaded]
+bash scripts/release-tools.sh verify-supplements --registry FILE
+bash scripts/release-tools.sh collect-notices --package-root DIRECTORY --inventory FILE --output DIRECTORY --license-report FILE --project-license FILE
+bash scripts/release-tools.sh build-bundles --source-materials DIRECTORY --notice-evidence DIRECTORY --output-directory DIRECTORY [--recipient-candidate]
+bash scripts/release-tools.sh verify-appimage-runtime SOURCE_RUNTIME APPIMAGE
+./gradlew :release-tools:test :release-tools:releaseIntegrationTest
+```
+
+Uploaded asset verification reads paginated GitHub JSON from standard input. The
+shell wrapper preserves caller-relative paths and arguments while locating the
+generated distribution. Notice collection also accepts supplemental and complete
+AppImage inputs; see [UC 0000157](usecases/uc_0000157_retain_third_party_notices.md).
+
+The compiled `.kt` application uses the documented
+[Kotlin console application](https://kotlinlang.org/docs/jvm-get-started.html) and
+[Gradle Application plugin](https://docs.gradle.org/current/userguide/application_plugin.html)
+model, including generated Unix/Windows launchers and `installDist`. The
+`.gradle.kts` files configure its build. Kotlin scripts are valid alternatives;
+this module shares substantial verification logic and tests without introducing
+a separate scripting host, compiler installation, or ad hoc dependency resolution.
+
+JSON trees reuse catalog-pinned `kotlinx.serialization`. Jackson Core, managed by
+the existing Spring Boot BOM, validates strict duplicate-key rejection before
+tree construction; no Spring runtime or databinding is introduced. Commons CSV
+handles quoted inventory records. Commons Compress exposes Unix ZIP symlink
+metadata and writes deterministic archives; explicit confinement, byte limits,
+CRC validation, and evidence policies remain the tooling's responsibility.
+NIO and `MessageDigest` provide filesystem and hash operations.
+
+Gradle TestKit executes actual packaging/version/legal fixtures with the current
+distribution and test JDK. Tagged integration tests prepare real source materials
+and are included in module `check`; state stays under ignored build directories.
+Test-only [XZ for Java](https://tukaani.org/xz/java.html), licensed under 0BSD,
+decodes compressed source TARs and does not enter the CLI runtime. Versions are
+pinned in the catalog; collection-library decisions are recorded in
+[UC 0000157](usecases/uc_0000157_retain_third_party_notices.md#tooling-design).
+Migration planning and comparison evidence are maintained in
+[issue #546](https://github.com/heckenmann/visual-agent/issues/546).
+
+## Current module graph
 
 ```text
 :desktop

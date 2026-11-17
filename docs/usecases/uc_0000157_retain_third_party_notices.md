@@ -95,8 +95,10 @@ Issue #546 isolates the collector and bundle builder in the Gradle-built
 [Gradle Application plugin](https://docs.gradle.org/current/userguide/application_plugin.html)
 model. A separate scripting host or compiler installation adds no needed capability.
 
-The library evaluation and migration comparisons are recorded in the
-[implementation plan](../issue-546-implementation-plan.md). The tooling reuses
+The migration plan and comparison evidence are recorded in
+[issue #546](https://github.com/heckenmann/visual-agent/issues/546); lasting commands
+and boundaries are documented in the [module architecture](../gradle-module-architecture.md#release-tooling).
+The tooling reuses
 Apache-2.0 [kotlinx.serialization](https://github.com/Kotlin/kotlinx.serialization)
 for JSON trees and the catalog's Jackson Core family for strict duplicate-key
 validation. Apache-2.0 [Commons Compress](https://github.com/apache/commons-compress)
