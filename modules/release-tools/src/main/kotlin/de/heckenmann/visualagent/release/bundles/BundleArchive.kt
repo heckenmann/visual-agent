@@ -66,7 +66,8 @@ internal fun writeBundleArchive(
     try {
         ZipArchiveOutputStream(temporary).use { archive ->
             archive.setUseZip64(Zip64Mode.AsNeeded)
-            archive.setUseLanguageEncodingFlag(false)
+            // Readers must decode non-ASCII paths as UTF-8 regardless of their legacy fallback charset.
+            archive.setUseLanguageEncodingFlag(true)
             for (item in all) {
                 val entry = ZipArchiveEntry(item.name)
                 entry.method = ZipArchiveEntry.STORED

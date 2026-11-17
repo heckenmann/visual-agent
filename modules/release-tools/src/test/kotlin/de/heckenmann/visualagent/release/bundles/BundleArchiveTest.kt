@@ -22,6 +22,19 @@ class BundleArchiveTest {
     lateinit var root: Path
 
     @Test
+    fun `Unicode paths declare UTF8 even for readers using a legacy fallback charset`() {
+        val name = "licenses/Ä/许可证.txt"
+        val bytes = "Original license\r\n".toByteArray()
+        val output = root.resolve("unicode.zip")
+        writeBundleArchive(output, listOf(BundleEntry(name, bytes = bytes)), null)
+        java.util.zip.ZipFile(output.toFile(), charset("CP437")).use { archive ->
+            assertContentEquals(bytes, archive.getInputStream(archive.getEntry(name)).use { it.readAllBytes() })
+            val manifest = archive.getInputStream(archive.getEntry("MANIFEST.sha256")).use { it.readAllBytes().toString(Charsets.UTF_8) }
+            assertTrue(manifest.endsWith("  $name\n"))
+        }
+    }
+
+    @Test
     fun `archives are reproducible with fixed dates permissions manifests and original bytes`() {
         val original = "Original license\r\n".toByteArray()
         val file = Files.write(root.resolve("LICENSE"), original)
