@@ -42,12 +42,13 @@ fun main(args: Array<String>) {
             println("Verified ${supplements.size} supplemental artifacts and ${runtimes.size} runtime mappings; review remains required.")
             return
         }
-        require(args.size in 3..4 && args[0] == "verify-assets" && args[1] == "--assets") {
+        require(args.firstOrNull() == "verify-assets") {
             "Usage: release-tools verify-assets --assets DIRECTORY [--uploaded]"
         }
-        val directory = Path.of(args[2])
-        if (args.size == 4) {
-            require(args[3] == "--uploaded") { "Unknown option: ${args[3]}" }
+        val options = args.drop(1)
+        val paths = namedPathOptions(options.filter { it != "--uploaded" }, setOf("assets"))
+        val directory = requireNotNull(paths["assets"]) { "Missing required option: --assets" }
+        if ("--uploaded" in options) {
             ReleaseAssets.verifyUploaded(directory, Json.parseToJsonElement(System.`in`.bufferedReader().readText()))
             println("All twelve uploaded assets match the build.")
         } else {

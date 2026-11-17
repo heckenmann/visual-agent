@@ -34,6 +34,21 @@ class ReleaseToolsCliTest {
             }
         }
         assertEquals(0, run("verify-assets", "--assets", assets.toString()).first)
+        assertEquals(0, run("verify-assets", "--assets=$assets").first)
+        val metadata =
+            ReleaseAssets.requiredNames.joinToString(",", "[[", "]]") { name ->
+                val file = assets.resolve(name)
+                val digest = noticeSha256(file)
+                """{"name":"$name","state":"uploaded","size":${Files.size(file)},"digest":"sha256:$digest"}"""
+            }
+        for (options in listOf(
+            arrayOf("--uploaded", "--assets", assets.toString()),
+            arrayOf("--assets=$assets", "--uploaded"),
+            arrayOf("--assets", assets.toString(), "--uploaded"),
+        )) {
+            val result = run("verify-assets", *options, input = metadata)
+            assertEquals(0, result.first, result.second)
+        }
         Files.writeString(assets.resolve("unexpected"), "extra")
         val failure = run("verify-assets", "--assets", assets.toString())
         assertEquals(1, failure.first)
@@ -54,7 +69,10 @@ class ReleaseToolsCliTest {
         }
     }
 
-    private fun run(vararg args: String): Pair<Int, String> {
+    private fun run(
+        vararg args: String,
+        input: String = "",
+    ): Pair<Int, String> {
         val repository = Path.of(System.getProperty("release.tools.repository"))
         val output = root.resolve("command.log")
         val process =
@@ -63,7 +81,7 @@ class ReleaseToolsCliTest {
                 .redirectErrorStream(true)
                 .redirectOutput(output.toFile())
                 .start()
-        process.outputStream.close()
+        process.outputStream.bufferedWriter().use { it.write(input) }
         try {
             assertTrue(process.waitFor(30, TimeUnit.SECONDS), "Release CLI exceeded its timeout")
             return process.exitValue() to Files.readString(output)
