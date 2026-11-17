@@ -1,5 +1,24 @@
 # Architecture
 
+## Project Tooling Languages
+
+Repository-owned application, build, release, verification, and test tooling must
+not use Python. This includes Python scripts, embedded snippets, generated Python,
+and wrappers that invoke Python indirectly. Use Kotlin with Gradle-managed builds
+and tests for structured processing, and Bash or existing PowerShell tooling for
+platform command orchestration. Do not introduce a separately installed Kotlin
+script runtime. Tooling dependencies must remain outside application runtime
+classpaths and distributable packages.
+
+Native package smoke tests must run without separately installed Java or Kotlin;
+their harness must not depend on the application's private bundled runtime.
+Executable-JAR smoke tests retain their explicit system JDK requirement.
+
+Issue #546 migrates the existing Python tooling and its regression coverage to
+this policy. Existing implementations are migration inputs, not a precedent for
+new Python code. Independently maintained third-party tools and developer-machine
+software are outside this repository-owned tooling rule.
+
 ## Settings Ownership And Navigation
 
 Global Settings has Appearance, Providers, Agent and Updates destinations. The
