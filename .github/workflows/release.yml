@@ -320,7 +320,7 @@ jobs:
           gradle wrapper --gradle-version "$version" --no-daemon
 
       - name: Collect pinned source and legal inputs
-        run: ./gradlew :desktop:prepareReleaseSourceMaterials --no-daemon --no-configuration-cache
+        run: ./gradlew :desktop:prepareReleaseSourceMaterials :release-tools:installDist --no-daemon --no-configuration-cache
 
       - name: Download per-platform package notice evidence
         uses: actions/download-artifact@v8
@@ -331,7 +331,7 @@ jobs:
 
       - name: Build review-only legal and source archives
         run: |
-          python3 scripts/build_release_material_bundles.py \
+          bash scripts/release-tools.sh build-bundles \
             --project-root . \
             --source-materials modules/desktop/build/reports/dependency-license/release-source-materials \
             --notice-evidence release-materials/package-notices \
@@ -339,7 +339,7 @@ jobs:
 
       - name: Build hash-bound recipient candidates
         run: |
-          python3 scripts/build_release_material_bundles.py \
+          bash scripts/release-tools.sh build-bundles \
             --project-root . \
             --source-materials modules/desktop/build/reports/dependency-license/release-source-materials \
             --notice-evidence release-materials/package-notices \

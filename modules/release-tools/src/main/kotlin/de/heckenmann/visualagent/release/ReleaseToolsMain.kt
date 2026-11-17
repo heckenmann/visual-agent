@@ -1,5 +1,6 @@
 package de.heckenmann.visualagent.release
 
+import de.heckenmann.visualagent.release.bundles.ReleaseMaterialBundles
 import kotlinx.serialization.json.Json
 import java.nio.file.Files
 import java.nio.file.Path
@@ -21,6 +22,10 @@ fun main(args: Array<String>) {
                 )
             AppImageRuntime.verifyPrefix(source, packaged, section(source), section(packaged))
             println("AppImage embeds the source-built runtime; only appimagetool's generated MD5 section differs.")
+            return
+        }
+        if (args.firstOrNull() == "build-bundles") {
+            ReleaseMaterialBundles.build(bundleRequest(args.drop(1)))
             return
         }
         if (args.firstOrNull() == "collect-notices") {
