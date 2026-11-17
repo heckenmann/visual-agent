@@ -112,7 +112,7 @@ jobs:
         uses: gradle/actions/wrapper-validation@v6.4.1
 
       - name: Verify offscreen and native smoke workflow contracts
-        run: python3 -m unittest discover -s scripts -p 'test_release_*.py'
+        run: ./gradlew :release-tools:test :release-tools:releaseIntegrationTest --no-daemon
 
   package-smoke:
     name: Package and launch

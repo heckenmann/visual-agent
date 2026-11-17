@@ -82,7 +82,7 @@ jobs:
         run: env -u DISPLAY -u WAYLAND_DISPLAY ./gradlew ktlintCheck check test verifyPackages --no-daemon --parallel --max-workers=4 -PtestMaxParallelForks=4
 
       - name: Verify package smoke runner contracts
-        run: python3 -m unittest discover -s scripts -p 'test_release_*.py'
+        run: ./gradlew :release-tools:test :release-tools:releaseIntegrationTest --no-daemon
 
       - name: Build release verification CLI
         run: ./gradlew :release-tools:installDist --no-daemon
@@ -415,14 +415,14 @@ jobs:
         if: matrix.image == 'ubuntu:24.04'
         run: |
           apt-get update
-          apt-get install --yes python3 xvfb xauth dbus-x11 gnome-menus libgtk-3-0t64 libasound2t64 libx11-xcb1 libxrender1 libxtst6 libxi6 libxrandr2 libfuse2t64
+          apt-get install --yes xvfb xauth dbus-x11 gnome-menus libgtk-3-0t64 libasound2t64 libx11-xcb1 libxrender1 libxtst6 libxi6 libxrandr2 libfuse2t64
 
       - name: Install Fedora desktop runtime dependencies
         if: matrix.image == 'fedora:latest'
-        run: dnf install --assumeyes python3 gtk3 alsa-lib libX11-xcb libXrender libXtst libXi libXrandr mesa-libgbm xorg-x11-server-Xvfb xorg-x11-xauth dbus-x11
+        run: dnf install --assumeyes gtk3 alsa-lib libX11-xcb libXrender libXtst libXi libXrandr mesa-libgbm xorg-x11-server-Xvfb xorg-x11-xauth dbus-x11
 
       - name: Install, launch, and verify native package
-        run: python3 scripts/smoke-release-posix.py linux "${{ matrix.kind }}" "artifact/visual-agent-${{ matrix.platform }}.${{ matrix.kind == 'appimage' && 'AppImage' || matrix.kind }}"
+        run: bash scripts/smoke-release-posix.sh linux "${{ matrix.kind }}" "artifact/visual-agent-${{ matrix.platform }}.${{ matrix.kind == 'appimage' && 'AppImage' || matrix.kind }}"
 
   smoke-linux-jar:
     name: Smoke Linux executable JAR
@@ -452,7 +452,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install --yes xvfb xauth
 
       - name: Launch and verify Linux JAR
-        run: python3 scripts/smoke-release-posix.py linux jar artifact/visual-agent-linux-x64-jar.jar
+        run: bash scripts/smoke-release-posix.sh linux jar artifact/visual-agent-linux-x64-jar.jar
 
   smoke-macos:
     name: Smoke ${{ matrix.platform }} ${{ matrix.kind }}
@@ -496,7 +496,7 @@ jobs:
           path: artifact
 
       - name: Launch and verify macOS artifact
-        run: python3 scripts/smoke-release-posix.py macos "${{ matrix.kind }}" "artifact/visual-agent-${{ matrix.platform }}.${{ matrix.kind }}"
+        run: bash scripts/smoke-release-posix.sh macos "${{ matrix.kind }}" "artifact/visual-agent-${{ matrix.platform }}.${{ matrix.kind }}"
 
   smoke-windows:
     name: Smoke Windows ${{ matrix.kind }}
