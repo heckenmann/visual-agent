@@ -84,6 +84,17 @@ jobs:
       - name: Verify package smoke runner contracts
         run: python3 -m unittest discover -s scripts -p 'test_release_*.py'
 
+      - name: Build release verification CLI
+        run: ./gradlew :release-tools:installDist --no-daemon
+
+      - name: Retain release verification CLI for this run
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-verification-tools
+          path: modules/release-tools/build/install/release-tools/
+          overwrite: true
+          if-no-files-found: error
+
 
   package:
     name: Package ${{ matrix.platform }}
@@ -546,6 +557,21 @@ jobs:
 
       - name: Revalidate release tag and source
         run: bash scripts/verify-release-ref.sh
+
+      - name: Set up verification Java
+        uses: actions/setup-java@v6
+        with:
+          distribution: zulu
+          java-version: ${{ env.ZULU_JDK_VERSION }}
+
+      - name: Download this run's release verification CLI
+        uses: actions/download-artifact@v8
+        with:
+          name: release-verification-tools
+          path: modules/release-tools/build/install/release-tools/
+
+      - name: Restore verification launcher permissions
+        run: chmod +x modules/release-tools/build/install/release-tools/bin/release-tools
 
       - name: Download this run's recipient assets
         run: |

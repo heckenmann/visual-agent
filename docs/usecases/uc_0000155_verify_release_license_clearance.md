@@ -39,4 +39,4 @@ enforce this job dependency. These checks do not determine legal clearance.
 - `.github/workflows/release.yml`
 - `scripts/verify-release-ref.sh`
 - `scripts/attach-release-draft.sh`
-- `scripts/verify-release-assets.py`
+- `scripts/release-tools.sh` (`verify-assets`, built by `:release-tools:installDist`)

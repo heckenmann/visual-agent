@@ -6,6 +6,12 @@ This document records the current Gradle module boundaries and dependency rules,
 
 ## Current module graph
 
+`:release-tools` is an isolated build-time CLI and test module for issue #546.
+It has no project dependencies and must not appear on application runtime
+classpaths or inside release packages. Structured processing uses compiled Kotlin
+sources and Gradle-managed dependencies; native smoke orchestration remains
+independent of any system Java/Kotlin installation.
+
 ```text
 :desktop
  ├── :ui
