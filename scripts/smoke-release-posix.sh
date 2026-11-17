@@ -21,19 +21,37 @@ smoke_detach() {
     done
 }
 
+# Inspect process groups using the shared Linux/macOS ps output format.
+smoke_group_alive() {
+    local pid=$1 processes
+    # A container's PID 1 may retain orphaned zombies. They have already stopped
+    # and cannot respond to signals, so kill -0 alone cannot prove liveness.
+    # Capture ps separately so a failed process inventory cannot look like success.
+    processes=$(ps -axo pgid=,stat=) || return 2
+    awk -v group="$pid" '$1 == group && $2 !~ /^Z/ { live = 1 } END { exit !live }' <<< "$processes"
+}
+
 # Every background job is started with job control enabled below. Its PID is also
 # its process-group ID, so TERM reaches the launcher and its inherited children.
-# Wait for orderly shutdown before escalating; an escalation fails the smoke test.
 # Only PIDs captured by this invocation may be passed to this function.
+# Wait only for running descendants; wait below still validates our own child's
+# exit status and reaps it even when no live members remain in its process group.
 smoke_stop() {
-    local pid=$1 label=$2 deadline status=0
+    local pid=$1 label=$2 deadline status=0 group_status
     # A launcher may exit before its children. Inspect and terminate its entire
     # owned group even when the original PID has already disappeared.
     if kill -0 -- "-$pid" 2>/dev/null; then
         kill -TERM -- "-$pid" 2>/dev/null || true
         deadline=$((SECONDS + 30))
-        while kill -0 -- "-$pid" 2>/dev/null && ((SECONDS < deadline)); do sleep 0.25; done
-        if kill -0 -- "-$pid" 2>/dev/null; then
+        while :; do
+            if smoke_group_alive "$pid"; then group_status=0; else group_status=$?; fi
+            if ((group_status == 1)); then break; fi
+            # Inventory errors fail closed and use the same bounded escalation as
+            # a live descendant. Never report a successful shutdown without proof.
+            if ((group_status > 1 || SECONDS >= deadline)); then break; fi
+            sleep 0.25
+        done
+        if ((group_status != 1)); then
             kill -KILL -- "-$pid" 2>/dev/null || true
             wait "$pid" 2>/dev/null || true
             smoke_fail "$label did not stop after SIGTERM"
