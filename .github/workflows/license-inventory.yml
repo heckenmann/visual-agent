@@ -8,11 +8,8 @@ on:
       - "gradle/wrapper/gradle-wrapper.properties"
       - "scripts/license-settings.init.gradle.kts"
       - "scripts/generate-package-inventory.sh"
-      - "scripts/collect-third-party-notices.py"
-      - "scripts/test_release_notices.py"
-      - "scripts/third_party_supplements.py"
-      - "scripts/test_release_supplements.py"
-      - "scripts/test_release_library_sources.py"
+      - "modules/release-tools/**"
+      - "scripts/release-tools.sh"
       - "docs/licensing/source-delivery.md"
       - "docs/licensing/third-party/**"
       - ".github/workflows/license-inventory.yml"
@@ -86,11 +83,12 @@ jobs:
           ./gradlew -I scripts/license-settings.init.gradle.kts \
             generateLicenseReport generateBuildPluginInventory generateDependencyScopeInventory \
             :desktop:generateDistributionArtifactInventory :desktop:prepareLibrarySourceMaterials \
+            :release-tools:installDist \
             --no-daemon --no-parallel --no-configuration-cache
           bash scripts/generate-package-inventory.sh \
             modules/desktop/build/compose/binaries/main/app \
             build/reports/dependency-license
-          python3 scripts/collect-third-party-notices.py \
+          bash scripts/release-tools.sh collect-notices \
             --package-root modules/desktop/build/compose/binaries/main/app \
             --inventory modules/desktop/build/reports/dependency-license/packaged-artifacts.csv \
             --license-report build/reports/dependency-license/licenses-all.json \

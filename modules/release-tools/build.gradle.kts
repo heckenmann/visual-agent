@@ -20,6 +20,10 @@ repositories {
 }
 
 dependencies {
+    implementation(platform(libs.spring.boot.bom))
+    implementation(libs.jackson.core)
+    implementation(libs.commons.compress)
+    implementation(libs.commons.csv)
     implementation(libs.serialization.json)
     testImplementation(libs.kotlin.test)
     testImplementation(libs.junit.jupiter)

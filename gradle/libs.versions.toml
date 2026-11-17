@@ -38,6 +38,8 @@ graaljs = "25.5.5.0.3"
 appdirs = "1.5.0"
 dnsjava = "3.7.1"
 license-report = "3.1.5"
+commons-compress = "1.28.0"
+commons-csv = "1.14.1"
 
 [libraries]
 skiko = { module = "org.jetbrains.skiko:skiko", version.ref = "skiko" }
@@ -52,6 +54,9 @@ spring-boot-starter-flyway = { module = "org.springframework.boot:spring-boot-st
 spring-context = { module = "org.springframework:spring-context" }
 spring-webflux = { module = "org.springframework:spring-webflux" }
 jackson-databind = { module = "tools.jackson.core:jackson-databind" }
+jackson-core = { module = "tools.jackson.core:jackson-core" }
+commons-compress = { module = "org.apache.commons:commons-compress", version.ref = "commons-compress" }
+commons-csv = { module = "org.apache.commons:commons-csv", version.ref = "commons-csv" }
 spring-security-oauth2-client = { module = "org.springframework.security:spring-security-oauth2-client" }
 spring-security-oauth2-jose = { module = "org.springframework.security:spring-security-oauth2-jose" }
 spring-data-r2dbc = { module = "org.springframework.data:spring-data-r2dbc" }

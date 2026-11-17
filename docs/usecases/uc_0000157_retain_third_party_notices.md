@@ -12,7 +12,8 @@ Gradle License Report's built-in all-license JSON renderer. Its broad dependency
 scope includes build/test artifacts and does not imply that every entry is shipped.
 
 1. Generate the desktop packaged-artifact inventory from the resolved distribution.
-2. Run `scripts/collect-third-party-notices.py` with `--package-root`, `--inventory`,
+2. Build `./gradlew :release-tools:installDist` and run
+   `bash scripts/release-tools.sh collect-notices` with `--package-root`, `--inventory`,
    `--license-report`, `--project-license`, and a new or empty `--output` directory.
 3. Verify every listed archive against its packaged SHA-256 before reading it.
 4. Retain detected license, notice, copyright, disclaimer, and author files
@@ -76,7 +77,7 @@ or unexpected native-platform evidence set also fail.
 ## Limits
 
 This evidence collector is not a license parser or legal approval service. It uses
-the standard ZIP reader, not a replacement for the existing Gradle License Report
+Apache Commons Compress for ZIP metadata and entry streaming, not a replacement for the existing Gradle License Report
 plugin. POM metadata, absent notices, dual-license selections, native code, fonts,
 and source obligations require separate review and supplemental materials. Even
 components with retained notices remain unreviewed. It does not alter release
@@ -85,20 +86,41 @@ mean every dependency/native/source obligation is covered. The About panel provi
 access to documents included in the current application build; completeness
 of the notice bundle, legal review, and corresponding sources remain open.
 
+## Tooling Design
+
+Issue #546 isolates the collector and bundle builder in the Gradle-built
+`:release-tools` CLI. Compiled `.kt` sources share tested verification logic;
+`.gradle.kts` files configure its build. This follows the documented
+[Kotlin console application](https://kotlinlang.org/docs/jvm-get-started.html) and
+[Gradle Application plugin](https://docs.gradle.org/current/userguide/application_plugin.html)
+model. A separate scripting host or compiler installation adds no needed capability.
+
+The library evaluation and migration comparisons are recorded in the
+[implementation plan](../issue-546-implementation-plan.md). The tooling reuses
+Apache-2.0 [kotlinx.serialization](https://github.com/Kotlin/kotlinx.serialization)
+for JSON trees and the catalog's Jackson Core family for strict duplicate-key
+validation. Apache-2.0 [Commons Compress](https://github.com/apache/commons-compress)
+provides ZIP symlink metadata and deterministic stored archives; the JDK ZIP API
+alone does not expose all required Unix metadata. Apache-2.0
+[Commons CSV](https://github.com/apache/commons-csv) reads Gradle's quoted inventory
+records without a custom CSV parser. These maintained JVM libraries use
+catalog-managed versions and remain outside application runtime dependencies.
+NIO and `MessageDigest` cover filesystem confinement and SHA-256 hashing.
+
 ## Tool Calls
 
 - None.
 
 ## Code Entry Points
 
-- `scripts/collect-third-party-notices.py`
-- `scripts/build_release_material_bundles.py`
-- `scripts/test_release_notices.py`
-- `scripts/test_release_material_bundles.py`
+- `scripts/release-tools.sh` (`collect-notices`)
+- `scripts/release-tools.sh` (`build-bundles`)
+- `modules/release-tools/src/test/kotlin/de/heckenmann/visualagent/release/NoticeCollectorContractTest.kt`
+- `modules/release-tools/src/test/kotlin/de/heckenmann/visualagent/release/bundles/`
 - `modules/desktop/build.gradle.kts`: `generateDistributionArtifactInventory`
 - `modules/desktop/build.gradle.kts`: `prepareDistributionLegalResources`
 - `modules/desktop/build.gradle.kts`: `prepareLibrarySourceMaterials`
-- `scripts/test_release_library_sources.py`
+- `modules/release-tools/src/test/kotlin/de/heckenmann/visualagent/release/packaging/`
 - `application/build.gradle.kts`: `bootJar` and `verifyExecutableJar`
 - `modules/protocol/src/main/kotlin/de/heckenmann/visualagent/protocol/OpenSourceLicensePort.kt`
 - `application/src/main/kotlin/de/heckenmann/visualagent/server/BundledOpenSourceLicensePort.kt`

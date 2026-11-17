@@ -24,7 +24,8 @@ Its source was `9f4b4b558a9656edfb4b76283a7b5a73e83b4291`; the successful packag
 run was [43501499023](https://github.com/heckenmann/visual-agent/actions/runs/43501499023).
 That is historical delivery evidence, not an end-to-end run of the tag-driven workflow.
 
-`scripts/verify-release-assets.py` checks only the recipient file set and archive
+`bash scripts/release-tools.sh verify-assets --assets DIRECTORY` (built with
+`./gradlew :release-tools:installDist`) checks only the recipient file set and archive
 integrity. The separate reviewer-attribution/hash registry was removed: the
 draft job uses only artifacts from the same successful tag workflow run. Source-input and archive-content hashes
 remain where they protect pinned inputs and generated materials; they are not
@@ -53,7 +54,8 @@ notice collector retains original notice bytes and adds curated upstream/native
 materials where applicable:
 
 ```bash
-python3 scripts/collect-third-party-notices.py \
+./gradlew :release-tools:installDist
+bash scripts/release-tools.sh collect-notices \
   --package-root modules/desktop/build/compose/binaries/main/app \
   --inventory modules/desktop/build/reports/dependency-license/packaged-artifacts.csv \
   --license-report build/reports/dependency-license/licenses-all.json \

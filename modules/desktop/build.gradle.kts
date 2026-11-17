@@ -853,7 +853,8 @@ tasks.register<Exec>("verifyAppImageRuntimeInPackage") {
     group = "verification"
     description = "Verifies the AppImage embeds the runtime built from retained source materials."
     dependsOn(packageAppImage)
-    val verificationScript = rootProject.layout.projectDirectory.file("scripts/verify_appimage_runtime_embedded.py")
+    dependsOn(":release-tools:installDist")
+    val verificationScript = rootProject.layout.projectDirectory.file("scripts/release-tools.sh")
     inputs.file(appImageRuntime)
     inputs.file(appImageOutput)
     inputs.file(verificationScript)
@@ -863,8 +864,9 @@ tasks.register<Exec>("verifyAppImageRuntimeInPackage") {
     }
     doFirst {
         commandLine(
-            "python3",
+            "bash",
             verificationScript.asFile,
+            "verify-appimage-runtime",
             appImageRuntime.get().asFile,
             appImageOutput.get().asFile,
         )

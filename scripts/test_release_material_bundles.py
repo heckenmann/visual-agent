@@ -488,8 +488,8 @@ class ReleaseMaterialBundleTest(unittest.TestCase):
             workflow.count("--source-materials modules/desktop/build/reports/dependency-license/release-source-materials"),
         )
         self.assertIn(":desktop:generateDistributionArtifactInventory", workflow)
-        self.assertIn("actions/setup-python@v7", workflow)
-        self.assertIn("collect-third-party-notices.py", workflow)
+        self.assertIn(":release-tools:installDist", workflow)
+        self.assertIn("scripts/release-tools.sh collect-notices", workflow)
         self.assertIn("--package-root modules/desktop/build/compose/binaries/main/app", workflow)
         self.assertIn("--inventory modules/desktop/build/reports/dependency-license/packaged-artifacts.csv", workflow)
         self.assertEqual(2, workflow.count("--notice-evidence release-materials/package-notices"))
