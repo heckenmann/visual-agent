@@ -40,4 +40,4 @@ reviewed.
 
 - `buildSrc/src/main/kotlin/de/heckenmann/visualagent/gradle/PrepareRuntimeLegalMaterials.kt`
 - `modules/desktop/build.gradle.kts`
-- `scripts/test_release_runtime.py`
+- `modules/release-tools/src/test/kotlin/de/heckenmann/visualagent/release/packaging/RuntimeLegalIntegrationTest.kt`

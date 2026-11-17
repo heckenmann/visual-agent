@@ -27,6 +27,8 @@ dependencies {
     implementation(libs.serialization.json)
     testImplementation(libs.kotlin.test)
     testImplementation(libs.junit.jupiter)
+    testImplementation(gradleTestKit())
+    testImplementation(libs.xz)
 }
 
 tasks.test {
@@ -42,6 +44,32 @@ tasks.test {
     useJUnitPlatform { excludeTags("release-integration") }
     filter { isFailOnNoMatchingTests = false }
 }
+
+val releaseIntegrationTest =
+    tasks.register<Test>("releaseIntegrationTest") {
+        description = "Verifies real release source preparation and Gradle task failure contracts."
+        group = "verification"
+        testClassesDirs =
+            sourceSets.test
+                .get()
+                .output.classesDirs
+        classpath = sourceSets.test.get().runtimeClasspath
+        dependsOn(":desktop:prepareReleaseSourceMaterials")
+        systemProperty("release.tools.repository", rootProject.projectDir.absolutePath)
+        systemProperty("release.tools.gradle.home", gradle.gradleUserHomeDir.absolutePath)
+        systemProperty(
+            "release.tools.testkit",
+            layout.buildDirectory
+                .dir("test-kit")
+                .get()
+                .asFile.absolutePath,
+        )
+        useJUnitPlatform { includeTags("release-integration") }
+        filter { isFailOnNoMatchingTests = false }
+        shouldRunAfter(tasks.test)
+    }
+
+tasks.check { dependsOn(releaseIntegrationTest) }
 
 kotlin {
     jvmToolchain(
