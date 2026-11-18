@@ -73,6 +73,7 @@ dependencies {
     implementation(libs.serialization.json)
     testImplementation(libs.kotlin.test)
     testImplementation(libs.compose.ui.test.junit4.desktop)
+    testImplementation(libs.coroutines.test)
     testImplementation(libs.mockk)
     testImplementation(project(":application"))
 }

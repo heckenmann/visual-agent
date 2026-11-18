@@ -64,6 +64,8 @@ These platform checks run in parallel after packaging. See the central
 [release guide](releases.md) for tag pushes, draft preparation, publication and
 retry behavior. Manual dispatch runs the same validation jobs without release writes.
 
+For freezes or displaced blocks during launch, see [desktop rendering diagnostics](desktop-rendering-diagnostics.md).
+
 ### Release Versions
 
 Release automation accepts `v`-prefixed Semantic Version tags, for example

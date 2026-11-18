@@ -16,7 +16,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.FrameWindowScope
-import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.WindowDecoration
 import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.WindowState
@@ -95,7 +94,8 @@ internal fun ComposeStartupSplashWindow(
             height = DEFAULT_SPLASH_HEIGHT,
             position = WindowPosition.Aligned(Alignment.Center),
         )
-    Window(
+    StartupWindow(
+        mode = StartupWindowMode.SPLASH,
         onCloseRequest = onCloseRequest,
         title = "$STARTUP_WINDOW_TITLE – Starting",
         icon = applicationIcon,
@@ -116,6 +116,7 @@ internal fun ComposeStartupSplashWindow(
 }
 
 /** Renders the explicit provider/model onboarding phase for the connected Visual Agent server. */
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 internal fun ComposeOnboardingWindow(
     applicationPort: ApplicationPort,
@@ -126,7 +127,9 @@ internal fun ComposeOnboardingWindow(
 ) {
     val applicationIcon = painterResource(Res.drawable.visual_agent)
     var skipRequested by remember { mutableStateOf(false) }
-    Window(
+    StartupWindow(
+        mode = StartupWindowMode.ONBOARDING,
+        observeStartup = automatic,
         onCloseRequest = {
             if (automatic) skipRequested = true else onCloseRequest()
         },
@@ -160,6 +163,7 @@ internal fun ComposeOnboardingWindow(
 }
 
 /** Renders the main window with its own state and independent lifecycle. */
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 internal fun ComposeMainWindow(
     dependencies: ComposeApplicationDependencies,
@@ -167,6 +171,7 @@ internal fun ComposeMainWindow(
     persistedWindows: List<LayoutWindowState>,
     onCloseApplication: suspend (WindowState, WorkspaceLayoutPersistenceCoordinator) -> Unit,
     onRunOnboarding: () -> Unit,
+    observeStartup: Boolean,
 ) {
     val applicationIcon = painterResource(Res.drawable.visual_agent)
     val scope = rememberCoroutineScope()
@@ -186,7 +191,9 @@ internal fun ComposeMainWindow(
                     ?: WindowPosition.Aligned(Alignment.Center),
         )
     val requestClose: () -> Unit = { scope.launch { onCloseApplication(windowState, layoutPersistence) } }
-    Window(
+    StartupWindow(
+        mode = StartupWindowMode.MAIN,
+        observeStartup = observeStartup,
         visible = geometryRestored,
         onCloseRequest = requestClose,
         title = STARTUP_WINDOW_TITLE,

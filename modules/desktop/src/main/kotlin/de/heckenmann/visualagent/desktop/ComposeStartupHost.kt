@@ -1,8 +1,10 @@
 package de.heckenmann.visualagent.desktop
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -40,9 +42,18 @@ private val logger = LoggerFactory.getLogger("de.heckenmann.visualagent.desktop.
 fun runVisualAgentComposeApplication() {
     AppIdentity.configureProcessProperties()
     val shutdownCoordinator = DesktopShutdownCoordinator()
+    val renderLog = StartupRenderLog()
     try {
-        application(exitProcessOnExit = false) { ComposeStartupHost(::exitApplication, shutdownCoordinator) }
+        application(exitProcessOnExit = false) {
+            CompositionLocalProvider(LocalStartupRenderLog provides renderLog) {
+                ComposeStartupHost(::exitApplication, shutdownCoordinator)
+            }
+        }
+    } catch (failure: Throwable) {
+        renderLog.nativeFailure(failure)
+        throw failure
     } finally {
+        renderLog.close()
         shutdownCoordinator.awaitResourceCleanup()
     }
 }
@@ -52,6 +63,7 @@ private fun ComposeStartupHost(
     exitApplication: () -> Unit,
     shutdownCoordinator: DesktopShutdownCoordinator,
 ) {
+    val renderLog = LocalStartupRenderLog.current
     var startupAttempt by remember { mutableStateOf(0) }
     var startupStatus by remember { mutableStateOf(StartupStatus.waitingForServerSelection()) }
     var startRequested by
@@ -69,6 +81,7 @@ private fun ComposeStartupHost(
     var persistedWindows by remember { mutableStateOf<List<LayoutWindowState>>(emptyList()) }
     var onboardingState by remember { mutableStateOf<OnboardingState?>(null) }
     var manualOnboardingRequested by remember { mutableStateOf(false) }
+    var mainWindowStarted by remember { mutableStateOf(false) }
     var startupThemeMode by remember { mutableStateOf(ThemeMode.SYSTEM) }
     val currentContext = rememberUpdatedState(springContext)
     val currentConnection = rememberUpdatedState(serverConnection)
@@ -184,6 +197,7 @@ private fun ComposeStartupHost(
             persistedLayout = loadedLayout
             persistedWindows = loadedLayout.windows
             onboardingState = withContext(Dispatchers.IO) { applicationPort.onboarding.state() }
+            renderLog.report("Desktop startup server readiness: ready")
             startupStatus = StartupStatus.ready()
         } catch (cancelled: CancellationException) {
             throw cancelled
@@ -281,8 +295,11 @@ private fun ComposeStartupHost(
                     }
                 },
             )
-        StartupWindowMode.MAIN ->
+        StartupWindowMode.MAIN -> {
+            val observeStartup = remember { !mainWindowStarted }
+            SideEffect { mainWindowStarted = true }
             ComposeMainWindow(
+                observeStartup = observeStartup,
                 dependencies = checkNotNull(readyDependencies),
                 persistedLayout = checkNotNull(persistedLayout),
                 persistedWindows = persistedWindows,
@@ -306,6 +323,7 @@ private fun ComposeStartupHost(
                     )
                 },
             )
+        }
     }
 }
 
