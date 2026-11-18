@@ -30,6 +30,7 @@ lib/
 src/main/resources/config/app.local.properties
 
 # Local databases
+.codegraph/
 *.db
 *.sqlite
 *.sqlite3

@@ -25,6 +25,18 @@
     },
     {
       "sourceArtifacts": {
+        "ch.qos.logback:logback-classic:1.6.7": "23c22387c0cec7ef3a8fe75fc9a443b87a9c88a57b30d441f92f20a843626ad8",
+        "ch.qos.logback:logback-core:1.6.7": "1762e3b6cb3af6931ae6a9fcec05fb1176c044993e7cb423a365d842fd49e4f8"
+      },
+      "proposedLicense": "EPL-2.0",
+      "upstreamCommit": "8b97c2fe6dd0cfa298ed3c3dd4f500b942edc63a",
+      "materialPaths": ["logback-1.6.7/LICENSE.txt", "logback-1.6.7/EPL-2.0.txt", "logback-1.6.7/SOURCE-AVAILABILITY.txt"],
+      "reviewStatus": "unreviewed",
+      "reviewNotes": "The exact logback-classic and logback-core 1.6.7 source JARs follow the selected runtime versions and are retained in the corresponding-sources candidate. The pinned upstream license is byte-identical to the retained 1.6.6 license; historical 1.6.6 evidence remains unchanged. The candidate archive is not yet a reviewed final asset.",
+      "remaining": ["Confirm both exact source JARs, the EPL-2.0 text, and the source-availability statement are present in the final hash-reviewed recipient materials"]
+    },
+    {
+      "sourceArtifacts": {
         "net.java.dev.jna:jna:5.19.1": "4fb141dd8ef6b0585ffceea4bc49602fbc6312fa977e2c488794ea3e6aafecae",
         "net.java.dev.jna:jna-platform:5.19.1": "3b3864f5b449e9c3c24b16861524b622b086563f44e0cd8384c8efc5a6052f82"
       },
@@ -1025,6 +1037,21 @@
     {
       "path": "logback-1.6.6/SOURCE-AVAILABILITY.txt",
       "sha256": "5a87bb89703313dafe4040a24687dd17f59705d5980d41e139e45f71da2d0fda",
+      "url": "https://logback.qos.ch/license.html"
+    },
+    {
+      "path": "logback-1.6.7/LICENSE.txt",
+      "sha256": "f1eedf4f2cb9e901d6ae549a06d0c20dcde0136d37e38b50adaf51d4673f66d2",
+      "url": "https://raw.githubusercontent.com/qos-ch/logback/8b97c2fe6dd0cfa298ed3c3dd4f500b942edc63a/LICENSE.txt"
+    },
+    {
+      "path": "logback-1.6.7/EPL-2.0.txt",
+      "sha256": "0becf16567beb77fa252b7664631dd177c8f9a1889e48995b45379c7130e5303",
+      "url": "https://www.eclipse.org/org/documents/epl-2.0/EPL-2.0.txt"
+    },
+    {
+      "path": "logback-1.6.7/SOURCE-AVAILABILITY.txt",
+      "sha256": "a3e017fcd949bb81e222e8b04674c4f2ae9460810d190a98aecaab45df82817b",
       "url": "https://logback.qos.ch/license.html"
     },
     {

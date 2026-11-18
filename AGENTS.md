@@ -78,6 +78,8 @@ Always run, in this order:
 
 ## Development Workflow
 
+- **No Python**: repository-owned application, build, release, verification, and test tooling must not use Python, including embedded/generated snippets or indirect wrappers. Use Gradle-managed Kotlin for structured processing and Bash/existing PowerShell for platform orchestration. Preserve native smoke tests without external Java/Kotlin. See `docs/architecture.md` and issue #546; existing Python files are migration inputs only.
+
 - Prefer database-level guarantees for consistency, ordering, locking, and persistence races whenever the database can solve the problem. Do not add a UI or Spring-server workaround for a problem that is already solvable at the database layer.
 - Before starting work on a problem, check whether a GitHub issue and a documented use case exist for it. Link both in the PR description and commit messages where applicable.
 - Before implementing any new function, research [klibs.io](https://klibs.io) and GitHub to determine whether a maintained library already implements the required capability. Evaluate protocol coverage, license, release maturity, compatibility with this project, and security implications before deciding to add a dependency or write a custom implementation. Record the decision in the relevant issue or use case when it materially affects the design.

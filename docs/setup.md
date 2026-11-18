@@ -124,10 +124,10 @@ Executable JAR and native-launcher verification is separate from `check`, but in
 
 ```bash
 ./gradlew verifyPackages --no-daemon
-python3 -m unittest discover -s scripts -p 'test_release_*.py'
+./gradlew :release-tools:test :release-tools:releaseIntegrationTest
 ```
 
-The Python suite includes offline Gradle fixture builds, so generate the wrapper first. It checks
+The Kotlin release suite includes offline Gradle fixture builds, so generate the wrapper first. It checks
 release version propagation, local/manual defaults, invalid tags, and workflow publication rules.
 
 Additional enforced checks in current build:

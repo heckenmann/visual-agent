@@ -27,3 +27,21 @@ function Close-SmokeWindows {
         }
     }
 }
+
+# Windows may keep a recently loaded native library locked briefly after its process exits.
+# Retry cleanup for that transient lock, but still fail the smoke test if the workspace remains.
+function Remove-SmokeWorkDirectory {
+    param([string] $Path)
+
+    $attemptLimit = 15
+    for ($attempt = 1; $attempt -le $attemptLimit; $attempt++) {
+        try {
+            Remove-Item -LiteralPath $Path -Recurse -Force -ErrorAction Stop
+            return
+        } catch {
+            if ($attempt -eq $attemptLimit) { throw }
+            Write-Host "Smoke workspace cleanup is waiting for locked files (attempt $attempt of $attemptLimit)."
+            Start-Sleep -Milliseconds 1000
+        }
+    }
+}

@@ -18,6 +18,7 @@ include(
     ":tool-standard",
     ":tool-javascript",
     ":tools",
+    ":release-tools",
 )
 
 project(":ui").projectDir = file("modules/ui")
@@ -34,6 +35,7 @@ project(":providers").projectDir = file("modules/providers-bundle")
 project(":tool-standard").projectDir = file("modules/tools")
 project(":tool-javascript").projectDir = file("modules/tool-javascript")
 project(":tools").projectDir = file("modules/tools-bundle")
+project(":release-tools").projectDir = file("modules/release-tools")
 
 plugins {
     id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0"

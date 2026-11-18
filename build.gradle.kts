@@ -286,6 +286,7 @@ tasks.named("check") {
         ":tool-javascript:check",
         ":tools:check",
         ":task-core:check",
+        ":release-tools:check",
         "verifyCentralizedVersions",
         "verifyModuleDependencies",
         "verifyReactorBoundaries",
@@ -310,6 +311,7 @@ val verificationModules =
         ":tool-javascript",
         ":tools",
         ":task-core",
+        ":release-tools",
     )
 val clientModules = listOf(":ui", ":protocol")
 
@@ -370,6 +372,7 @@ tasks.named("build") {
         ":desktop:build",
         ":agent-core:build",
         ":model-core:build",
+        ":release-tools:build",
         ":provider-core:build",
         ":provider-standard:build",
         ":providers:build",
@@ -411,6 +414,7 @@ gradle.projectsEvaluated {
             ":tool-javascript",
             ":tools",
             ":task-core",
+            ":release-tools",
         )
     val moduleMainSourceSets =
         moduleProjects.map { modulePath ->
@@ -501,6 +505,7 @@ tasks.register("ktlintCheck") {
         ":tool-standard:ktlintCheck",
         ":tool-javascript:ktlintCheck",
         ":task-core:ktlintCheck",
+        ":release-tools:ktlintCheck",
     )
 }
 
@@ -529,6 +534,7 @@ tasks.register("verifyModuleDependencies") {
                 ":tool-javascript",
                 ":tools",
                 ":task-core",
+                ":release-tools",
             ).associateWith { modulePath ->
                 project(modulePath)
                     .configurations
@@ -546,6 +552,7 @@ tasks.register("verifyModuleDependencies") {
                 ":protocol" to setOf(":task-core", ":model-core"),
                 ":model-core" to emptySet(),
                 ":task-core" to emptySet(),
+                ":release-tools" to emptySet(),
                 ":desktop" to setOf(":ui", ":application", ":protocol"),
                 ":agent-core" to emptySet(),
                 ":provider-core" to setOf(":agent-core", ":model-core"),
@@ -682,6 +689,7 @@ tasks.register("verifyCentralizedVersions") {
             "modules/desktop/build.gradle.kts",
             "modules/agent-core/build.gradle.kts",
             "modules/model-core/build.gradle.kts",
+            "modules/release-tools/build.gradle.kts",
             "modules/provider-core/build.gradle.kts",
             "modules/providers/build.gradle.kts",
             "modules/provider-openai-codex/build.gradle.kts",

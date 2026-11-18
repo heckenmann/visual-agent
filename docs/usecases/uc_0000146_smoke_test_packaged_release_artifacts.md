@@ -46,7 +46,7 @@ Every published native installer, portable Linux package, and platform-specific 
 - `.github/workflows/release.yml`
 - `gradle/release-version.settings.gradle.kts`
 - `build.gradle.kts` (`verifyJavaToolchains`)
-- `scripts/smoke-release-posix.py`
+- `scripts/smoke-release-posix.sh`
 - `scripts/smoke-release-windows.ps1`
 - `de.heckenmann.visualagent.desktop.DesktopStartupSmokeSupport`
 - `de.heckenmann.visualagent.desktop.ComposeStartupHost`

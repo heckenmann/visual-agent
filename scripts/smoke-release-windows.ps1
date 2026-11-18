@@ -103,6 +103,6 @@ try {
             if ($uninstall.ExitCode -ne 0) { throw "MSI uninstall returned $($uninstall.ExitCode)" }
         }
     } finally {
-        Remove-Item -Path $work -Recurse -Force
+        Remove-SmokeWorkDirectory -Path $work
     }
 }

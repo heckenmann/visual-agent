@@ -293,6 +293,7 @@ val kotlinMainSourceRoots =
         rootProject.projectDir.toPath().resolve("modules/provider-openai-codex/src/main/kotlin"),
         rootProject.projectDir.toPath().resolve("modules/tools/src/main/kotlin"),
         rootProject.projectDir.toPath().resolve("modules/task-core/src/main/kotlin"),
+        rootProject.projectDir.toPath().resolve("modules/release-tools/src/main/kotlin"),
     )
 val kotlinProductionSourceRoots =
     buildList {
@@ -313,6 +314,7 @@ val kotlinSourceRoots =
             rootProject.projectDir.toPath().resolve("modules/providers/src/test/kotlin"),
             rootProject.projectDir.toPath().resolve("modules/provider-openai-codex/src/test/kotlin"),
             rootProject.projectDir.toPath().resolve("modules/tools/src/test/kotlin"),
+            rootProject.projectDir.toPath().resolve("modules/release-tools/src/test/kotlin"),
         )
 
 val generatedUseCaseResources = layout.buildDirectory.dir("generated/usecase-resources")
