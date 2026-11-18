@@ -82,8 +82,19 @@ class SmokeWorkflowContractTest {
             "Get-SmokeProcessIds -RootProcessId ${'$'}app.Id",
             "Close-SmokeWindows -Processes",
             "throw \"The application did not exit cleanly",
+            "Remove-SmokeWorkDirectory -Path ${'$'}work",
         ).forEach {
             assertTrue(windows.contains(it))
+        }
+        val windowsProcessHelpers = read("scripts/windows-smoke-processes.ps1")
+        listOf(
+            "function Remove-SmokeWorkDirectory",
+            "${'$'}attemptLimit = 15",
+            "Remove-Item -LiteralPath ${'$'}Path -Recurse -Force -ErrorAction Stop",
+            "Start-Sleep -Milliseconds 1000",
+            "if (${'$'}attempt -eq ${'$'}attemptLimit) { throw }",
+        ).forEach {
+            assertTrue(windowsProcessHelpers.contains(it))
         }
         assertTrue(release.contains("bash scripts/smoke-release-posix.sh"))
     }
