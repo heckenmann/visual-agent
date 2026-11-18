@@ -31,6 +31,26 @@ dependencies {
     testImplementation(libs.xz)
 }
 
+// Contract tests inspect repository files beyond their compiled test classpath.
+// Git excludes generated build/cache data while including newly added source files.
+val contractRepository = rootProject.projectDir
+val repositoryContractFiles =
+    providers
+        .exec {
+            workingDir(contractRepository)
+            commandLine("git", "ls-files", "--cached", "--others", "--exclude-standard", "-z")
+        }.standardOutput.asText
+        .map { names ->
+            names.split('\u0000').filter(String::isNotEmpty).map(contractRepository::resolve)
+        }
+
+tasks.withType<Test>().configureEach {
+    inputs
+        .files(repositoryContractFiles)
+        .withPropertyName("repositoryContracts")
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+}
+
 tasks.test {
     dependsOn(tasks.installDist)
     systemProperty(
@@ -55,6 +75,21 @@ val releaseIntegrationTest =
                 .output.classesDirs
         classpath = sourceSets.test.get().runtimeClasspath
         dependsOn(":desktop:prepareReleaseSourceMaterials")
+        // Offline TestKit builds inspect the desktop packager's runtime inputs.
+        // Resolve external JARs online here without building or copying project JARs.
+        inputs
+            .files(
+                provider {
+                    project(":desktop")
+                        .configurations
+                        .getByName("runtimeClasspath")
+                        .incoming
+                        .artifactView {
+                            componentFilter { it is org.gradle.api.artifacts.component.ModuleComponentIdentifier }
+                        }.files
+                },
+            ).withPropertyName("desktopRuntimeArtifacts")
+            .withPathSensitivity(PathSensitivity.NAME_ONLY)
         systemProperty("release.tools.repository", rootProject.projectDir.absolutePath)
         systemProperty("release.tools.gradle.home", gradle.gradleUserHomeDir.absolutePath)
         systemProperty(
