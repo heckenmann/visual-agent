@@ -15,7 +15,7 @@ class HistoricalJvmRegistryTest {
     fun `historical licenses Jakarta ICU UPL and ANTLR retain exact identity`() {
         val fixture = RegistryFixture()
         val components = fixture.components
-        assertEquals(103, components.size)
+        assertEquals(105, components.size)
         for ((coordinate, license) in mapOf(
             "com.h2database:h2:2.5.252" to "MPL-2.0",
             "ch.qos.logback:logback-core:1.6.6" to "EPL-2.0",
@@ -81,6 +81,27 @@ class HistoricalJvmRegistryTest {
                 .toString(Charsets.UTF_8)
         assertTrue(antlr.contains("2005-2009 Terence Parr"))
         assertTrue(antlr.contains("2012 Sam Harwell"))
+    }
+
+    @Test
+    fun `current Logback evidence preserves historical licenses and exact binary identities`() {
+        val fixture = RegistryFixture()
+        for ((module, hash) in mapOf(
+            "classic" to "23c22387c0cec7ef3a8fe75fc9a443b87a9c88a57b30d441f92f20a843626ad8",
+            "core" to "1762e3b6cb3af6931ae6a9fcec05fb1176c044993e7cb423a365d842fd49e4f8",
+        )) {
+            val coordinate = "ch.qos.logback:logback-$module:1.6.7"
+            val current = fixture.components.getValue(coordinate)
+            val historical = fixture.components.getValue("ch.qos.logback:logback-$module:1.6.6")
+            assertEquals(hash, current.sourceArtifactSha256)
+            assertEquals("8b97c2fe6dd0cfa298ed3c3dd4f500b942edc63a", current.upstreamCommit)
+            assertEquals("EPL-2.0", current.proposedLicense.jsonPrimitive.content)
+            assertEquals("unreviewed", fixture.record(coordinate).text("reviewStatus"))
+            assertContentEquals(historical.materials.first().content, current.materials.first().content)
+            val notice = current.materials.single { it.metadata.text("path").endsWith("SOURCE-AVAILABILITY.txt") }
+            assertTrue(notice.content.toString(Charsets.UTF_8).contains("logback-$module-1.6.7-sources.jar"))
+            assertTrue(current.remaining.jsonArray.isNotEmpty())
+        }
     }
 
     @Test

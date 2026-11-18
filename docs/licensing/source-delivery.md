@@ -40,18 +40,22 @@ source-material test.
 
 The following exact-version source archives resolve from the same selected runtime
 dependency graph used for packaging. Their source variants were verified by the
-release investigation on 2026-10-31, 2026-11-07, and 2026-11-13. Hashes identify the exact
+release investigation on 2026-10-31, 2026-11-07, 2026-11-13, and 2026-11-18. Hashes identify the exact
 downloaded bytes, not a legal determination of completeness.
 
 | Component | Source archive | SHA-256 |
 | --- | --- | --- |
 | H2 2.5.252 | [h2-2.5.252-sources.jar](https://repo.maven.apache.org/maven2/com/h2database/h2/2.5.252/h2-2.5.252-sources.jar) | `ff3d277f962df614283d0a754949eea1e4685ed645f603a590f19c5dbbdb83b3` |
-| Logback Core 1.6.6 | [logback-core-1.6.6-sources.jar](https://repo.maven.apache.org/maven2/ch/qos/logback/logback-core/1.6.6/logback-core-1.6.6-sources.jar) | `2da2e76aa79f98770ffba58311b495e0e710b8bc6f46504249d039262668fe96` |
-| Logback Classic 1.6.6 | [logback-classic-1.6.6-sources.jar](https://repo.maven.apache.org/maven2/ch/qos/logback/logback-classic/1.6.6/logback-classic-1.6.6-sources.jar) | `e3a8a1a00701c54f0b23c2c1427c307e9481da6c0696a7abf3a38a77322288d0` |
+| Logback Core 1.6.7 | [logback-core-1.6.7-sources.jar](https://repo.maven.apache.org/maven2/ch/qos/logback/logback-core/1.6.7/logback-core-1.6.7-sources.jar) | `0a020459385b35a3f0580c70e69bcd2a90c952620b26ca6c66830df886112a63` |
+| Logback Classic 1.6.7 | [logback-classic-1.6.7-sources.jar](https://repo.maven.apache.org/maven2/ch/qos/logback/logback-classic/1.6.7/logback-classic-1.6.7-sources.jar) | `924254ea6d051e7af69e9539049af63c9cef2265fb7a141ba50e5665e75a2c26` |
 | JNA 5.19.1 | [jna-5.19.1-sources.jar](https://repo.maven.apache.org/maven2/net/java/dev/jna/jna/5.19.1/jna-5.19.1-sources.jar) | `0136f719ddd91d92d2368aa2c59a0c436810ac0b9c29024044383758b0e99786` |
 | Skiko AWT 0.150.2 | [skiko-awt-0.150.2-sources.jar](https://repo.maven.apache.org/maven2/org/jetbrains/skiko/skiko-awt/0.150.2/skiko-awt-0.150.2-sources.jar) | `7a10e5e7ec5363ed6ea3b089fd5d619d0088e9e6c05459a33da256a95f9b1d4b` |
 | GraalJS language 25.5.5.0.3 | [js-language-25.5.5.0.3-sources.jar](https://repo.maven.apache.org/maven2/org/graalvm/js/js-language/25.5.5.0.3/js-language-25.5.5.0.3-sources.jar) | `691844c58fa8efef16d550b9a7646674ca78f08751402c250ffc31857184e28b` |
 | Jakarta Annotations API 3.0.0 | [jakarta.annotation-api-3.0.0-sources.jar](https://repo.maven.apache.org/maven2/jakarta/annotation/jakarta.annotation-api/3.0.0/jakarta.annotation-api-3.0.0-sources.jar) | `142dfd2343429df2aac3e1cfacfacc21c8393112c0e0280d3628648d9b612470` |
+
+The selected Logback sources follow the runtime's 1.6.7 update. The version-specific
+1.6.7 notice and pinned upstream license are retained separately; historical 1.6.6
+materials and artifact mappings remain unchanged in `third-party/sources.json`.
 
 The Jakarta Annotations source archive is selected from the packaged runtime
 dependency graph and included in the generated corresponding-source materials.
@@ -497,7 +501,7 @@ metadata inventory; its reports are not a substitute for source delivery.
 - Logback's proposed option is EPL-2.0. Section 3.1(a) requires the Program to
   be made available as Source Code and requires a statement explaining how
   recipients can obtain it. A version-specific `SOURCE-AVAILABILITY.txt` now
-  links both Logback 1.6.6 source JARs from Maven Central and gives their verified
+  links both Logback 1.6.7 source JARs from Maven Central and gives their verified
   hashes; the exact-version source JARs are also retained in generated local
   source materials. The URLs, included notice and full EPL text still require
   final recipient-route review. Review section 3.1(b)'s binary-distribution

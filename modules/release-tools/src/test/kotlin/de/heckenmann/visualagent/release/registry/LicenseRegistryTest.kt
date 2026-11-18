@@ -147,7 +147,7 @@ class LicenseRegistryTest {
         )) {
             assertTrue(font.text("reviewNotes").contains(text))
         }
-        assertEquals(103, fixture.components.size)
+        assertEquals(105, fixture.components.size)
         assertEquals("liberation-fonts-2.1.5/LICENSE", font.text("licenseMaterialPath"))
         assertTrue(
             Files.readString(fixture.path.parent.resolve(font.text("licenseMaterialPath"))).contains("SIL OPEN FONT LICENSE Version 1.1"),
