@@ -31,6 +31,8 @@ Desktop user.
 
 For release smoke tests only, the opt-in system property `visualagent.startup.auto-start-local=true` requests the same local-start action as the splash button. Automatic onboarding is hidden without changing its persisted status. After the server connection, initial layout, and onboarding state are loaded and the main window has been composed with restored geometry, the desktop host emits `VISUAL_AGENT_DESKTOP_READY`. Normal launches do not auto-start or emit this smoke marker.
 
+The desktop host logs UI exception and responsiveness diagnostics separately from server readiness. It observes the splash, automatic onboarding when shown, and the first main window. Startup and smoke signals leave visual integrity unknown. See [desktop rendering diagnostics](../desktop-rendering-diagnostics.md) for the opt-in capture check and reproduction steps.
+
 ## Result
 
 The user sees the Visual Agent main window and can interact with chat, session settings, todos, sub-agents, files, and canvas panels.
