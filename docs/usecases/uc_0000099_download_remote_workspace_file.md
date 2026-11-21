@@ -44,6 +44,10 @@ tool calls on the next user turn.
 
 The downloaded file is available to existing workspace tools without exposing an arbitrary server filesystem path.
 
+The Files panel runs pause, resume, and cancel off the UI thread. While an action is pending,
+that download’s controls are disabled. The panel refreshes the server state after success
+and reports failures in its status area.
+
 ## Tool Calls
 
 - `workspace:download` with `source`, and optional `directory` and `filename`.
