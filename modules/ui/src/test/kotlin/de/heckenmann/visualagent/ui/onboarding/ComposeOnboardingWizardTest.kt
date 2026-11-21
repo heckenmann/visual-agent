@@ -63,6 +63,8 @@ class ComposeOnboardingWizardTest {
             composeTestRule.onNodeWithText("Ask model to create sub-agent").performClick()
         }
         composeTestRule.onNodeWithText("Created Researcher").assertExists()
+        composeTestRule.onNodeWithText("Continue").performClick()
+        composeTestRule.onNodeWithText("Terminal Access").assertExists()
         composeTestRule.awaitCompletion(onboarding.completion) {
             composeTestRule.onNodeWithText("Finish").performClick()
         }

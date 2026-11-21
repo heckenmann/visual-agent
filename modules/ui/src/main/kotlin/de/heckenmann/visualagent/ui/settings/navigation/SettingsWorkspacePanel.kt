@@ -16,6 +16,7 @@ import de.heckenmann.visualagent.protocol.SettingsSection
 import de.heckenmann.visualagent.ui.application.ComposePanelServices
 import de.heckenmann.visualagent.ui.settings.agent.AgentSettingsPage
 import de.heckenmann.visualagent.ui.settings.agent.MainAgentMemoryDraft
+import de.heckenmann.visualagent.ui.settings.agent.TerminalAccessPage
 import de.heckenmann.visualagent.ui.settings.providers.ProviderManagementPanel
 import de.heckenmann.visualagent.ui.settings.providers.ProviderManagementState
 import de.heckenmann.visualagent.ui.settings.settingsPanel
@@ -59,6 +60,7 @@ internal fun SettingsWorkspacePanel(services: ComposePanelServices) {
                         memoryDraft = memory,
                         onSaved = services.onSettingsChanged,
                     )
+                SettingsDestination.TERMINAL_ACCESS -> TerminalAccessPage(services.serverTerminalConsent)
                 else ->
                     settingsPanel(
                         settingsPort = services.settings,

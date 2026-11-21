@@ -29,8 +29,10 @@ import de.heckenmann.visualagent.protocol.OnboardingPort
 import de.heckenmann.visualagent.protocol.OnboardingProviderDraft
 import de.heckenmann.visualagent.protocol.OnboardingProviderProfile
 import de.heckenmann.visualagent.protocol.ProviderModel
+import de.heckenmann.visualagent.protocol.TerminalConsentPort
 import de.heckenmann.visualagent.ui.modal.ComposeConfirmationModal
 import de.heckenmann.visualagent.ui.modal.ComposeModalHost
+import de.heckenmann.visualagent.ui.settings.agent.TerminalAccessPage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -44,6 +46,7 @@ fun ComposeOnboardingWizard(
     skipRequested: Boolean = false,
     onSkipRequestHandled: () -> Unit = {},
     providers: de.heckenmann.visualagent.protocol.ProviderPort? = null,
+    terminalConsent: TerminalConsentPort? = null,
 ) {
     var profiles by remember { mutableStateOf<List<OnboardingProviderProfile>>(emptyList()) }
     var loadingProfiles by remember { mutableStateOf(true) }
@@ -206,7 +209,7 @@ fun ComposeOnboardingWizard(
                                 onRefresh = discoverModels,
                             )
                         3 -> OnboardingReviewStep(draft, credentialConfigured, selectedModel, validationError)
-                        else ->
+                        4 ->
                             OnboardingAgentStep(
                                 agents,
                                 agentDescription,
@@ -216,6 +219,7 @@ fun ComposeOnboardingWizard(
                                 onDescriptionChange = { agentDescription = it },
                                 onCreate = createAgent,
                             )
+                        else -> TerminalAccessPage(terminalConsent)
                     }
                 }
                 if (stepScrollState.maxValue > 0) {
@@ -240,28 +244,29 @@ fun ComposeOnboardingWizard(
                             discoverModels()
                         }
                         3 -> saveProvider()
-                        4 -> completeOnboarding()
+                        TERMINAL_ACCESS_STEP -> completeOnboarding()
                         else -> step += 1
                     }
                 },
-                onSkipAgents = completeOnboarding,
+                onSkipAgents = { step = TERMINAL_ACCESS_STEP },
+                onSkipTerminal = completeOnboarding,
             )
             if (confirmSkip) {
                 ComposeModalHost(
                     modal =
                         ComposeConfirmationModal(
-                            title = if (step == 4) "Skip agent setup?" else "Skip provider setup?",
+                            title = if (step >= 4) "Finish setup?" else "Skip provider setup?",
                             message =
-                                if (step == 4) {
+                                if (step >= 4) {
                                     "Your provider and model are saved. You can create sub-agents later from the conversation."
                                 } else {
                                     "Setup will not open automatically again. You can run it later from Providers and models."
                                 },
-                            confirmDescription = if (step == 4) "Skip agent setup" else "Skip setup",
+                            confirmDescription = if (step >= 4) "Finish setup" else "Skip setup",
                             onConfirm = {
                                 scope.launch {
                                     withContext(Dispatchers.IO) {
-                                        if (step == 4) onboarding.complete() else onboarding.dismiss()
+                                        if (step >= 4) onboarding.complete() else onboarding.dismiss()
                                     }
                                     onFinished()
                                 }

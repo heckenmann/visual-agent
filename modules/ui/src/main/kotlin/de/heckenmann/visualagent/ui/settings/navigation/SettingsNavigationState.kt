@@ -11,6 +11,7 @@ enum class SettingsDestination(
     APPEARANCE("Appearance"),
     PROVIDERS("Providers"),
     AGENT("Agent"),
+    TERMINAL_ACCESS("Terminal Access"),
     UPDATES("Updates"),
 }
 

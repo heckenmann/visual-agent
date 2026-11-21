@@ -29,21 +29,29 @@ internal fun OnboardingNavigation(
     onCancel: () -> Unit,
     onContinue: () -> Unit,
     onSkipAgents: () -> Unit,
+    onSkipTerminal: () -> Unit = onSkipAgents,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.End),
     ) {
-        if (step > 0 && step < AGENT_STEP) {
+        if (step > 0 && step != AGENT_STEP) {
             OutlinedButton(onClick = onBack, enabled = !busy) { Text("Back") }
         }
         OutlinedButton(
-            onClick = if (step == AGENT_STEP) onSkipAgents else onCancel,
+            onClick =
+                when (step) {
+                    AGENT_STEP -> onSkipAgents
+                    TERMINAL_ACCESS_STEP -> onSkipTerminal
+                    else -> onCancel
+                },
             enabled = !busy,
         ) {
             Icon(Icons.Filled.Close, contentDescription = null)
             Text(
-                if (step == AGENT_STEP) {
+                if (step == TERMINAL_ACCESS_STEP) {
+                    "Skip terminal access"
+                } else if (step == AGENT_STEP) {
                     "Skip agent setup"
                 } else if (automatic) {
                     "Skip setup"
@@ -61,7 +69,7 @@ internal fun OnboardingNavigation(
             Text(
                 when (step) {
                     REVIEW_STEP -> if (busy) "Saving…" else "Save and continue"
-                    AGENT_STEP -> "Finish"
+                    TERMINAL_ACCESS_STEP -> "Finish"
                     else -> "Continue"
                 },
                 modifier = Modifier.padding(start = 8.dp),
@@ -72,3 +80,4 @@ internal fun OnboardingNavigation(
 
 private const val REVIEW_STEP = 3
 private const val AGENT_STEP = 4
+internal const val TERMINAL_ACCESS_STEP = 5
