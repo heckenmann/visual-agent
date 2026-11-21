@@ -93,11 +93,11 @@ internal class LinuxServerTerminalBackend : ServerTerminalBackend {
             Files.isExecutable(Path.of(BUBBLEWRAP)) &&
             runtimeMounts() != null
 
-    /** Runs a no-op under the same namespaces, mount setup and seccomp filter as a real command. */
+    /** Runs a directory listing under the same namespaces, mount setup and seccomp filter as a real command. */
     fun supportsPlatform(): Boolean =
         runCatching {
             val root = Path.of("/usr/bin").toRealPath()
-            val request = TerminalSandboxRequest(de.heckenmann.visualagent.agent.tools.TerminalHost.SERVER, ":", null, null)
+            val request = TerminalSandboxRequest(de.heckenmann.visualagent.agent.tools.TerminalHost.SERVER, "ls -d .", null, null)
             val execution =
                 start(request, ServerTerminalDirectory(root, root, DirectoryAccessMode.READ_ONLY), emptyMap())
                     as? BubblewrapExecution ?: return false
@@ -111,7 +111,17 @@ internal class LinuxServerTerminalBackend : ServerTerminalBackend {
 
     private fun runtimeMounts(): List<String>? {
         val libraryDirectories = listOf(Path.of("/usr/lib/x86_64-linux-gnu"), Path.of("/usr/lib"))
-        val libraries = listOf("ld-linux-x86-64.so.2", "libc.so.6", "libtinfo.so.6", "libreadline.so.8", "libncursesw.so.6")
+        val libraries =
+            listOf(
+                "ld-linux-x86-64.so.2",
+                "libc.so.6",
+                "libtinfo.so.6",
+                "libreadline.so.8",
+                "libncursesw.so.6",
+                "libcap.so.2",
+                "libselinux.so.1",
+                "libpcre2-8.so.0",
+            )
         val mounts = mutableListOf<String>()
         for (program in listOf("bash", "cat", "touch", "ls", "sleep")) {
             val source = Path.of("/usr/bin", program)

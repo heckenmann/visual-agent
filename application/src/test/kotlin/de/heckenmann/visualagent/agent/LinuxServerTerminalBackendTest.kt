@@ -28,7 +28,7 @@ class LinuxServerTerminalBackendTest {
         val invocation =
             TerminalSandboxRequest(
                 TerminalHost.SERVER,
-                """cat allowed && ! touch denied && ! cat ../outside && ! cat "$outside" """,
+                """ls . && cat allowed && ! touch denied && ! cat ../outside && ! cat "$outside" """,
                 null,
                 null,
             )
@@ -40,6 +40,7 @@ class LinuxServerTerminalBackendTest {
             val output = execution.output.bufferedReader().use { it.readText() }
             assertEquals(0, execution.awaitExit(), output)
             assertContains(output, "allowed-text")
+            assertContains(output.lineSequence().toList(), "allowed")
             assertFalse(output.contains("outside-text"))
             assertFalse(Files.exists(grant.resolve("denied")))
         } finally {
