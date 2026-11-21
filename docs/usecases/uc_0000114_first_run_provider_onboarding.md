@@ -20,7 +20,7 @@ let the configured main model create a first sub-agent after the desktop client 
 1. The desktop reads onboarding state from the connected server.
 2. One welcome page briefly explains the Main Agent, specialized Sub-agents, and durable Todos.
 3. The user selects an enabled provider profile and the server discovers structured model metadata using a staged, non-persistent draft.
-4. The user may refresh model discovery without persisting the draft, then selects a model and reviews the safe provider summary.
+4. The user may refresh model discovery without persisting the draft, filters by model name or ID if needed, then selects a model and reviews the safe provider summary.
 5. The server validates the exact provider/model selection.
 6. After successful validation the server saves and activates the provider selection.
 7. The wizard displays all existing persisted sub-agents from this server and a prefilled example request for a Researcher.
@@ -65,8 +65,9 @@ and persisted sub-agents; the desktop never reads existing credentials.
 - Onboarding shares the splash screen's initial 880 x 600 dp dimensions and
   decorative background resources. The connected server's theme selection
   determines the light/dark variant; System follows the OS appearance.
-- The onboarding window is not user-resizable; longer content remains accessible
-  through the wizard's scrollable content area.
+- The fixed 880 x 600 dp setup window keeps step instructions, validation feedback,
+  and navigation visible. Provider, model, and existing sub-agent lists scroll
+  independently when needed. The provider editor replaces the profile list while open.
 - Reopening onboarding refreshes theme settings from the server asynchronously.
 - Missing or malformed background assets do not interrupt the wizard; theme
   colors provide the fallback and all foreground/contrast treatments.

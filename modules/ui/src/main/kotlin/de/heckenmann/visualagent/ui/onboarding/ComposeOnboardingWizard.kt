@@ -1,15 +1,11 @@
 package de.heckenmann.visualagent.ui.onboarding
 
-import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.rememberScrollbarAdapter
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -20,7 +16,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import de.heckenmann.visualagent.protocol.CredentialUpdate
@@ -94,7 +89,7 @@ fun ComposeOnboardingWizard(
                     withContext(Dispatchers.IO) { onboarding.discoverModels(providerDraft) }
                 }.onSuccess { discovered ->
                     models = discovered
-                    selectedModel = discovered.firstOrNull()
+                    selectedModel = discovered.firstOrNull { it.id == selectedModel?.id } ?: discovered.firstOrNull()
                     if (discovered.isEmpty()) {
                         validationError =
                             "No selectable model was found for this provider. Check the provider and refresh later."
@@ -149,22 +144,16 @@ fun ComposeOnboardingWizard(
             onFinished()
         }
     }
-    val stepScrollState = rememberScrollState()
-    LaunchedEffect(step) { stepScrollState.scrollTo(0) }
     Box(modifier = Modifier.fillMaxSize()) {
         Column(
-            modifier = Modifier.fillMaxSize().padding(48.dp),
-            verticalArrangement = Arrangement.spacedBy(20.dp),
+            modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Text("Set up Visual Agent", style = MaterialTheme.typography.headlineMedium)
-            Text(
-                "Learn the workflow, choose this server's model, and optionally create your first specialized helper.",
-                style = MaterialTheme.typography.bodyLarge,
-            )
             Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
                 Column(
-                    modifier = Modifier.fillMaxSize().verticalScroll(stepScrollState),
-                    verticalArrangement = Arrangement.spacedBy(20.dp),
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     when (step) {
                         0 -> OnboardingWelcome()
@@ -190,6 +179,7 @@ fun ComposeOnboardingWizard(
                                     selectedModel = null
                                     validationError = null
                                 },
+                                onCancelDraft = { customDraft = null },
                                 onDraftChange = {
                                     selected = null
                                     customDraft = it
@@ -221,12 +211,6 @@ fun ComposeOnboardingWizard(
                             )
                         else -> TerminalAccessPage(terminalConsent)
                     }
-                }
-                if (stepScrollState.maxValue > 0) {
-                    VerticalScrollbar(
-                        adapter = rememberScrollbarAdapter(stepScrollState),
-                        modifier = Modifier.align(Alignment.CenterEnd),
-                    )
                 }
             }
             OnboardingNavigation(

@@ -1,9 +1,24 @@
 package de.heckenmann.visualagent.ui.onboarding
 
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.hasScrollToIndexAction
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToIndex
+import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.test.performTextReplacement
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.dp
 import de.heckenmann.visualagent.protocol.OnboardingAgent
 import de.heckenmann.visualagent.protocol.OnboardingAgentCreationResult
 import de.heckenmann.visualagent.protocol.OnboardingPort
@@ -51,7 +66,7 @@ class ComposeOnboardingWizardTest {
         composeTestRule.awaitCompletion(onboarding.modelDiscovery) {
             composeTestRule.onNodeWithText("Continue").performClick()
         }
-        composeTestRule.onNodeWithText("✓ Discovered model").assertExists()
+        composeTestRule.onNodeWithText("Discovered model").assertExists()
         composeTestRule.onNodeWithText("Continue").performClick()
         composeTestRule.onNodeWithText("Review").assertExists()
         composeTestRule.awaitCompletion(onboarding.providerSaved) {
@@ -62,7 +77,12 @@ class ComposeOnboardingWizardTest {
         composeTestRule.awaitCompletion(onboarding.agentCreation) {
             composeTestRule.onNodeWithText("Ask model to create sub-agent").performClick()
         }
-        composeTestRule.onNodeWithText("Created Researcher").assertExists()
+        composeTestRule
+            .onNodeWithText("Created Researcher", substring = true)
+            .performSemanticsAction(SemanticsActions.ScrollBy) { scrollBy ->
+                assertTrue(scrollBy(0f, 100f))
+            }
+        composeTestRule.onNodeWithText("Continue").assertIsDisplayed()
         composeTestRule.onNodeWithText("Continue").performClick()
         composeTestRule.onNodeWithText("Terminal Access").assertExists()
         composeTestRule.awaitCompletion(onboarding.completion) {
@@ -71,6 +91,44 @@ class ComposeOnboardingWizardTest {
 
         assertTrue(onboarding.finished)
         assertTrue(onboarding.completed)
+    }
+
+    @Test
+    fun `model list scrolls independently at larger font scale`() {
+        val models =
+            List(40) { ProviderModel("model-$it") } +
+                ProviderModel("long-model", "A model with a long display name that wraps across lines at larger font sizes")
+        val selection = mutableStateOf<ProviderModel?>(null)
+        composeTestRule.setContent {
+            CompositionLocalProvider(LocalDensity provides Density(1f, fontScale = 1.5f)) {
+                MaterialTheme(colorScheme = androidx.compose.material3.darkColorScheme()) {
+                    Column(Modifier.size(640.dp, 320.dp)) {
+                        OnboardingModelStep(
+                            draft = null,
+                            models = models,
+                            selectedModel = selection.value,
+                            loading = false,
+                            error = "The server could not validate this model. Select another model or retry.",
+                            onSelect = { selection.value = it },
+                            onRefresh = {},
+                        )
+                    }
+                }
+            }
+        }
+        composeTestRule.onNode(hasScrollToIndexAction()).performScrollToIndex(models.lastIndex)
+        composeTestRule
+            .onNodeWithText(models.last().name)
+            .assertIsDisplayed()
+            .performClick()
+            .assertIsSelected()
+        composeTestRule.onNodeWithText("Search models").performTextReplacement("no matching model")
+        composeTestRule.onNodeWithText("No models match your search.").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Selected model: ${models.last().name}").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Search models").performTextReplacement("LONG-MODEL")
+        composeTestRule.onNodeWithText(models.last().name).assertIsDisplayed().assertIsSelected()
+        composeTestRule.onNodeWithText("Refresh models").assertIsDisplayed()
+        composeTestRule.onNodeWithText("The server could not validate", substring = true).assertIsDisplayed()
     }
 
     private class TestOnboardingPort : OnboardingPort {
@@ -115,7 +173,7 @@ class ComposeOnboardingWizardTest {
             creationCalled = true
             agentCreation.complete()
             return OnboardingAgentCreationResult(
-                "Created Researcher",
+                "Created Researcher\n" + "Researcher setup details.\n".repeat(100),
                 agents() + OnboardingAgent("researcher", "Researcher", "Research topics"),
             )
         }

@@ -1,14 +1,17 @@
 package de.heckenmann.visualagent.ui.onboarding
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -21,7 +24,7 @@ internal const val DEFAULT_RESEARCHER_REQUEST =
 
 /** Renders the optional model-assisted first sub-agent creation step. */
 @Composable
-internal fun OnboardingAgentStep(
+internal fun ColumnScope.OnboardingAgentStep(
     agents: List<OnboardingAgent>,
     description: String,
     creating: Boolean,
@@ -31,26 +34,12 @@ internal fun OnboardingAgentStep(
     onCreate: () -> Unit,
 ) {
     Text("Create your first sub-agent", style = MaterialTheme.typography.titleLarge)
-    Text(
-        "Describe the helper you want. The configured main model will inspect the existing agents and can create it " +
-            "through the same agent:create flow used later in the conversation. This step is optional.",
-    )
-    Text("Existing sub-agents", style = MaterialTheme.typography.titleMedium)
-    if (agents.isEmpty()) {
-        Text("No sub-agents exist on this Visual Agent server yet.")
-    } else {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            agents.forEach { agent ->
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    tonalElevation = 2.dp,
-                    shape = MaterialTheme.shapes.medium,
-                ) {
-                    Column(modifier = Modifier.padding(12.dp)) {
-                        Text(agent.name, style = MaterialTheme.typography.titleSmall)
-                        Text(agent.role, style = MaterialTheme.typography.bodyMedium)
-                    }
-                }
+    Text("Describe a helper for the main model to create. You can also do this later in the conversation.")
+    if (agents.isNotEmpty()) {
+        Text("Existing sub-agents", style = MaterialTheme.typography.titleMedium)
+        LazyColumn(Modifier.weight(1f, fill = false).fillMaxWidth()) {
+            items(agents) { agent ->
+                ListItem(headlineContent = { Text(agent.name) }, supportingContent = { Text(agent.role) })
             }
         }
     }
@@ -59,13 +48,20 @@ internal fun OnboardingAgentStep(
         onValueChange = onDescriptionChange,
         label = { Text("Describe the sub-agent") },
         supportingText = { Text("This text is sent to the main model as a normal conversation request.") },
-        minLines = 4,
+        minLines = 2,
+        maxLines = 3,
         modifier = Modifier.fillMaxWidth(),
     )
     Button(onClick = onCreate, enabled = description.isNotBlank() && !creating) {
         if (creating) CircularProgressIndicator(modifier = Modifier.padding(end = 8.dp))
         Text(if (creating) "Creating…" else "Ask model to create sub-agent")
     }
-    resultMessage?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
+    resultMessage?.let { message ->
+        Text(
+            message,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.weight(1f, fill = false).fillMaxWidth().verticalScroll(rememberScrollState()),
+        )
+    }
     error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
 }

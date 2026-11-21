@@ -1,7 +1,10 @@
 package de.heckenmann.visualagent.ui.onboarding
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Icon
@@ -10,6 +13,11 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -18,13 +26,15 @@ import de.heckenmann.visualagent.protocol.OnboardingProviderDraft
 import de.heckenmann.visualagent.protocol.OnboardingProviderProfile
 import de.heckenmann.visualagent.protocol.ProviderAdapter
 import de.heckenmann.visualagent.protocol.ProviderModel
+import de.heckenmann.visualagent.ui.components.PanelDropdownField
+import de.heckenmann.visualagent.ui.components.PanelSelectOption
 import java.util.UUID
 
 /** Renders the welcome copy for the server-owned onboarding flow. */
 @Composable
 internal fun OnboardingWelcome() {
     Text("Welcome", style = MaterialTheme.typography.titleLarge)
-    Text("Provider settings remain on this Visual Agent server. You can change them later in Providers and models.")
+    Text("Choose a provider and model for this server. You can change them later in Providers and models.")
     Text("How Visual Agent works", style = MaterialTheme.typography.titleMedium)
     Text("Main Agent — understands your request, plans the work, and coordinates available tools and helpers.")
     Text("Sub-agents — specialized helpers created for roles such as research, coding, or analysis.")
@@ -33,25 +43,28 @@ internal fun OnboardingWelcome() {
 
 /** Renders selection and staged editing of one LLM provider profile. */
 @Composable
-internal fun OnboardingProviderStep(
+internal fun ColumnScope.OnboardingProviderStep(
     profiles: List<OnboardingProviderProfile>,
     selected: OnboardingProviderProfile?,
     customDraft: OnboardingProviderDraft?,
     loading: Boolean,
     onSelect: (OnboardingProviderProfile) -> Unit,
     onDraftChange: (OnboardingProviderDraft) -> Unit,
+    onCancelDraft: () -> Unit,
     authorizationControls: @Composable (OnboardingProviderDraft) -> Unit = {},
 ) {
     Text("LLM provider", style = MaterialTheme.typography.titleLarge)
+    if (customDraft != null) {
+        OnboardingProviderEditor(customDraft, onDraftChange)
+        authorizationControls(customDraft)
+        OutlinedButton(onClick = onCancelDraft) { Text("Back to providers") }
+        return
+    }
     when {
         loading -> Text("Loading providers from the Visual Agent server…")
         profiles.isEmpty() -> Text("No provider profile is configured on this server yet.")
         else ->
-            profiles.forEach { profile ->
-                OutlinedButton(onClick = { onSelect(profile) }, modifier = Modifier.fillMaxWidth()) {
-                    Text(if (profile == selected) "✓ ${profile.name}" else profile.name)
-                }
-            }
+            OnboardingChoices(profiles, selected, { it.name }, onSelect, Modifier.weight(1f, fill = false))
     }
     OutlinedButton(
         onClick = {
@@ -68,8 +81,7 @@ internal fun OnboardingProviderStep(
     ) {
         Text("Add provider")
     }
-    customDraft?.let { draft -> OnboardingProviderEditor(draft, onDraftChange) }
-    (customDraft ?: selected?.toDraft())?.let { authorizationControls(it) }
+    selected?.toDraft()?.let { authorizationControls(it) }
 }
 
 @Composable
@@ -85,14 +97,13 @@ private fun OnboardingProviderEditor(
         singleLine = true,
         modifier = Modifier.fillMaxWidth(),
     )
-    Text("Provider type", style = MaterialTheme.typography.labelLarge)
-    androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        ProviderAdapter.entries.forEach { adapter ->
-            OutlinedButton(onClick = { onChange(draft.withAdapter(adapter)) }) {
-                Text(if (adapter == draft.adapter) "✓ ${adapter.label()}" else adapter.label())
-            }
-        }
-    }
+    PanelDropdownField(
+        label = "Provider type",
+        selectedValue = draft.adapter.name,
+        options = ProviderAdapter.entries.map { PanelSelectOption(it.name, it.label()) },
+        onSelected = { onChange(draft.withAdapter(ProviderAdapter.valueOf(it))) },
+        modifier = Modifier.fillMaxWidth(),
+    )
     if (draft.adapter == ProviderAdapter.CODEX_CLI) {
         Text("Codex CLI is checked on the connected Visual Agent server and does not use an HTTP endpoint.")
     } else {
@@ -137,7 +148,7 @@ private fun OnboardingHttpProviderFields(
 
 /** Renders discovery results and the selected provider model. */
 @Composable
-internal fun OnboardingModelStep(
+internal fun ColumnScope.OnboardingModelStep(
     draft: OnboardingProviderDraft?,
     models: List<ProviderModel>,
     selectedModel: ProviderModel?,
@@ -146,20 +157,39 @@ internal fun OnboardingModelStep(
     onSelect: (ProviderModel) -> Unit,
     onRefresh: () -> Unit,
 ) {
+    var query by remember(draft?.id) { mutableStateOf("") }
+    val filter = query.trim()
+    val visibleModels =
+        remember(models, filter) {
+            models.filter { it.name.contains(filter, ignoreCase = true) || it.id.contains(filter, ignoreCase = true) }
+        }
     Text("Model", style = MaterialTheme.typography.titleLarge)
     Text(draft?.let { "Select a model for ${it.name}." } ?: "Select a provider first.")
     if (loading) {
         Text("Discovering models…")
     } else {
-        OutlinedButton(onClick = onRefresh, modifier = Modifier.fillMaxWidth()) {
-            Icon(Icons.Filled.Refresh, contentDescription = null)
-            Text("Refresh models")
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            OutlinedTextField(
+                value = query,
+                onValueChange = { query = it },
+                label = { Text("Search models") },
+                singleLine = true,
+                modifier = Modifier.weight(1f),
+            )
+            OutlinedButton(onClick = onRefresh) {
+                Icon(Icons.Filled.Refresh, contentDescription = null)
+                Text("Refresh models", modifier = Modifier.padding(start = 8.dp))
+            }
         }
     }
-    models.forEach { model ->
-        OutlinedButton(onClick = { onSelect(model) }, modifier = Modifier.fillMaxWidth()) {
-            Text(if (model == selectedModel) "✓ ${model.name}" else model.name)
-        }
+    when {
+        visibleModels.isNotEmpty() ->
+            OnboardingChoices(visibleModels, selectedModel, { it.name }, onSelect, Modifier.weight(1f, fill = false))
+        !loading && models.isNotEmpty() -> Text("No models match your search.")
+        !loading && error == null -> Text("No models were found. Refresh after checking the provider.")
+    }
+    if (selectedModel != null && selectedModel !in visibleModels) {
+        Text("Selected model: ${selectedModel.name}", style = MaterialTheme.typography.bodyMedium)
     }
     error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
 }
