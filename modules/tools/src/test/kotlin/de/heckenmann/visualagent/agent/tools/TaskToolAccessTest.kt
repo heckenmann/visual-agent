@@ -98,7 +98,7 @@ class TaskToolAccessTest {
             val registry = ToolRegistry(listOf(terminal), ToolEventBus())
             val access =
                 TaskToolAccess(TaskPolicy(resources = listOf("allowed")), { setOf("terminal") }, { true })
-            val argument = """{"command":${JsonPrimitive("echo bypass > $marker")}}"""
+            val argument = """{"target":"server","command":${JsonPrimitive("echo bypass > $marker")}}"""
             val result = registry.executeBlockingResult(terminal, argument, mapOf("taskToolAccess" to access))
             assertFalse(result.success)
             assertFalse(Files.exists(marker))

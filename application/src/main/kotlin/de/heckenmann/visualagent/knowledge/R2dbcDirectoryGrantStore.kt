@@ -22,6 +22,18 @@ internal class R2dbcDirectoryGrantStore(
         saveDirectoryGrantReactive(record).blockCompletion()
     }
 
+    override fun updateDirectoryGrant(record: DirectoryGrantRecord): Boolean =
+        databaseClient
+            .sql("UPDATE directory_grants SET display_name = :name, mode = :mode, updated_at = :updated WHERE id = :id")
+            .bind("name", record.displayName)
+            .bind("mode", record.mode)
+            .bind("updated", record.updatedAt.toString())
+            .bind("id", record.id)
+            .fetch()
+            .rowsUpdated()
+            .map { it == 1L }
+            .blockRequired()
+
     override fun listDirectoryGrants(): List<DirectoryGrantRecord> = listDirectoryGrantsReactive().blockList()
 
     override fun getDirectoryGrant(id: String): DirectoryGrantRecord? = getDirectoryGrantReactive(id).blockNullable()

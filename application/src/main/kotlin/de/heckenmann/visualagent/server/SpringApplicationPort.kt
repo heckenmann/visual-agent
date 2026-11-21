@@ -15,6 +15,7 @@ import de.heckenmann.visualagent.protocol.OpenSourceLicensePort
 import de.heckenmann.visualagent.protocol.ProviderPort
 import de.heckenmann.visualagent.protocol.SettingsPort
 import de.heckenmann.visualagent.protocol.SkillPort
+import de.heckenmann.visualagent.protocol.TerminalConsentPort
 import de.heckenmann.visualagent.protocol.TodoPort
 import de.heckenmann.visualagent.protocol.WorkspaceFilePort
 import org.springframework.stereotype.Component
@@ -41,6 +42,7 @@ class SpringApplicationPort(
     override val activity: ActivityPort,
     override val lifecycle: LifecyclePort,
     private val agentManager: de.heckenmann.visualagent.agent.AgentManager,
+    override val serverTerminalConsent: TerminalConsentPort? = null,
 ) : ApplicationPort {
     override fun cancelActiveWork() {
         if (lifecycle.closing) {

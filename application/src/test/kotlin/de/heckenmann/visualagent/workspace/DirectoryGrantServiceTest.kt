@@ -231,6 +231,8 @@ private class MemoryDirectoryGrantStore : DirectoryGrantStore {
         records[record.id] = record
     }
 
+    override fun updateDirectoryGrant(record: DirectoryGrantRecord): Boolean = records.replace(record.id, record) != null
+
     override fun listDirectoryGrants(): List<DirectoryGrantRecord> = records.values.toList()
 
     override fun getDirectoryGrant(id: String): DirectoryGrantRecord? = records[id]
