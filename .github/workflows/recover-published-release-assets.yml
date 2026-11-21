@@ -1,0 +1,47 @@
+name: Recover verified assets for published release
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_run_id:
+        description: Failed release tag-push run ID whose verification and package jobs all passed
+        required: true
+        type: string
+
+concurrency:
+  group: recover-release-assets-${{ inputs.source_run_id }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  attach:
+    name: Attach verified assets to published release
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      SOURCE_RUN_ID: ${{ inputs.source_run_id }}
+    steps:
+      - name: Check out current release tooling
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Require the default branch
+        run: test "$GITHUB_REF" = "refs/heads/master"
+
+      - name: Set up verification Java
+        uses: actions/setup-java@v6
+        with:
+          distribution: zulu
+          java-version: "27.0.1.0.3+1"
+
+      - name: Download and attach verified assets from the original run
+        run: bash scripts/attach-published-release-assets.sh

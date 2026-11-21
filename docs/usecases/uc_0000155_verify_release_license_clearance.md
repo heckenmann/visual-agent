@@ -24,11 +24,19 @@ maintainer publishes the completed draft through GitHub. See the [release guide]
 
 Failed required jobs prevent draft attachment. Tag movement, a commit outside
 `master`, invalid assets, API failures, or an already published release stop the
-operation. A partially completed upload remains a draft and can be retried in the
-same workflow run while its artifacts remain available. Concurrency prevents two
-workflow runs for the same tag from updating the draft simultaneously. Repository
-writers must wait for workflow success before publishing; GitHub's UI does not
-enforce this job dependency. These checks do not determine legal clearance.
+standard draft operation. If the only failed job is the published-release guard,
+the maintainer may dispatch **Recover verified assets for published release** with
+the source run ID. That Action accepts only a completed tag-push run where source,
+quality, packaging, legal/source-material and smoke jobs all succeeded and the
+draft attachment step failed for the published-state guard. It revalidates the tag,
+downloads only that run's assets, appends missing verified files without replacing
+mismatched public assets, and verifies the final remote files. It never changes the
+release's published status, notes or unrelated assets. No local upload is used.
+
+A partial upload can be retried through the same recovery Action while its source
+artifacts remain available. The tag must still point to the verified commit in
+`master`. These technical checks do not determine legal clearance; see open issue
+#410.
 
 ## Tool Calls
 
@@ -37,6 +45,8 @@ enforce this job dependency. These checks do not determine legal clearance.
 ## Code Entry Points
 
 - `.github/workflows/release.yml`
+- `.github/workflows/recover-published-release-assets.yml`
 - `scripts/verify-release-ref.sh`
 - `scripts/attach-release-draft.sh`
+- `scripts/attach-published-release-assets.sh`
 - `scripts/release-tools.sh` (`verify-assets`, built by `:release-tools:installDist`)

@@ -59,6 +59,25 @@ draft. Wait for the draft job's success before publishing. GitHub repository
 writers can publish through the UI even while a workflow is running; the workflow
 does not impose a repository-wide publication lock.
 
+## Recover a Release Published Before Attachment
+
+If a maintainer publishes the release before the tag-push workflow attaches its
+files, wait for the build and smoke jobs to finish. When the only failed job is
+the draft-only attachment guard, run **Recover verified assets for published
+release** from the default branch and enter the source run ID. The recovery Action
+accepts only that exact failure shape and downloads the twelve files by artifact
+ID from the verified run. It checks the tag again before modifying the release.
+It adds missing files to the matching
+published release, preserves its publication status, notes, and unrelated assets,
+and refuses to replace completed assets whose size or SHA-256 differs. On retry,
+it can clear an empty upload placeholder left by GitHub.
+It verifies the final remote asset metadata against the run outputs. No local asset
+download or upload is part of this recovery.
+
+The recovery Action is limited to completed tag-push release runs where every
+verification, packaging, legal/source-material, and smoke job succeeded. It does
+not retry a release run with any other failure.
+
 ## Manual Smoke Validation
 
 Run the same workflow through **Run workflow** for a selected branch or tag to
