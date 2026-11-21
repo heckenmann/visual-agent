@@ -8,7 +8,6 @@ import de.heckenmann.visualagent.agent.ChatRequestContext
 import de.heckenmann.visualagent.agent.Message
 import de.heckenmann.visualagent.agent.ProviderTurnResponse
 import de.heckenmann.visualagent.agent.tools.ToolCallEvent
-import de.heckenmann.visualagent.agent.tools.ToolCallPhase
 import de.heckenmann.visualagent.error.ErrorMessageMapper
 import de.heckenmann.visualagent.protocol.ConversationCompletionEvent
 import de.heckenmann.visualagent.protocol.ConversationStreamUpdate
@@ -258,18 +257,6 @@ internal class AgentManagerConversationOps(
 
     /** Schedules recovery for persisted work interrupted by an application restart. */
     fun resumeInterruptedConversationIfNeeded() = historyOps.resumeInterruptedConversationIfNeeded()
-
-    /** Records main-agent tool activity as durable parent-linked history rows. */
-    fun registerToolEventListener(): AutoCloseable =
-        owner.toolEventBus.addListener { event ->
-            if (event.context["agent"] != "main") return@addListener
-            val requestId = event.context["requestId"]?.toString().orEmpty()
-            if (requestId.isBlank()) return@addListener
-            historyOps.recordToolCall(event)
-            if (event.phase == ToolCallPhase.FINISHED) {
-                owner.finishedToolEventsByRequestId.computeIfAbsent(requestId) { mutableListOf() }.add(event)
-            }
-        }
 
     /** Builds the main-agent request from complete history and active provider configuration. */
     fun buildMainRequest(

@@ -27,8 +27,9 @@ class AgentManagerToolHistoryPersistenceTest {
         val db1 =
             de.heckenmann.visualagent.testsupport.KnowledgeDbTestFactory
                 .create(tempDb)
+        val bus = ToolEventBus()
         val manager1 =
-            AgentManager(db1, mockk(relaxed = true), AgentToolConfigService(db1), ToolEventBus(), TodoEventBus(), AppConfigBean(db1))
+            AgentManager(db1, mockk(relaxed = true), AgentToolConfigService(db1), bus, TodoEventBus(), AppConfigBean(db1))
         val parentId = UUID.randomUUID().toString()
         db1.saveConversationMessage(
             parentId,
@@ -40,29 +41,30 @@ class AgentManagerToolHistoryPersistenceTest {
             assistantToolTurn = true,
         )
         val now = Instant.now()
+        val requestId = UUID.randomUUID().toString()
         val baseEvent =
             ToolCallEvent(
                 toolId = "file:read",
                 functionName = "file_read",
                 providerToolCallId = "call-1",
-                requestId = UUID.randomUUID().toString(),
+                requestId = requestId,
                 round = 0,
                 sequence = 0,
                 parentAssistantTurnId = parentId,
                 inputJson = """{"path":"app.properties"}""",
-                context = mapOf("agent" to "main", "sessionId" to "main"),
+                context = mapOf("agent" to "main", "sessionId" to "main", "requestId" to requestId),
                 result = ToolResult("file:read", true, ""),
                 startedAtUtc = now,
                 finishedAtUtc = now,
                 durationMillis = 0,
             )
 
-        manager1.recordToolCall(baseEvent.copy(phase = ToolCallPhase.STARTED))
+        bus.publish(baseEvent.copy(phase = ToolCallPhase.STARTED))
         val rowWhileRunning = db1.getConversationMessages("main", 10).single { it.role == "tool" }
         assertTrue(rowWhileRunning.content.contains("running"))
-        manager1.recordToolCall(baseEvent.copy(phase = ToolCallPhase.UPDATED, liveState = ToolLiveState("execution", 1, "Intermediate")))
+        bus.publish(baseEvent.copy(phase = ToolCallPhase.UPDATED, liveState = ToolLiveState("execution", 1, "Intermediate")))
         assertEquals(rowWhileRunning, db1.getConversationMessages("main", 10).single { it.role == "tool" })
-        manager1.recordToolCall(
+        bus.publish(
             baseEvent.copy(
                 phase = ToolCallPhase.FINISHED,
                 result = ToolResult("file:read", true, "configuration contents"),
@@ -90,6 +92,7 @@ class AgentManagerToolHistoryPersistenceTest {
         assertEquals(setOf(parentId, completedRow.id), nextPage.records.map { it.id }.toSet())
         assertEquals(2, nextPage.nextOffset)
         assertTrue(!nextPage.hasMore)
+        manager1.destroy()
         db1.close()
 
         val db2 =

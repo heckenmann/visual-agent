@@ -67,6 +67,7 @@ class CodexCliProvider internal constructor(
                     request.workingDirectory(),
                     request.showReasoningSummary(),
                     budgetPlan.request.responseSchema,
+                    recordToolTurn = { turn -> recordToolTurn(turn, request) },
                 )
             val response =
                 chatModel
@@ -100,6 +101,7 @@ class CodexCliProvider internal constructor(
                 request.workingDirectory(),
                 request.showReasoningSummary(),
                 budgetPlan.request.responseSchema,
+                recordToolTurn = { turn -> recordToolTurn(turn, request) },
             ).streamReactive(budgetPlan.request.toPrompt(), request.cancellationToken)
                 .map { chunk ->
                     ChatResponse(
@@ -207,6 +209,11 @@ class CodexCliProvider internal constructor(
         private const val TOOL_HELP_FUNCTION = "tool_help"
         private const val TOOL_GUARD_MESSAGE_ID = "__provider_tool_guard__"
     }
+
+    private fun recordToolTurn(
+        turn: ProviderTurnResponse,
+        request: ChatRequestContext,
+    ): String? = toolCallbacks.recordAssistantToolTurn(turn, request.metadata + ("providerToolTurnId" to turn.toolCalls.single().id))
 
     private fun effectiveModel(model: String): String = model.takeIf(String::isNotBlank).orEmpty()
 

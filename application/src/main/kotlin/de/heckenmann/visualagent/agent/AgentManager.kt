@@ -164,7 +164,7 @@ class AgentManager
                     completionEvents = conversationCompletionEvents,
                 )
             todoReviewListenerHandle = registerTodoTerminalReviewListener()
-            toolEventListenerHandle = conversationOpsProvider.registerToolEventListener()
+            toolEventListenerHandle = conversationOpsProvider.registerToolEventListener(conversationOps::recordToolCall)
             conversationOps.loadConversationFromDb()
             conversationOps.resumeInterruptedConversationIfNeeded()
         }

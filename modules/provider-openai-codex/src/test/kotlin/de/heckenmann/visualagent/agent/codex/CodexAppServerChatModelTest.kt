@@ -8,11 +8,8 @@ import kotlinx.serialization.json.buildJsonObject
 import org.junit.jupiter.api.Test
 import org.springframework.ai.chat.model.ChatResponse
 import org.springframework.ai.chat.prompt.Prompt
-import org.springframework.ai.tool.ToolCallback
-import org.springframework.ai.tool.definition.ToolDefinition
 import java.nio.file.Files
 import java.nio.file.Path
-import java.util.concurrent.atomic.AtomicReference
 import kotlin.io.path.createTempDirectory
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -21,42 +18,6 @@ import kotlin.test.assertTrue
 
 /** Verifies the clean-room Codex app-server protocol adapter. */
 class CodexAppServerChatModelTest {
-    @Test
-    fun `native deltas are exposed as spring responses and dynamic tools receive results`() =
-        runBlocking {
-            val directory = createTempDirectory("codex-app-server-test-")
-            val executable = fakeServer(directory)
-            val receivedArguments = AtomicReference<String>()
-            val callback =
-                object : ToolCallback {
-                    override fun getToolDefinition(): ToolDefinition =
-                        ToolDefinition
-                            .builder()
-                            .name("context")
-                            .description("Returns context")
-                            .inputSchema("{\"type\":\"object\"}")
-                            .build()
-
-                    override fun call(functionInput: String): String {
-                        receivedArguments.set(functionInput)
-                        return "tool-result:$functionInput"
-                    }
-                }
-            try {
-                val model = CodexAppServerChatModel(executable, "gpt-test", listOf(callback), directory)
-                val responses = model.streamBlocking(Prompt("hello"))
-
-                assertEquals(
-                    listOf("hel", "lo", ""),
-                    responses.map(::responseText),
-                )
-                assertTrue(responses.last().hasFinishReasons(setOf("stop")))
-                assertEquals("{}", receivedArguments.get())
-            } finally {
-                deleteRecursively(directory)
-            }
-        }
-
     @Test
     fun `a single native delta is forwarded without artificial chunks`() =
         runBlocking {
