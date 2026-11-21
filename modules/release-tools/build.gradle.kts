@@ -10,6 +10,11 @@ application {
     mainClass.set("de.heckenmann.visualagent.release.ReleaseToolsMainKt")
 }
 
+tasks.named<JavaExec>("run") {
+    // Gradle also selects this task when running `./gradlew run` from the repository root.
+    onlyIf("The release CLI was given arguments") { !args.isNullOrEmpty() }
+}
+
 group = "de.heckenmann.visualagent"
 version =
     libs.versions.visual.agent
