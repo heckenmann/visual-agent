@@ -1,5 +1,6 @@
 package de.heckenmann.visualagent.agent.config
 
+import de.heckenmann.visualagent.agent.ServerTerminalConsent
 import de.heckenmann.visualagent.agent.SubAgent
 import de.heckenmann.visualagent.agent.ToolId
 import de.heckenmann.visualagent.knowledge.PreferenceStore
@@ -18,6 +19,7 @@ class AgentToolConfigService(
     private val preferenceStore: PreferenceStore? = configStore as? PreferenceStore,
     private val registry: org.springframework.beans.factory.ObjectProvider<de.heckenmann.visualagent.agent.tools.ToolRegistry>? = null,
     private val modelCapabilities: de.heckenmann.visualagent.task.TaskModelCapabilities? = null,
+    private val terminalConsent: ServerTerminalConsent? = null,
 ) {
     init {
         ensureDefaultConfigs()
@@ -44,6 +46,7 @@ class AgentToolConfigService(
             "todos",
             "workspace:file",
             "workspace:download",
+            "terminal",
             "update:check",
             "context",
             "model:selection",
@@ -116,6 +119,7 @@ class AgentToolConfigService(
      */
     fun isToolGloballyEnabled(toolId: String): Boolean =
         toolId !in BLOCKED_TOOL_IDS &&
+            (toolId != "terminal" || terminalConsent?.isEnabled() == true) &&
             toolId !in disabledToolIds() &&
             (toolId !in PROCESS_INVENTORY_TOOL_IDS || preferenceStore?.getPreference(PROCESS_INVENTORY_INITIALIZED_KEY) == "true") &&
             (toolId != SYSTEM_ENV_TOOL_ID || preferenceStore?.getPreference(SYSTEM_ENV_INITIALIZED_KEY) == "true")
@@ -153,6 +157,7 @@ class AgentToolConfigService(
         toolId: String,
         enabled: Boolean,
     ) {
+        require(toolId != "terminal") { "Change terminal access through the dedicated consent setting." }
         require(!enabled || toolId !in BLOCKED_TOOL_IDS) {
             "This tool is unavailable due to a security policy"
         }
@@ -365,31 +370,6 @@ private val BLOCKED_TOOL_IDS =
         "file:grep",
         "file:write",
         "file:edit",
-        "terminal",
         "pwd",
         "javascript:execute",
     )
-
-/**
- * Persisted tool configuration for one agent template.
- *
- * @property id Stable config ID
- * @property name Display name
- * @property description Purpose shown in the UI or logs
- * @property model Preferred model for this agent
- * @property systemPrompt Agent-specific system prompt
- * @property tools Tool IDs allowed for this agent
- * @property maxTurns Maximum autonomous loop turns
- * @property enabled Whether this config can be used
- * @see docs/usecases/uc_0000019_configure_agent_tools.md
- */
-data class SubAgentToolConfig(
-    val id: String,
-    val name: String,
-    val description: String,
-    val model: String = "nemotron-3-super:cloud",
-    val systemPrompt: String = "",
-    val tools: List<String>,
-    val maxTurns: Int = 5,
-    val enabled: Boolean = true,
-)

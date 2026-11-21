@@ -20,6 +20,9 @@ interface ApplicationPort {
     /** Runtime and presentation settings. */
     val settings: SettingsPort
 
+    /** Server terminal consent for an authorized administrative connection. */
+    val serverTerminalConsent: TerminalConsentPort? get() = null
+
     /** Recipient-facing open-source license documents bundled with this application build. */
     val openSourceLicenses: OpenSourceLicensePort
 

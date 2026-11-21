@@ -40,6 +40,9 @@ interface DirectoryGrantStore {
     /** Persists a new or updated grant. */
     fun saveDirectoryGrant(record: DirectoryGrantRecord)
 
+    /** Updates an existing grant and returns false if it was revoked. */
+    fun updateDirectoryGrant(record: DirectoryGrantRecord): Boolean
+
     /** Lists grants in stable creation order. */
     fun listDirectoryGrants(): List<DirectoryGrantRecord>
 

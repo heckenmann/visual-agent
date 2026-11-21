@@ -1,5 +1,6 @@
 package de.heckenmann.visualagent.workspace
 
+import de.heckenmann.visualagent.agent.ServerTerminalConsent
 import de.heckenmann.visualagent.knowledge.DirectoryGrantRecord
 import de.heckenmann.visualagent.knowledge.DirectoryGrantStore
 import de.heckenmann.visualagent.protocol.ClientDirectoryCapabilityRegistration
@@ -20,6 +21,7 @@ class DirectoryGrantService(
     private val store: DirectoryGrantStore,
     private val clientCapabilities: ClientDirectoryCapabilityRegistry,
     private val protectedDirectories: VisualAgentProtectedDirectoryPolicy,
+    private val terminalConsent: ServerTerminalConsent? = null,
 ) {
     private val pathPolicy = DirectoryGrantPathPolicy()
     private val serverAuthorization = DirectoryGrantServerAuthorization(::requireServerGrant, pathPolicy)
@@ -107,15 +109,16 @@ class DirectoryGrantService(
     ): DirectoryGrant {
         require(displayName.isNotBlank()) { "Display name must not be blank" }
         val current = requireGrant(id)
-        return current
-            .copy(displayName = displayName.trim(), mode = mode, updatedAt = Instant.now())
-            .also { store.saveDirectoryGrant(it.toRecord()) }
+        val updated = current.copy(displayName = displayName.trim(), mode = mode, updatedAt = Instant.now())
+        val save = { require(store.updateDirectoryGrant(updated.toRecord())) { "Unknown or revoked directory grant" } }
+        if (terminalConsent != null) terminalConsent.changeGrant(id, save) else save()
+        return updated
     }
 
     /** Revokes a grant immediately for every future authorization lookup. */
     fun removeGrant(id: String): Boolean {
         val grant = store.getDirectoryGrant(id)?.toDomain() ?: return false
-        val deleted = store.deleteDirectoryGrant(id)
+        val deleted = terminalConsent?.changeGrant(id) { store.deleteDirectoryGrant(id) } ?: store.deleteDirectoryGrant(id)
         if (deleted && grant.origin == DirectoryGrantOrigin.CLIENT) clientCapabilities.revoke(id)
         return deleted
     }
@@ -303,7 +306,8 @@ class DirectoryGrantService(
     private fun requireGrant(id: String): DirectoryGrant =
         requireNotNull(store.getDirectoryGrant(id)) { "Unknown or revoked directory grant" }.toDomain()
 
-    private fun requireServerGrant(id: String): DirectoryGrant =
+    /** Loads and validates a live server-owned directory grant. */
+    internal fun requireServerGrant(id: String): DirectoryGrant =
         requireGrant(id).also {
             require(it.origin == DirectoryGrantOrigin.SERVER) {
                 "CROSS_ROOT_TRANSFER_UNAVAILABLE: client-owned directories require the file-exchange transport"
@@ -333,18 +337,3 @@ class DirectoryGrantService(
         const val MAX_TEXT_BYTES = 262_144L
     }
 }
-
-private fun DirectoryGrantRecord.toDomain() =
-    DirectoryGrant(
-        id,
-        displayName,
-        canonicalRoot,
-        DirectoryGrantOrigin.valueOf(origin),
-        DirectoryAccessMode.valueOf(mode),
-        ownerClientId,
-        createdAt,
-        updatedAt,
-    )
-
-private fun DirectoryGrant.toRecord() =
-    DirectoryGrantRecord(id, displayName, canonicalRoot, origin.name, mode.name, ownerClientId, createdAt, updatedAt)

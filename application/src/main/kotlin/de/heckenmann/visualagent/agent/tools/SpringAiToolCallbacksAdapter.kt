@@ -98,7 +98,10 @@ class SpringAiToolCallbacksAdapter(
         val requestId = context["requestId"]?.toString()?.takeIf(String::isNotBlank) ?: return null
         val manager = agentManager?.invoke() ?: return null
         val round = turn.metadata.round ?: 0
-        val turnId = AssistantTurnIdentity.forRound(requestId, round)
+        val turnId =
+            (context["providerToolTurnId"] as? String)
+                ?.let { AssistantTurnIdentity.forProviderToolTurn(requestId, it) }
+                ?: AssistantTurnIdentity.forRound(requestId, round)
         manager.recordProviderAssistantTurn(turn, turnId, requestId)
         return turnId
     }

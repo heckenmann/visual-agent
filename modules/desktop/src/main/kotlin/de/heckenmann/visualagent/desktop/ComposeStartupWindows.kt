@@ -152,6 +152,7 @@ internal fun ComposeOnboardingWindow(
                 ComposeOnboardingWizard(
                     onboarding = applicationPort.onboarding,
                     providers = applicationPort.providers,
+                    terminalConsent = applicationPort.serverTerminalConsent,
                     automatic = automatic,
                     onFinished = onFinished,
                     skipRequested = skipRequested,

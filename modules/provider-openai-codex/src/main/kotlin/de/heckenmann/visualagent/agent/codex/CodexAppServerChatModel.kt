@@ -30,6 +30,7 @@ internal class CodexAppServerChatModel(
     private val workingDirectory: Path,
     private val showReasoningSummary: Boolean = false,
     private val responseSchema: ResponseSchema? = null,
+    private val recordToolTurn: ((de.heckenmann.visualagent.agent.ProviderTurnResponse) -> String?)? = null,
 ) : ChatModel {
     /** Spring AI's imperative compatibility method; the provider uses [completeReactive] reactively. */
     override fun call(prompt: Prompt): SpringChatResponse =
@@ -97,6 +98,8 @@ internal class CodexAppServerChatModel(
                             CodexAppServerRequestParams.thread(prompt, model, workingDirectory, toolCallbacks),
                         )
                     val threadId = thread.codexThreadId()
+                    // Older app servers can ignore an unknown thread/start field. Require the settings RPC before starting a turn.
+                    transport.request("thread/settings/update", CodexAppServerRequestParams.disableNativeEnvironment(threadId))
                     val historyItems = CodexAppServerRequestParams.historyItems(prompt)
                     if (historyItems.isNotEmpty()) {
                         transport.request(
@@ -210,16 +213,38 @@ internal class CodexAppServerChatModel(
             return false
         }
         val arguments = request.params["arguments"]?.toString() ?: "{}"
-        val providerCallId = request.params["callId"]?.jsonPrimitive?.contentOrNull ?: request.id
-        val toolContext =
-            ToolContext(
-                mapOf(
-                    "providerToolCallId" to providerCallId,
-                    "toolCallRound" to 0,
-                    "toolCallSequence" to sequence,
-                ),
-            )
-        val result = withContext(Dispatchers.IO) { runCatching { callback.call(arguments, toolContext) } }
+        val providerCallId = request.params["callId"]?.jsonPrimitive?.contentOrNull ?: request.id.toString()
+        val result =
+            withContext(Dispatchers.IO) {
+                runCatching {
+                    val call =
+                        de.heckenmann.visualagent.agent.ProviderToolCall(
+                            providerCallId,
+                            "function",
+                            requireNotNull(toolName),
+                            arguments,
+                        )
+                    val turn =
+                        de.heckenmann.visualagent.agent.ProviderTurnResponse(
+                            model = model,
+                            content = "",
+                            toolCalls = listOf(call),
+                            finishReason = de.heckenmann.visualagent.agent.ProviderFinishReason.TOOL_CALLS,
+                            metadata =
+                                de.heckenmann.visualagent.agent
+                                    .ProviderResponseMetadata(round = sequence),
+                        )
+                    val parent = recordToolTurn?.invoke(turn)
+                    val context =
+                        mutableMapOf<String, Any>(
+                            "providerToolCallId" to providerCallId,
+                            "toolCallRound" to sequence,
+                            "toolCallSequence" to 0,
+                        )
+                    if (parent != null) context["parentAssistantTurnId"] = parent
+                    callback.call(arguments, ToolContext(context))
+                }
+            }
         val allowInlineImage = isWorkspaceImageRequest(toolName, arguments)
         val response =
             if (result.isFailure) {

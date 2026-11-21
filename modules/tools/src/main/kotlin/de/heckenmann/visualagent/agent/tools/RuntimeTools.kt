@@ -3,10 +3,8 @@ package de.heckenmann.visualagent.agent.tools
 import de.heckenmann.visualagent.agent.tools.api.ToolDefinition
 import de.heckenmann.visualagent.agent.tools.api.ToolId
 import de.heckenmann.visualagent.agent.tools.api.ToolResult
+import java.io.InputStream
 import java.nio.charset.StandardCharsets
-import java.nio.file.Files
-import java.nio.file.Path
-import java.nio.file.Paths
 import java.util.concurrent.TimeUnit
 
 /**
@@ -15,16 +13,18 @@ import java.util.concurrent.TimeUnit
  * Use cases: UC-0000021.
  */
 @AgentTool
-class TerminalTool : LiveVisualAgentTool {
+class TerminalTool(
+    private val launcher: TerminalSandboxLauncher? = null,
+) : LiveVisualAgentTool {
     override val definition =
         ToolDefinition(
             id = ToolId("terminal"),
             name = ToolId("terminal").toFunctionName(),
             description =
-                "Run a non-interactive shell command in the workspace directory. " +
-                    "Input: {\"command\":\"ls -la\"}. Returns stdout + stderr combined. " +
-                    "Exit code is included in the result. Use for building, testing, git, and file operations.",
-            inputSchema = STRING_SCHEMA,
+                "Run a non-interactive shell command on the application server. " +
+                    "Returns combined stdout and stderr and the exit status.",
+            inputSchema =
+                """{"type":"object","properties":{"target":{"type":"string","enum":["server"]},"command":{"type":"string"},"grantId":{"type":"string"},"workingDirectory":{"type":"string"}},"required":["target","command"],"additionalProperties":false}""",
         )
 
     override fun execute(
@@ -47,72 +47,101 @@ class TerminalTool : LiveVisualAgentTool {
     ): ToolResult {
         val input = parseObject(inputJson)
         val command = input.requiredString("command")
+        val target = input.requiredString("target")
+        val host =
+            when (target) {
+                "server" -> TerminalHost.SERVER
+                "client" -> TerminalHost.CLIENT
+                else -> return failure("terminal", "INVALID_TARGET: Select server or client.")
+            }
+        val request = TerminalSandboxRequest(host, command, input.string("grantId"), input.string("workingDirectory"))
         val process =
-            ProcessBuilder(shellCommand(command))
-                .directory(terminalWorkspaceRoot().toFile())
-                .redirectErrorStream(true)
-                .start()
+            launcher?.launch(request, context)
+                ?: return failure("terminal", "SANDBOX_UNAVAILABLE: Terminal execution is unavailable on the selected target.")
         val cancellationRegistration =
-            (context["toolCancellationToken"] as? ToolCancellationToken)?.onCancelled { destroyProcessTree(process) }
+            (context["toolCancellationToken"] as? ToolCancellationToken)?.onCancelled { process.cancel() }
         val output = StringBuilder()
         val recent = TerminalLiveLog()
-        try {
-            reporter?.report(
-                de.heckenmann.visualagent.model
-                    .ToolLiveState("", 0, "Running command"),
-            )
-            process.inputStream.reader(StandardCharsets.UTF_8).use { reader ->
-                val chunk = CharArray(512)
-                var count = reader.read(chunk)
-                while (count >= 0) {
-                    if (output.length < 8000) output.append(chunk, 0, count.coerceAtMost(8000 - output.length))
-                    recent.append(chunk, count)
-                    reporter?.report(
-                        de.heckenmann.visualagent.model
-                            .ToolLiveState("", 0, "Running command", logs = recent.snapshot()),
-                    )
-                    count = reader.read(chunk)
+        var completed = false
+        val exitCode =
+            try {
+                reporter?.report(
+                    de.heckenmann.visualagent.model
+                        .ToolLiveState("", 0, "Running command on $target"),
+                )
+                process.output.reader(StandardCharsets.UTF_8).use { reader ->
+                    val chunk = CharArray(512)
+                    var count = reader.read(chunk)
+                    while (count >= 0) {
+                        if (output.length < 8000) output.append(chunk, 0, count.coerceAtMost(8000 - output.length))
+                        recent.append(chunk, count)
+                        reporter?.report(
+                            de.heckenmann.visualagent.model
+                                .ToolLiveState("", 0, "Running command", logs = recent.snapshot()),
+                        )
+                        count = reader.read(chunk)
+                    }
                 }
+                process.awaitExit().also { completed = true }
+            } catch (_: InterruptedException) {
+                Thread.currentThread().interrupt()
+                return failure("terminal", "TOOL_CANCELLED: Command execution was cancelled.")
+            } finally {
+                cancellationRegistration?.close()
+                if (!completed) process.cancel()
             }
-            process.waitFor()
-        } catch (_: InterruptedException) {
-            destroyProcessTree(process)
-            Thread.currentThread().interrupt()
-            return failure("terminal", "TOOL_CANCELLED: Command execution was cancelled.")
-        } finally {
-            cancellationRegistration?.close()
-        }
         return ToolResult(
             "terminal",
-            process.exitValue() == 0,
-            output.toString(),
-            if (process.exitValue() == 0) null else "Exit ${process.exitValue()}",
+            exitCode == 0,
+            "Target: $target\nExit code: $exitCode\n$output",
+            if (exitCode == 0) null else "Exit $exitCode",
         )
-    }
-
-    private fun shellCommand(command: String): List<String> {
-        val shell =
-            listOf("zsh", "bash", "sh")
-                .firstOrNull(::isExecutableOnPath) ?: "sh"
-        return listOf(shell, "-lc", command)
-    }
-
-    private fun destroyProcessTree(process: Process) {
-        process.toHandle().descendants().forEach { descendant -> descendant.destroyForcibly() }
-        process.destroyForcibly()
-    }
-
-    private fun isExecutableOnPath(command: String): Boolean {
-        val path = System.getenv("PATH").orEmpty()
-        return path
-            .split(java.io.File.pathSeparator)
-            .asSequence()
-            .map { Path.of(it, command) }
-            .any { Files.isExecutable(it) }
     }
 }
 
-private fun terminalWorkspaceRoot(): Path = Paths.get(System.getProperty("user.dir")).toAbsolutePath().normalize()
+/** Host role selected for a terminal invocation. */
+enum class TerminalHost {
+    /** The host running the Visual Agent server. */
+    SERVER,
+
+    /** The desktop associated with the current request. */
+    CLIENT,
+}
+
+/**
+ * Model input for one sandbox invocation. The selected host must authorize the grant and resolve the working directory.
+ */
+data class TerminalSandboxRequest(
+    /** Requested host role. */
+    val target: TerminalHost,
+    /** Shell script to execute inside the sandbox. */
+    val command: String,
+    /** Optional opaque directory grant identifier. */
+    val grantId: String?,
+    /** Optional working directory relative to the authorized root. */
+    val workingDirectory: String?,
+)
+
+/** Starts an authorized terminal command with the sandbox enforced on the selected host. */
+fun interface TerminalSandboxLauncher {
+    /** Returns the running sandbox process with merged output, or null when execution is unavailable. */
+    fun launch(
+        request: TerminalSandboxRequest,
+        context: Map<String, Any>,
+    ): TerminalSandboxExecution?
+}
+
+/** One terminal invocation on the selected host, including its output and cancellation channel. */
+interface TerminalSandboxExecution {
+    /** Combined standard output and standard error. */
+    val output: InputStream
+
+    /** Waits for the invocation and returns its exit code. */
+    fun awaitExit(): Int
+
+    /** Stops the entire sandbox, including descendants, or throws if termination cannot be confirmed. */
+    fun cancel()
+}
 
 /**
  * Placeholder tool for browser automation when no browser backend is configured.

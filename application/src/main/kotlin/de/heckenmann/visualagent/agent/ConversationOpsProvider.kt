@@ -103,14 +103,15 @@ class ConversationOpsProvider(
         checkNotNull(persistMessage) { "persistMessage not wired; ensure AgentManager.init completed" }(message)
 
     /**
-     * Registers a listener on the [ToolEventBus] that collects finished tool-call events
-     * keyed by request ID. Returns an [AutoCloseable] handle to remove the listener.
+     * Persists main-agent tool history and collects finished tool calls for response processing.
      */
-    fun registerToolEventListener(): AutoCloseable =
+    fun registerToolEventListener(recordToolCall: (ToolCallEvent) -> Unit): AutoCloseable =
         toolEventBus.addListener { event ->
-            if (event.phase != ToolCallPhase.FINISHED) return@addListener
             val requestId = event.context["requestId"]?.toString().orEmpty()
             if (requestId.isBlank()) return@addListener
-            finishedToolEventsByRequestId.computeIfAbsent(requestId) { mutableListOf() }.add(event)
+            if (event.context["agent"] == "main" && event.phase != ToolCallPhase.UPDATED) recordToolCall(event)
+            if (event.phase == ToolCallPhase.FINISHED) {
+                finishedToolEventsByRequestId.computeIfAbsent(requestId) { mutableListOf() }.add(event)
+            }
         }
 }

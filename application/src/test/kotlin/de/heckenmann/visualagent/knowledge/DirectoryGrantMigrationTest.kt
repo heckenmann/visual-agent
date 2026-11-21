@@ -34,6 +34,8 @@ class DirectoryGrantMigrationTest {
             db.directoryGrantStore.saveDirectoryGrantReactive(updated).block()
             assertEquals(updated, db.directoryGrantStore.getDirectoryGrantReactive("grant-1").block())
             assertTrue(db.directoryGrantStore.deleteDirectoryGrantReactive("grant-1").block() == true)
+            assertFalse(db.directoryGrantStore.updateDirectoryGrant(updated.copy(mode = "READ_ONLY")))
+            assertEquals(null, db.directoryGrantStore.getDirectoryGrant("grant-1"))
             assertFalse(db.directoryGrantStore.deleteDirectoryGrant("grant-1"))
         } finally {
             db.close()

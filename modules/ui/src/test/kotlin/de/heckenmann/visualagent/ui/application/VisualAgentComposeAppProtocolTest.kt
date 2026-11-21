@@ -168,6 +168,7 @@ class VisualAgentComposeAppProtocolTest {
         every { activity.addToolListener(any()) } returns AutoCloseable { }
         every { activity.addAgentListener(any()) } returns AutoCloseable { }
         val application = mockk<ApplicationPort>()
+        every { application.serverTerminalConsent } returns null
         every { application.conversation } returns conversation
         every { application.conversationSuggestions } returns mockk<ConversationSuggestionPort>(relaxed = true)
         every { application.todos } returns todos
