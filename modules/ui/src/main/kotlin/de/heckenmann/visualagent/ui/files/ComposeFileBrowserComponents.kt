@@ -73,6 +73,7 @@ internal fun WorkspaceDownloadRow(
     onPause: () -> Unit,
     onResume: () -> Unit,
     onCancel: () -> Unit,
+    controlsEnabled: Boolean = true,
 ) {
     PanelContentCard(modifier = Modifier.fillMaxWidth()) {
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -90,11 +91,21 @@ internal fun WorkspaceDownloadRow(
             }
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 if (download.state == WorkspaceDownloadState.PAUSED) {
-                    ActionIconButton(icon = Icons.Filled.PlayArrow, description = "Resume download", onClick = onResume)
+                    ActionIconButton(
+                        icon = Icons.Filled.PlayArrow,
+                        description = "Resume download",
+                        onClick = onResume,
+                        enabled = controlsEnabled,
+                    )
                 } else {
-                    ActionIconButton(icon = Icons.Filled.Pause, description = "Pause download", onClick = onPause)
+                    ActionIconButton(
+                        icon = Icons.Filled.Pause,
+                        description = "Pause download",
+                        onClick = onPause,
+                        enabled = controlsEnabled,
+                    )
                 }
-                ActionIconButton(icon = Icons.Filled.Close, description = "Cancel download", onClick = onCancel)
+                ActionIconButton(icon = Icons.Filled.Close, description = "Cancel download", onClick = onCancel, enabled = controlsEnabled)
             }
         }
     }

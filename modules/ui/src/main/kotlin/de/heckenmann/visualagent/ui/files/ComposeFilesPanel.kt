@@ -45,7 +45,10 @@ import de.heckenmann.visualagent.ui.workspace.*
 import io.github.vinceglb.filekit.PlatformFile
 import io.github.vinceglb.filekit.dialogs.compose.rememberFilePickerLauncher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.File
 
@@ -74,26 +77,29 @@ internal fun FilesPanel(
     var status by remember { mutableStateOf("Loading workspace…") }
     var downloads by remember { mutableStateOf(emptyList<WorkspaceDownload>()) }
     val scope = rememberCoroutineScope()
+    val refreshLock = remember { Mutex() }
 
     /** Refreshes workspace metadata and active download state off the UI thread. */
-    suspend fun refreshWorkspace() {
-        val snapshot =
-            withContext(Dispatchers.IO) {
-                WorkspaceBrowserSnapshot(
-                    workspaceFileService.listFiles(),
-                    workspaceFileService.listDirectories(),
-                    workspaceFileService.activeDownloads(),
-                    workspaceFileService.workspaceRoot(),
-                )
-            }
-        files = snapshot.files
-        directories = snapshot.directories
-        downloads = snapshot.downloads
-        if (status == "Loading workspace…") status = "Workspace: ${snapshot.root}"
-    }
-    val refresh: () -> Unit = {
-        scope.launch { refreshWorkspace() }
-    }
+    suspend fun refreshWorkspace() =
+        refreshLock.withLock {
+            val snapshot =
+                withContext(Dispatchers.IO) {
+                    WorkspaceBrowserSnapshot(
+                        workspaceFileService.listFiles(),
+                        workspaceFileService.listDirectories(),
+                        workspaceFileService.activeDownloads(),
+                        workspaceFileService.workspaceRoot(),
+                    )
+                }
+            files = snapshot.files
+            directories = snapshot.directories
+            downloads = snapshot.downloads
+            if (status == "Loading workspace…") status = "Workspace: ${snapshot.root}"
+        }
+
+    val downloadControls = rememberDownloadControls(workspaceFileService, ::refreshWorkspace) { status = it }
+    val refreshRequests = remember(workspaceFileService) { Channel<Unit>(Channel.CONFLATED) }
+    val refresh: () -> Unit = { refreshRequests.trySend(Unit) }
     val requestedArtifact = LocalWorkspaceArtifactPath.current?.value
     LaunchedEffect(requestedArtifact) {
         requestedArtifact?.let { path ->
@@ -103,7 +109,10 @@ internal fun FilesPanel(
             refreshWorkspace()
         }
     }
-    LaunchedEffect(workspaceFileService) { refreshWorkspace() }
+    LaunchedEffect(refreshRequests) {
+        refreshWorkspace()
+        for (request in refreshRequests) refreshWorkspace()
+    }
     DisposableEffect(workspaceFileService) {
         val downloadHandle =
             workspaceFileService.addDownloadListener {
@@ -114,6 +123,7 @@ internal fun FilesPanel(
                 refresh()
             }
         onDispose {
+            refreshRequests.close()
             downloadHandle.close()
             activityHandle.close()
         }
@@ -249,9 +259,10 @@ internal fun FilesPanel(
                 currentDownloads.forEach { download ->
                     WorkspaceDownloadRow(
                         download = download,
-                        onPause = { workspaceFileService.pauseDownload(download.id) },
-                        onResume = { workspaceFileService.resumeDownload(download.id) },
-                        onCancel = { workspaceFileService.cancelDownload(download.id) },
+                        controlsEnabled = downloadControls.isEnabled(download.id),
+                        onPause = { downloadControls.run(download.id, "pause") { workspaceFileService.pauseDownload(download.id) } },
+                        onResume = { downloadControls.run(download.id, "resume") { workspaceFileService.resumeDownload(download.id) } },
+                        onCancel = { downloadControls.run(download.id, "cancel") { workspaceFileService.cancelDownload(download.id) } },
                     )
                 }
                 visibleFiles.forEach { file ->
