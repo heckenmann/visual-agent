@@ -244,6 +244,13 @@ class CodexAppServerChatModelTest {
                   request_id=${'$'}(printf '%s' "${'$'}line" | sed -n 's/.*"id":\([0-9][0-9]*\).*/\1/p')
                   printf '{"jsonrpc":"2.0","id":%s,"result":{"thread":{"id":"thread-1"}}}\n' "${'$'}request_id"
                   ;;
+                *'"method":"thread/settings/update"'*)
+                  request_id=${'$'}(printf '%s' "${'$'}line" | sed -n 's/.*"id":\([0-9][0-9]*\).*/\1/p')
+                  case "${'$'}line" in
+                    *'"environments":[]'*) printf '{"jsonrpc":"2.0","id":%s,"result":{}}\n' "${'$'}request_id" ;;
+                    *) printf '{"jsonrpc":"2.0","id":%s,"error":{"code":-32602,"message":"Native environment must be disabled"}}\n' "${'$'}request_id" ;;
+                  esac
+                  ;;
                 *'"method":"thread/inject_items"'*)
                   printf '%s' "${'$'}line" > '${directory.resolve("history-inject.json")}'
                   request_id=${'$'}(printf '%s' "${'$'}line" | sed -n 's/.*"id":\([0-9][0-9]*\).*/\1/p')

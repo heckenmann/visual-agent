@@ -43,6 +43,7 @@ class CodexAppServerRequestParamsTest {
 
         val thread = CodexAppServerRequestParams.thread(prompt, "model", Path.of("."), emptyList())
         val baseInstructions = thread.getValue("baseInstructions").jsonPrimitive.content
+        assertTrue(thread.getValue("environments").jsonArray.isEmpty())
         val providerConfig = thread.getValue("config").jsonObject
         val history = CodexAppServerRequestParams.historyItems(prompt)
         val turn = CodexAppServerRequestParams.turn(prompt, "thread", "model", false, null)

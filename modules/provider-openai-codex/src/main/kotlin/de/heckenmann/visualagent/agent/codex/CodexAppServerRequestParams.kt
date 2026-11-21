@@ -34,6 +34,7 @@ internal object CodexAppServerRequestParams {
             put("sandbox", JsonPrimitive("read-only"))
             put("approvalPolicy", JsonPrimitive("never"))
             put("ephemeral", JsonPrimitive(true))
+            put("environments", JsonArray(emptyList()))
             put(
                 "config",
                 buildJsonObject {
@@ -58,6 +59,13 @@ internal object CodexAppServerRequestParams {
                     }
                 },
             )
+        }
+
+    /** Disables native execution and requires an app server that understands environment settings. */
+    fun disableNativeEnvironment(threadId: String): JsonObject =
+        buildJsonObject {
+            put("threadId", JsonPrimitive(threadId))
+            put("environments", JsonArray(emptyList()))
         }
 
     /** Builds a turn request, optionally appending one inline image user input. */

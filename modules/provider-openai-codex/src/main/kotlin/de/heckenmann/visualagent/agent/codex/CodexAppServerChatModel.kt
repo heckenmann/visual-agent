@@ -97,6 +97,8 @@ internal class CodexAppServerChatModel(
                             CodexAppServerRequestParams.thread(prompt, model, workingDirectory, toolCallbacks),
                         )
                     val threadId = thread.codexThreadId()
+                    // Older app servers can ignore an unknown thread/start field. Require the settings RPC before starting a turn.
+                    transport.request("thread/settings/update", CodexAppServerRequestParams.disableNativeEnvironment(threadId))
                     val historyItems = CodexAppServerRequestParams.historyItems(prompt)
                     if (historyItems.isNotEmpty()) {
                         transport.request(
