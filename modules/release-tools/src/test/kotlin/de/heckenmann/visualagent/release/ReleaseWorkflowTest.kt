@@ -124,6 +124,56 @@ class ReleaseWorkflowTest {
     }
 
     @Test
+    fun `published release recovery requires a numeric source run before GitHub access`() {
+        val result = fixture.run("attach-published-release-assets.sh", "SOURCE_RUN_ID" to "44947970996;echo unsafe")
+
+        assertTrue(result.first != 0)
+        assertTrue(result.second.contains("must be numeric"))
+        assertEquals("", fixture.log())
+    }
+
+    @Test
+    fun `published release recovery uploads only verified assets from the failed tag run`() {
+        fixture.preparePublishedRecovery()
+        val result =
+            fixture.run(
+                "attach-published-release-assets.sh",
+                "EXISTING" to "published",
+                "INITIAL_ASSETS" to """[[{"id":41,"name":"visual-agent-windows.msi","state":"starter","size":0}]]""",
+            )
+
+        assertEquals(0, result.first, result.second)
+        assertTrue(result.second.contains("Published release v1.2.3 has all twelve verified assets."))
+        assertEquals(13, Regex("actions/artifacts/\\d+/zip").findAll(fixture.log()).count())
+        assertTrue(fixture.log().contains("api -X DELETE repos/owner/repo/releases/assets/41"))
+        assertTrue(fixture.log().contains("release upload v1.2.3"))
+        assertFalse(fixture.log().contains("--clobber"))
+        assertFalse(fixture.log().contains("release edit"))
+        assertFalse(fixture.log().contains("PATCH"))
+    }
+
+    @Test
+    fun `published release recovery stops when the source run restarts`() {
+        fixture.preparePublishedRecovery()
+        val result = fixture.run("attach-published-release-assets.sh", "CURRENT_ATTEMPT" to "2")
+
+        assertTrue(result.second.contains("Source run was restarted"))
+        assertFalse(fixture.log().contains("actions/artifacts/"))
+        assertFalse(fixture.log().contains("release upload"))
+    }
+
+    @Test
+    fun `published release recovery is an Actions workflow that consumes a source run ID`() {
+        val workflow = Files.readString(fixture.repository.resolve(".github/workflows/recover-published-release-assets.yml"))
+
+        assertTrue(workflow.contains("workflow_dispatch:"))
+        assertTrue(workflow.contains("source_run_id:"))
+        assertTrue(workflow.contains("contents: write"))
+        assertTrue(workflow.contains("scripts/attach-published-release-assets.sh"))
+        assertFalse(workflow.contains("gh release upload"))
+    }
+
+    @Test
     fun `prerelease and build metadata classification is preserved`() {
         val preview = fixture.run(overrides = arrayOf("RELEASE_TAG" to "v1.2.3-beta.1+build.7", "PREVIEW" to "true"))
         assertEquals(0, preview.first, preview.second)

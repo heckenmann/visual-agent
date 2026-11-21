@@ -33,6 +33,14 @@ Release workflow.
 10. It verifies the asset set, creates or reuses the matching draft, and attaches only the verified files. Existing notes and unrelated assets survive retries; published releases are rejected.
 11. The maintainer inspects the populated draft and publishes using GitHub's UI. Manual dispatch never executes the draft job.
 
+If the release was published through GitHub before step 10 and the only failed job
+is the published-state guard, the maintainer can dispatch
+**Recover verified assets for published release** with the source run ID. That
+Action accepts only the original completed tag-push run after all build, legal/source
+material, and smoke jobs passed. It downloads only that run's files, appends missing
+assets without replacing mismatched files, verifies all twelve uploads, and leaves
+the published release metadata unchanged. It performs no local upload.
+
 ## Result
 
 Every published native installer, portable Linux package, and platform-specific JAR has passed an actual application startup check on a compatible operating system. Native packages are launched without relying on a separately installed JDK.
