@@ -18,7 +18,7 @@ import kotlin.test.assertFailsWith
 /** Verifies provider routing and capability checks for image analysis. */
 class ConfiguredLLMProviderVisionTest {
     @Test
-    fun `global vision uses the assigned Ollama profile`() =
+    fun `global vision uses the assigned Ollama profile only while enabled and selectable`() =
         runTest {
             val catalog = catalog()
             val profile =
@@ -42,6 +42,11 @@ class ConfiguredLLMProviderVisionTest {
                     .awaitSingle()
                     .message.content,
             )
+            catalog.saveProvider(profile.copy(modelBlacklist = setOf("llava")))
+            assertFailsWith<IllegalStateException> { router.visionReactive(byteArrayOf(1), "describe").awaitSingle() }
+            catalog.saveProvider(profile.copy(enabled = false))
+            assertFailsWith<IllegalStateException> { router.visionReactive(byteArrayOf(1), "describe").awaitSingle() }
+            io.mockk.verify(exactly = 1) { ollama.visionReactive(any(), "describe", "llava", profile) }
         }
 
     @Test

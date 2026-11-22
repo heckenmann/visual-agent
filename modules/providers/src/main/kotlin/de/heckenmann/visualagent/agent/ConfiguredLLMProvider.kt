@@ -56,11 +56,18 @@ class ConfiguredLLMProvider(
         Mono
             .fromCallable {
                 val selected = providerCatalog.taskModelAssignment(ModelCapability.VISION)
-                val providerId = selected?.first ?: providerCatalog.activeProviderId()
+                if (selected != null) {
+                    val resolved = providerCatalog.resolve(selected.first, selected.second)
+                    require(resolved.model.supportsCapability(ModelCapability.VISION)) {
+                        "Model '${selected.first}/${selected.second}' does not support VISION"
+                    }
+                    return@fromCallable resolved.provider to resolved.model.id
+                }
+                val providerId = providerCatalog.activeProviderId()
                 val profile =
                     providerCatalog.getProvider(providerId)
                         ?: error("Active provider profile is missing: $providerId")
-                val modelId = selected?.second ?: providerCatalog.activeModelId().ifBlank { profile.defaultModel }
+                val modelId = providerCatalog.activeModelId().ifBlank { profile.defaultModel }
                 requireVisionCapability(profile, modelId)
                 profile to modelId
             }.subscribeOn(Schedulers.boundedElastic())
