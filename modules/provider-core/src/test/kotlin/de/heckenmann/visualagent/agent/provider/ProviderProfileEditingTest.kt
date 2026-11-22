@@ -37,6 +37,19 @@ class ProviderProfileEditingTest {
         assertEquals(profiles, catalog.listProviders())
     }
 
+    @Test fun `an unavailable assignment does not prevent provider edits and can be cleared`() {
+        val catalog = catalog()
+        val provider = catalog.getProvider("ollama")!!
+        catalog.saveProvider(provider.copy(models = listOf(ProviderModelConfig("vision", capabilities = setOf("vision")))))
+        assertEquals("ollama" to "vision", catalog.taskModelAssignment(ModelCapability.VISION))
+        catalog.updateDiscoveredModels("ollama", emptyList())
+        val baseline = catalog.listProviders()
+        catalog.replaceProfiles(baseline.map { it.copy(name = "Updated ${it.name}") }, baseline)
+        val assignments = catalog.taskModelAssignments()
+        catalog.replaceTaskModelAssignments(assignments - "VISION", assignments)
+        assertEquals(null, catalog.taskModelAssignment(ModelCapability.VISION))
+    }
+
     private fun catalog(): ProviderCatalogService =
         ProviderCatalogService(
             object : ProviderPreferenceStore {

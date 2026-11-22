@@ -20,6 +20,7 @@ import de.heckenmann.visualagent.protocol.ProviderPort
 import de.heckenmann.visualagent.protocol.ProviderProfile
 import de.heckenmann.visualagent.protocol.ProviderSignInResult
 import de.heckenmann.visualagent.protocol.ProviderSignInSession
+import de.heckenmann.visualagent.protocol.TaskModelAssignment
 import de.heckenmann.visualagent.protocol.UserFacingError
 import kotlinx.coroutines.reactor.awaitSingle
 import kotlinx.coroutines.reactor.awaitSingleOrNull
@@ -74,6 +75,13 @@ class SpringProviderPort(
             expectedProfiles.map { it.toApplication() },
         )
     }
+
+    override fun taskModelAssignments(): List<TaskModelAssignment> = protocolBoundary { providerCatalog.taskModelAssignmentsToProtocol() }
+
+    override fun replaceTaskModelAssignments(
+        assignments: List<TaskModelAssignment>,
+        expectedAssignments: List<TaskModelAssignment>,
+    ) = protocolBoundary { providerCatalog.replaceTaskModelAssignmentsFromProtocol(assignments, expectedAssignments) }
 
     override fun deleteProvider(providerId: String): Boolean = protocolBoundary { providerCatalog.deleteProvider(providerId) }
 

@@ -276,7 +276,14 @@ data class SubAgent(
             options = modelSelection.options,
             enabledTools = enabledTools,
             metadata =
-                executionMetadata + mapOf("agentId" to id, "agentName" to name, "agentRole" to role, "modelCapability" to capability.name) +
+                executionMetadata +
+                    mapOf(
+                        "agentId" to id,
+                        "agentName" to name,
+                        "agentRole" to role,
+                        "modelCapability" to capability.name,
+                        "capabilityModelExplicit" to (config.capabilityModels[capability]?.isNotBlank() == true),
+                    ) +
                     requestId?.let { mapOf("requestId" to it, "sessionId" to AgentManagerConstants.MAIN_SESSION_ID) }.orEmpty(),
             cancellationToken = token,
             responseSchema = executionMetadata["taskResponseSchema"] as? ResponseSchema,

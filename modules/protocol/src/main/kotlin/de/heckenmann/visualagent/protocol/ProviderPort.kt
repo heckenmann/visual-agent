@@ -38,6 +38,15 @@ interface ProviderPort {
         expectedProfiles: List<ProviderProfile>,
     ): Unit = throw UnsupportedOperationException("Provider catalog editing is unavailable")
 
+    /** Lists application-wide model choices for task capabilities. */
+    fun taskModelAssignments(): List<TaskModelAssignment> = emptyList()
+
+    /** Saves application-wide task model choices against the previously loaded baseline. */
+    fun replaceTaskModelAssignments(
+        assignments: List<TaskModelAssignment>,
+        expectedAssignments: List<TaskModelAssignment>,
+    ): Unit = throw UnsupportedOperationException("Task model assignment editing is unavailable")
+
     /** Deletes a provider profile when the catalog allows it. */
     fun deleteProvider(providerId: String): Boolean
 
@@ -82,6 +91,13 @@ interface ProviderPort {
     suspend fun signOutDirectProvider(profile: ProviderProfile): Boolean =
         throw UnsupportedOperationException("Direct provider authorization is unavailable")
 }
+
+/** Provider-qualified application-wide model choice for one task capability. */
+data class TaskModelAssignment(
+    val capability: String,
+    val providerId: String,
+    val modelId: String,
+)
 
 /** Browser instructions; authorization URLs may contain identity hints and must never be logged. */
 data class ProviderSignInSession(

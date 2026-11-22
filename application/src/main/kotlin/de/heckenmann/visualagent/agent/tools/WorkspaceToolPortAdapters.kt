@@ -228,8 +228,12 @@ class WorkspaceFileToolPortAdapter(
         val bytes = files.imageBytes(requireRecord(file))
         return llmProvider
             .getObject()
-            .visionReactive(Base64.getDecoder().decode(bytes.base64), prompt, selection)
-            .map { response -> ToolImageAnalysis(response.model, response.message.content) }
+            .visionReactive(
+                Base64.getDecoder().decode(bytes.base64),
+                prompt,
+                selection,
+                useTaskDefault = agent.config.capabilityModels[ModelCapability.VISION].isNullOrBlank(),
+            ).map { response -> ToolImageAnalysis(response.model, response.message.content) }
     }
 
     override fun detectMimeType(file: ToolWorkspaceFile): ToolMimeType =

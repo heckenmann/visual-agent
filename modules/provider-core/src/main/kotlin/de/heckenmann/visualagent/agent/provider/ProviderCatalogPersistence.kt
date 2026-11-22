@@ -12,6 +12,14 @@ internal data class CatalogState(
     val activeProviderId: String = "ollama",
     val activeModelId: String = "",
     val providers: List<ProviderProfile> = emptyList(),
+    val taskModelAssignments: Map<String, CatalogModelSelection> = emptyMap(),
+)
+
+/** Provider-qualified model selected for one application-wide task capability. */
+@Serializable
+internal data class CatalogModelSelection(
+    val providerId: String,
+    val modelId: String,
 )
 
 /** Recomputes mutations against fresh database state after a compare-and-set conflict. */

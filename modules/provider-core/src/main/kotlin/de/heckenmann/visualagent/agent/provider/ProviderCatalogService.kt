@@ -37,6 +37,7 @@ class ProviderCatalogService(
         ensureBuiltInProfiles()
         migrateBuiltInCodexProfile()
         normalizeActiveCodexSelection()
+        mutate { it }
     }
 
     /**
@@ -59,6 +60,43 @@ class ProviderCatalogService(
      * Use cases: UC-0000008.
      */
     fun getProvider(id: String): ProviderProfile? = listProviders().firstOrNull { it.id == id }
+
+    /** Returns the configured application-wide model for one task capability. */
+    fun taskModelAssignment(capability: ModelCapability): Pair<String, String>? =
+        load().taskModelAssignments[capability.name]?.let { it.providerId to it.modelId }
+
+    /** Returns all configured application-wide task model assignments. */
+    fun taskModelAssignments(): Map<String, Pair<String, String>> =
+        load().taskModelAssignments.mapValues { (_, selection) -> selection.providerId to selection.modelId }
+
+    /** Replaces application-wide task model assignments against the UI's catalog baseline. */
+    fun replaceTaskModelAssignments(
+        assignments: Map<String, Pair<String, String>>,
+        expectedAssignments: Map<String, Pair<String, String>>,
+    ) {
+        val proposed = assignments.mapValues { (_, selection) -> CatalogModelSelection(selection.first, selection.second) }
+        mutate { current ->
+            val baseline = expectedAssignments.mapValues { (_, selection) -> CatalogModelSelection(selection.first, selection.second) }
+            check(current.taskModelAssignments == baseline) { "Task model assignments changed elsewhere. Reload before saving." }
+            validateTaskModelAssignments(proposed.filter { (key, value) -> current.taskModelAssignments[key] != value }, current.providers)
+            current.copy(taskModelAssignments = proposed)
+        }
+    }
+
+    private fun validateTaskModelAssignments(
+        assignments: Map<String, CatalogModelSelection>,
+        profiles: List<ProviderProfile>,
+    ) {
+        assignments.forEach { (capabilityName, selection) ->
+            val capability = ModelCapability.valueOf(capabilityName)
+            val profile = profiles.firstOrNull { it.id == selection.providerId && it.enabled }
+            require(profile != null) { "Provider is missing or disabled: ${selection.providerId}" }
+            val model = profile.selectableModels().firstOrNull { it.id == selection.modelId }
+            require(model?.supportsCapability(capability) == true) {
+                "Model '${selection.providerId}/${selection.modelId}' does not support $capability"
+            }
+        }
+    }
 
     /**
      * Inserts or replaces a provider profile.
@@ -98,7 +136,9 @@ class ProviderCatalogService(
      */
     fun replaceConfiguration(configuration: ProviderConfiguration) {
         val proposed = validatedCatalogState(configuration)
-        mutate { current -> proposed.withAuthoritativeCredentials(current) }
+        mutate { current ->
+            proposed.copy(taskModelAssignments = current.taskModelAssignments).withAuthoritativeCredentials(current)
+        }
     }
 
     /** Saves profile edits against their database baseline without replacing a concurrent model selection. */
@@ -127,8 +167,12 @@ class ProviderCatalogService(
     fun replaceConfigurationReactive(configuration: ProviderConfiguration): Mono<Void> {
         val state = validatedCatalogState(configuration)
         return persistence
-            .mutateReactive { current -> state.withAuthoritativeCredentials(current) }
-            .flatMap { notifications.publishReactive() }
+            .mutateReactive { current ->
+                state
+                    .copy(taskModelAssignments = current.taskModelAssignments)
+                    .withAutomaticTaskModelAssignments()
+                    .withAuthoritativeCredentials(current)
+            }.flatMap { notifications.publishReactive() }
     }
 
     private fun validatedCatalogState(configuration: ProviderConfiguration): CatalogState {
@@ -409,7 +453,7 @@ class ProviderCatalogService(
     private fun mutate(transform: (CatalogState) -> CatalogState) {
         var changed = false
         persistence.mutate { current ->
-            transform(current).also { changed = it != current }
+            transform(current).withAutomaticTaskModelAssignments().also { changed = it != current }
         }
         if (changed) notifications.publish()
     }
