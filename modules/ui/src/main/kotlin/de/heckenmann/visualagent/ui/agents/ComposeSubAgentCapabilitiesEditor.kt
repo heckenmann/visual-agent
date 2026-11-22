@@ -14,6 +14,7 @@ import de.heckenmann.visualagent.protocol.capabilitySupport
 import de.heckenmann.visualagent.ui.components.PanelCheckbox
 import de.heckenmann.visualagent.ui.components.PanelDropdownField
 import de.heckenmann.visualagent.ui.components.PanelSelectOption
+import de.heckenmann.visualagent.ui.settings.selectableModels
 
 /** Specialized capabilities that may be enabled independently of the mandatory CHAT capability. */
 internal val SPECIALIZED_MODEL_CAPABILITIES =
@@ -40,13 +41,10 @@ internal fun SubAgentCapabilitiesEditor(
             providers
                 .filter { it.enabled }
                 .flatMap { profile ->
-                    profile.models
-                        .filter { model ->
-                            model.id !in profile.modelBlacklist &&
-                                (profile.modelWhitelist.isEmpty() || model.id in profile.modelWhitelist) &&
-                                model.status.name !in setOf("DEPRECATED", "DISABLED") &&
-                                model.capabilitySupport(capability) == CapabilitySupport.SUPPORTED
-                        }.map { model ->
+                    profile
+                        .selectableModels()
+                        .filter { it.capabilitySupport(capability) == CapabilitySupport.SUPPORTED }
+                        .map { model ->
                             PanelSelectOption("${profile.id}::${model.id}", "${model.name} (${profile.name} — $capability)")
                         }
                 }
@@ -66,10 +64,14 @@ internal fun SubAgentCapabilitiesEditor(
                     PanelDropdownField(
                         label = "$capability model",
                         selectedValue = capabilityModels[capability].orEmpty(),
-                        options = listOf(PanelSelectOption("", "Choose a capable model")) + eligible,
-                        onSelected = { model -> onModelsChanged(capabilityModels + (capability to model)) },
-                        enabled = eligible.isNotEmpty(),
-                        information = "Only catalog models declaring $capability can be selected.",
+                        options = listOf(PanelSelectOption("", "Use default model")) + eligible,
+                        onSelected = { model ->
+                            onModelsChanged(
+                                if (model.isBlank()) capabilityModels - capability else capabilityModels + (capability to model),
+                            )
+                        },
+                        enabled = eligible.isNotEmpty() || capability in capabilityModels,
+                        information = "Override the default with a catalog model declaring $capability.",
                     )
                     if (eligible.isEmpty()) {
                         Text("No $capability model is available. Enable it in the provider catalog first.")
@@ -84,27 +86,23 @@ internal fun SubAgentCapabilitiesEditor(
     }
 }
 
-/** Ensures every specialized enabled feature refers to a visible, capable catalog model. */
+/** Ensures each explicit override refers to an enabled capability and a selectable model. */
 internal fun validCapabilityAssignments(
     enabled: Set<String>,
     selected: Map<String, String>,
     providers: List<ProviderProfile>,
 ): Boolean =
     "CHAT" in enabled &&
-        selected.keys.all { it in enabled } &&
-        (enabled - "CHAT").all { capability ->
-            val selection = selected[capability] ?: return@all false
+        selected.all { (capability, selection) ->
+            if (capability !in enabled) return@all false
+            if (capability == "CHAT") return@all true
             val providerId = selection.substringBefore("::")
             val modelId = selection.substringAfter("::", "")
             providers
                 .firstOrNull { it.id == providerId && it.enabled }
-                ?.models
+                ?.selectableModels()
                 ?.any { model ->
-                    val profile = providers.first { it.id == providerId }
                     model.id == modelId &&
-                        model.id !in profile.modelBlacklist &&
-                        (profile.modelWhitelist.isEmpty() || model.id in profile.modelWhitelist) &&
-                        model.status.name !in setOf("DEPRECATED", "DISABLED") &&
                         model.capabilitySupport(capability) == CapabilitySupport.SUPPORTED
                 } == true
         }

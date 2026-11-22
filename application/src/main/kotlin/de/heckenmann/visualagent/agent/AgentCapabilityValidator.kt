@@ -5,7 +5,7 @@ import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
 import de.heckenmann.visualagent.agent.provider.supportsCapability
 import org.springframework.stereotype.Component
 
-/** Checks that enabled specialized agent features resolve to usable, declared provider models. */
+/** Checks that explicit capability overrides resolve to usable, declared provider models. */
 @Component
 class AgentCapabilityValidator(
     private val catalog: ProviderCatalogService,
@@ -16,10 +16,8 @@ class AgentCapabilityValidator(
         require(config.capabilityModels.keys.all { it in config.enabledCapabilities }) {
             "Assigned model requires an enabled capability"
         }
-        val capabilitiesToValidate =
-            config.enabledCapabilities - ModelCapability.CHAT +
-                setOfNotNull(ModelCapability.CHAT.takeIf { it in config.capabilityModels })
-        for (capability in capabilitiesToValidate) {
+        for ((capability, model) in config.capabilityModels) {
+            require(model.isNotBlank()) { "Model override for $capability must not be blank" }
             val selection = config.modelSelection(capability)
             val resolved = catalog.resolve(selection.provider, selection.model)
             require(resolved.model.supportsCapability(capability)) {

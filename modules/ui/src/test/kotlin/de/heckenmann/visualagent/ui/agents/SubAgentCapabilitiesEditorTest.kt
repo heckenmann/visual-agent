@@ -32,6 +32,11 @@ class SubAgentCapabilitiesEditorTest {
     }
 
     @Test
+    fun `accepts an enabled capability that inherits its model`() {
+        assertTrue(validCapabilityAssignments(enabled, emptyMap(), emptyList()))
+    }
+
+    @Test
     fun `rejects blocked or excluded capability models`() {
         assertFalse(validCapabilityAssignments(enabled, assigned, listOf(profile(blacklist = setOf("vision")))))
         assertFalse(validCapabilityAssignments(enabled, assigned, listOf(profile(whitelist = setOf("different")))))
