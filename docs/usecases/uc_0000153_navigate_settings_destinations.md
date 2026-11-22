@@ -13,21 +13,24 @@ destinations instead of one overloaded provider/conversation form.
 ## Main Flow
 
 1. Open the existing Settings workspace panel.
-2. Choose Appearance, Providers, Agent or Updates in the tab navigation.
+2. Choose Appearance, Providers, Task Models, Agent or Updates in the tab navigation.
 3. Appearance contains theme, font size, UI scale and panel-label preferences.
 4. Providers contains profile creation/edit/removal, authentication, staged model
    discovery, capability overrides and advanced provider/model options. Inspecting
    a profile/model does not change the main agent's active selection.
-5. Agent contains durable instructions, the revisioned memory document, startup
+5. Task Models contains one application-wide assignment per model capability, independent
+   from provider profile editing. Vision, Speech recognition, Speech output and Embeddings
+   can each select a compatible model across enabled providers.
+6. Agent contains durable instructions, the revisioned memory document, startup
    history, parallelism, tool timeout and memory size limits. Memory is saved as
    its own revision-checked resource, independently of the surrounding form.
-6. Updates contains the existing version/update preferences and actions.
-7. Switch destinations without losing unsaved settings or memory drafts. Each
+7. Updates contains the existing version/update preferences and actions.
+8. Switch destinations without losing unsaved settings or memory drafts. Each
    category has its own Save/Reset actions; these do not submit another category.
    Unfinished provider creation/edit forms also retain their field values until
    explicitly saved or cancelled, including across destination changes.
-8. The model picker can reveal Providers directly, opening the Settings panel if hidden.
-9. The Conversation settings dialog contains only Model and Conversation tabs.
+9. The model picker can reveal Providers directly, opening the Settings panel if hidden.
+10. The Conversation settings dialog contains only Model and Conversation tabs.
    Interpolation details are expandable and automatic-mode details remain visible
    while enabled. Follow-up count and idle delay appear only while suggestions are enabled.
 

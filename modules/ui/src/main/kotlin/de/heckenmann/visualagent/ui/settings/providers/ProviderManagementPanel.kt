@@ -31,7 +31,6 @@ import de.heckenmann.visualagent.protocol.SettingsPort
 import de.heckenmann.visualagent.ui.components.ActionIconButton
 import de.heckenmann.visualagent.ui.components.PanelScrollbarHost
 import de.heckenmann.visualagent.ui.components.RegisterPanelVerticalScrollbar
-import de.heckenmann.visualagent.ui.components.settingsDraftActionRow
 import de.heckenmann.visualagent.ui.components.toUiErrorMessage
 import de.heckenmann.visualagent.ui.settings.DirectAuthorizationControls
 import de.heckenmann.visualagent.ui.settings.ProviderProfileEditor
@@ -45,7 +44,6 @@ import de.heckenmann.visualagent.ui.settings.toFormState
 import de.heckenmann.visualagent.ui.settings.upsert
 import de.heckenmann.visualagent.ui.settings.withDirectCredentialReference
 import de.heckenmann.visualagent.ui.settings.withModels
-import de.heckenmann.visualagent.ui.workspace.PanelStatus
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -78,7 +76,9 @@ internal fun ProviderManagementPanel(
     val scope = rememberCoroutineScope()
     val draft = state.draft
     val selected = draft.providers.firstOrNull { it.id == draft.providerId }
-    val dirty = state.loaded && (draft.providers != state.persisted.providers || state.optionsDirty)
+    val dirty =
+        state.loaded &&
+            (draft.providers != state.persisted.providers || state.optionsDirty)
 
     /** Reads the catalog baseline independently of the inspected provider. */
     fun reload() {
@@ -87,7 +87,10 @@ internal fun ProviderManagementPanel(
         state.busy = true
         scope.launch {
             try {
-                val current = withContext(Dispatchers.IO) { providerSettingsDraft(settings.snapshot(), port.listProviders()) }
+                val current =
+                    withContext(Dispatchers.IO) {
+                        providerSettingsDraft(settings.snapshot(), port.listProviders())
+                    }
                 if (generation != state.generation) return@launch
                 state.persisted = current
                 state.draft =
@@ -263,35 +266,6 @@ internal fun ProviderManagementPanel(
                 }
             }
         }
-        settingsDraftActionRow(
-            dirty,
-            state.busy,
-            canSave =
-                state.modelOptions.values.all(
-                    ::validModelOptions,
-                ),
-            onReset = ::reload,
-            onSave = {
-                val submitted = state.draft.providers
-                val baseline = state.persisted.providers
-                state.busy = true
-                scope.launch {
-                    try {
-                        withContext(Dispatchers.IO) { port.replaceProfiles(submitted, baseline) }
-                        state.persisted = state.persisted.copy(providers = submitted)
-                        state.optionsDirty = false
-                        state.status = "Saved provider settings"
-                        onSaved()
-                    } catch (cancelled: CancellationException) {
-                        throw cancelled
-                    } catch (error: Exception) {
-                        state.status = error.toUiErrorMessage()
-                    } finally {
-                        state.busy = false
-                    }
-                }
-            },
-        )
-        PanelStatus(state.status)
+        ProviderSettingsSaveControls(port, state, dirty, ::reload, onSaved)
     }
 }

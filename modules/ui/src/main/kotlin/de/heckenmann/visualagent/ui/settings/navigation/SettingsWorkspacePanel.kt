@@ -14,6 +14,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import de.heckenmann.visualagent.protocol.SettingsSection
 import de.heckenmann.visualagent.ui.application.ComposePanelServices
+import de.heckenmann.visualagent.ui.settings.TaskModelSettingsPanel
+import de.heckenmann.visualagent.ui.settings.TaskModelSettingsState
 import de.heckenmann.visualagent.ui.settings.agent.AgentSettingsPage
 import de.heckenmann.visualagent.ui.settings.agent.MainAgentMemoryDraft
 import de.heckenmann.visualagent.ui.settings.agent.TerminalAccessPage
@@ -28,6 +30,7 @@ internal fun SettingsWorkspacePanel(services: ComposePanelServices) {
     val navigation = services.settingsNavigation
     val pages = remember(services.settings) { SettingsDestination.entries.associateWith { SettingsPageDraft() } }
     val providers = remember(services.providers) { ProviderManagementState() }
+    val taskModels = remember(services.providers) { TaskModelSettingsState() }
     val memory = remember(services.mainAgentMemory) { MainAgentMemoryDraft() }
     Column(Modifier.fillMaxSize()) {
         PrimaryScrollableTabRow(
@@ -44,6 +47,7 @@ internal fun SettingsWorkspacePanel(services: ComposePanelServices) {
         }
         Box(Modifier.fillMaxWidth().weight(1f)) {
             when (navigation.destination) {
+                SettingsDestination.TASK_MODELS -> TaskModelSettingsPanel(services.providers, taskModels)
                 SettingsDestination.PROVIDERS ->
                     ProviderManagementPanel(
                         services.settings,
