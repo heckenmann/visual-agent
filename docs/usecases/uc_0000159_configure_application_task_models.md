@@ -16,10 +16,10 @@ Desktop user.
 ## Main Flow
 
 1. The user opens **Settings → Task Models**.
-2. The application lists task-specific model defaults for Vision, Speech recognition, Speech output, and Embeddings.
+2. The application lists task-specific model defaults for Vision, Speech recognition, Speech output, Image generation, and Embeddings.
 3. If no task model is configured, Visual Agent automatically assigns the first selectable model that declares the matching capability. Automatic Vision selection stays within the active provider. The user may explicitly choose a Vision model from another provider.
 4. The user saves the task defaults independently of provider profile edits.
-5. Vision, audio input, audio output, and embedding selections are stored independently as global task defaults.
+5. Vision, audio input, audio output, image generation, and embedding selections are stored independently as global task defaults.
 6. A per-sub-agent model explicitly assigned for the same capability takes precedence. If no capable model is available, existing request and conversation selections continue to apply until discovery finds one.
 
 ## Result
@@ -34,12 +34,12 @@ Application-wide model defaults are stored with the provider catalog and survive
 
 ## Acceptance Criteria
 
-- **Settings → Task Models** exposes independent Vision, Speech recognition, Speech output, and Embeddings choices across enabled provider profiles.
+- **Settings → Task Models** exposes independent Vision, Speech recognition, Speech output, Image generation, and Embeddings choices across enabled provider profiles.
 - The model options include only models that declare the relevant capability.
 - The first available capable model is assigned automatically when a task has no selection; later discovery does not replace a saved selection.
 - If no capable model is available, existing request and conversation model behavior is preserved.
 - Main-agent vision requests, workspace image analysis, and embeddings honor their application-wide defaults.
-- Speech recognition and speech output assignments can be configured independently and persist with the provider catalog.
+- Speech recognition, speech output, and image generation assignments can be configured independently and persist with the provider catalog.
 - An explicit per-sub-agent capability model remains higher priority than the application default.
 - Saving task model choices uses a database-conditional catalog mutation.
 - Existing catalog JSON without task assignments decodes with no application-wide defaults.
@@ -54,4 +54,4 @@ Application-wide model defaults are stored with the provider catalog and survive
 
 ## Implementation Decision
 
-Task assignments extend the existing versioned provider-catalog preference and compare-and-set mutation. Automatic selection prefers the active provider, then provider identifiers; each provider's default model is preferred before model identifiers. The global task model settings live in their own Settings destination, separate from provider profile editing. Audio capabilities are configurable, while provider speech operations are not yet implemented in the runtime.
+Task assignments extend the existing versioned provider-catalog preference and compare-and-set mutation. Automatic selection prefers the active provider, then provider identifiers; each provider's default model is preferred before model identifiers. The global task model settings live in their own Settings destination, separate from provider profile editing. Speech execution is tracked in [#483](https://github.com/heckenmann/visual-agent/issues/483) and image generation execution in [#231](https://github.com/heckenmann/visual-agent/issues/231).

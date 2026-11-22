@@ -17,7 +17,7 @@ Desktop user and main orchestrator agent.
 
 1. The user checks the enabled capabilities in the sub-agent editor, or the model invokes the available agent creation/update function.
 2. CHAT remains mandatory; VISION, AUDIO_INPUT, AUDIO_OUTPUT, IMAGE_GENERATION, EMBEDDING, and TOOLS are independently configurable.
-3. Each enabled specialized capability is associated with a capable model, validated against the provider catalog.
+3. Each enabled specialized capability can inherit its default or use an explicit model override validated against the provider catalog.
 4. The agent configuration is saved through the existing persisted sub-agent record.
 5. Agent list/show functions display enabled capabilities and model assignments so the orchestrator can choose appropriate workers.
 6. The system prompts advise the orchestrator to delegate specialized work only to properly configured agents.
@@ -38,9 +38,9 @@ Desktop user and main orchestrator agent.
 
 ## Live Model Probes
 
-- The capability editor's Test action verifies **CHAT** with a real tool-free text request and **VISION** with a small image through the selected provider/model endpoint.
+- The capability editor's Test action verifies **CHAT** with a real tool-free text request, **VISION** with a small image, and **EMBEDDING** with a short text through the selected provider/model endpoint.
 - Probes are bounded to 15 seconds and never store a conversation or expose tool definitions.
-- AUDIO_INPUT, AUDIO_OUTPUT, IMAGE_GENERATION, EMBEDDING, and TOOLS currently have no corresponding functional probe protocol. The UI reports this limitation as an error rather than treating model metadata as a successful test.
+- AUDIO_INPUT, AUDIO_OUTPUT, IMAGE_GENERATION, and TOOLS currently have no corresponding functional probe protocol. The UI reports this limitation as an error rather than treating model metadata as a successful test.
 - Existing provider workflows determine whether specialized operations are executable. Declaring a capability alone does not enable provider operations that have not yet been implemented.
 
 ## Failure Cases

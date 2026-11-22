@@ -17,9 +17,9 @@ Desktop user.
 
 1. The user opens the provider settings and refreshes the model catalog.
 2. Known capabilities are displayed for each discovered model; the user can correct or supplement each with **Automatic**, **Supported**, or **Unsupported**. Automatic retains unknown state when the provider omits evidence. The heading, explanation and capability controls occupy separate vertically spaced rows, including at narrow widths and enlarged font scales. Showing or hiding this section must not stack its children on top of each other.
-3. The user may also configure application-wide Vision, Speech recognition, Speech output, and Embedding defaults in **Settings → Task Models** as described in [UC-0000159](uc_0000159_configure_application_task_models.md), then opens the details of an existing sub-agent.
+3. The user may also configure application-wide Vision, Speech recognition, Speech output, Image generation, and Embedding defaults in **Settings → Task Models** as described in [UC-0000159](uc_0000159_configure_application_task_models.md), then opens the details of an existing sub-agent.
 4. CHAT remains enabled, while specialized features are independently granted or revoked.
-5. Each enabled feature requires a model selected from providers that advertise that feature. Selections store a provider-qualified `providerId::modelId` reference.
+5. Each enabled feature can use its default or be overridden with a model from providers that advertise that feature. Explicit selections store a provider-qualified `providerId::modelId` reference.
 6. The backend validates the assigned provider and model against the current catalog before persisting the agent.
 7. During an image-bearing sub-agent request, an explicitly assigned per-agent VISION model takes precedence over the application-wide default. Without either, the agent's primary model remains in use. Text-only chat retains the agent's primary model.
 8. During a workspace-file image-analysis tool call, the trusted sub-agent identity selects the vision model. A disabled feature or unsupported model yields an actionable error.
