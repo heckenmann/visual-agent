@@ -218,6 +218,13 @@ class OllamaClient(
         modelId: String,
     ): Mono<List<Double>> = auxiliary.embeddingsReactive(text, modelId)
 
+    /** Generates embeddings through the assigned profile's endpoint and credentials. */
+    internal fun embeddingsReactive(
+        text: String,
+        modelId: String,
+        profile: ProviderProfile,
+    ): Mono<List<Double>> = auxiliary.embeddingsReactive(text, modelId) { createOllamaApi(profile, appConfig) }
+
     override fun isConnected(): Boolean = ops.isConnected()
 
     override fun checkConnectionReactive(): Mono<Boolean> = ops.checkConnectionReactive()

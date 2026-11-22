@@ -74,11 +74,12 @@ internal class OllamaClientAuxiliary(
     fun embeddingsReactive(
         text: String,
         modelId: String,
+        api: () -> OllamaApi = { ollamaApi },
     ): Mono<List<Double>> =
         Mono
             .fromCallable {
                 try {
-                    val response = ollamaApi.embed(OllamaApi.EmbeddingsRequest(modelId, text))
+                    val response = api().embed(OllamaApi.EmbeddingsRequest(modelId, text))
                     response
                         .embeddings()
                         .firstOrNull()

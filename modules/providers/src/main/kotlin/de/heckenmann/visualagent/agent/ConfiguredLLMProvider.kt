@@ -128,22 +128,20 @@ class ConfiguredLLMProvider(
         Mono
             .fromCallable {
                 val selected = providerCatalog.taskModelAssignment(ModelCapability.EMBEDDING)
-                if (selected == null) return@fromCallable null to null
+                if (selected == null) return@fromCallable null
                 val resolved = providerCatalog.resolve(selected.first, selected.second)
                 require(resolved.model.supportsCapability(ModelCapability.EMBEDDING)) {
                     "Model '${selected.first}/${selected.second}' does not support EMBEDDING"
                 }
-                providerFor(resolved.provider) to resolved.model.id
-            }.subscribeOn(Schedulers.boundedElastic())
-            .flatMap { (provider, model) ->
-                if (provider == null || model == null) {
-                    activeProviderSelectionReactive().flatMap { (activeProvider, activeModel) ->
-                        activeProvider.embeddingsReactive(text, activeModel)
-                    }
-                } else {
-                    provider.embeddingsReactive(text, model)
+                require(resolved.provider.adapter == ProviderAdapter.OLLAMA) {
+                    "Provider '${resolved.provider.id}' cannot execute EMBEDDING tasks"
                 }
-            }
+                resolved
+            }.subscribeOn(Schedulers.boundedElastic())
+            .flatMap { resolved -> ollamaClient.embeddingsReactive(text, resolved.model.id, resolved.provider) }
+            .switchIfEmpty(
+                activeProviderSelectionReactive().flatMap { (provider, model) -> provider.embeddingsReactive(text, model) },
+            )
 
     override fun isConnected(): Boolean {
         val profile = providerCatalog.getProvider(providerCatalog.activeProviderId()) ?: return false

@@ -10,6 +10,7 @@ internal fun CatalogState.withAutomaticTaskModelAssignments(): CatalogState {
                 providers
                     .asSequence()
                     .filter(ProviderProfile::enabled)
+                    .filter { it.adapter.supportsTaskModel(capability) }
                     .sortedWith(compareBy<ProviderProfile> { if (it.id == activeProviderId) 0 else 1 }.thenBy(ProviderProfile::id))
                     .firstOrNull { candidate ->
                         candidate
@@ -38,3 +39,6 @@ internal fun CatalogState.withAutomaticTaskModelAssignments(): CatalogState {
     }
     return if (assignments == taskModelAssignments) this else copy(taskModelAssignments = assignments)
 }
+
+internal fun ProviderAdapter.supportsTaskModel(capability: ModelCapability): Boolean =
+    capability != ModelCapability.EMBEDDING || this == ProviderAdapter.OLLAMA

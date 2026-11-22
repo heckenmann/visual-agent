@@ -91,6 +91,7 @@ class ProviderCatalogService(
             val capability = ModelCapability.valueOf(capabilityName)
             val profile = profiles.firstOrNull { it.id == selection.providerId && it.enabled }
             require(profile != null) { "Provider is missing or disabled: ${selection.providerId}" }
+            require(profile.adapter.supportsTaskModel(capability)) { "Provider '${profile.id}' cannot execute $capability tasks" }
             val model = profile.selectableModels().firstOrNull { it.id == selection.modelId }
             require(model?.supportsCapability(capability) == true) {
                 "Model '${selection.providerId}/${selection.modelId}' does not support $capability"

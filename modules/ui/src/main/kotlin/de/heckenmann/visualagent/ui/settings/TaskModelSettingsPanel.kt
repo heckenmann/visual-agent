@@ -18,6 +18,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import de.heckenmann.visualagent.protocol.CapabilitySupport
+import de.heckenmann.visualagent.protocol.ProviderAdapter
 import de.heckenmann.visualagent.protocol.ProviderPort
 import de.heckenmann.visualagent.protocol.ProviderProfile
 import de.heckenmann.visualagent.protocol.TaskModelAssignment
@@ -162,6 +163,7 @@ private fun TaskModelAssignmentField(
     val options =
         profiles
             .filter(ProviderProfile::enabled)
+            .filter { capability != "EMBEDDING" || it.adapter == ProviderAdapter.OLLAMA }
             .flatMap { profile ->
                 profile
                     .selectableModels()
