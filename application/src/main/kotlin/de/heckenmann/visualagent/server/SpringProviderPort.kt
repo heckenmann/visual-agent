@@ -299,4 +299,8 @@ private fun ShowResponse.toProtocol(): ModelDetails =
         format = details?.format,
         quantizationLevel = details?.quantizationLevel,
         contextLimit = details?.contextLimit,
+        capabilities = details?.capabilities.orEmpty(),
+        capabilitiesComplete = details?.capabilitiesComplete ?: false,
+        capabilitiesOverridden = details?.capabilitiesOverridden ?: false,
+        capabilityOverrides = details?.capabilityOverrides.orEmpty(),
     )

@@ -152,7 +152,14 @@ data class ProviderModel(
     val capabilityOverrides: Map<String, Boolean> = emptyMap(),
 )
 
-/** User-safe model detail response. */
+/**
+ * User-safe model detail response.
+ *
+ * @property capabilities Provider-reported model capabilities
+ * @property capabilitiesComplete Whether provider metadata declares the complete capability set
+ * @property capabilitiesOverridden Whether a legacy whole-set override is active
+ * @property capabilityOverrides Per-capability user overrides
+ */
 data class ModelDetails(
     val model: String,
     val modifiedAt: String,
@@ -161,4 +168,8 @@ data class ModelDetails(
     val format: String? = null,
     val quantizationLevel: String? = null,
     val contextLimit: Int? = null,
+    val capabilities: Set<String> = emptySet(),
+    val capabilitiesComplete: Boolean = false,
+    val capabilitiesOverridden: Boolean = false,
+    val capabilityOverrides: Map<String, Boolean> = emptyMap(),
 )

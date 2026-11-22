@@ -28,6 +28,7 @@ import de.heckenmann.visualagent.ui.components.ActionIconButton
 import de.heckenmann.visualagent.ui.components.PanelDropdownField
 import de.heckenmann.visualagent.ui.components.PanelInfoBox
 import de.heckenmann.visualagent.ui.components.PanelSelectOption
+import de.heckenmann.visualagent.ui.components.labelWithCapabilities
 import de.heckenmann.visualagent.ui.settings.LegacyCapabilityReset
 import de.heckenmann.visualagent.ui.settings.ModelCapabilitiesEditor
 import de.heckenmann.visualagent.ui.settings.ProviderSettingsDraft
@@ -99,7 +100,7 @@ internal fun ProviderModelCatalog(
     PanelDropdownField(
         "Model catalog",
         draft.modelId,
-        profile.models.map { PanelSelectOption(it.id, it.name) },
+        profile.models.map { PanelSelectOption(it.id, it.labelWithCapabilities()) },
         enabled = profile.models.isNotEmpty() && !busy,
         onSelected = { onChange(draft.copy(modelId = it)) },
     )

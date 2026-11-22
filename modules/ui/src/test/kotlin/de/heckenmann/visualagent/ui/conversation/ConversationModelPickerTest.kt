@@ -19,6 +19,7 @@ import de.heckenmann.visualagent.protocol.ProviderPort
 import de.heckenmann.visualagent.protocol.ProviderProfile
 import de.heckenmann.visualagent.protocol.SettingsPort
 import de.heckenmann.visualagent.protocol.SettingsSnapshot
+import de.heckenmann.visualagent.ui.components.labelWithCapabilities
 import de.heckenmann.visualagent.ui.conversation.models.ConversationModelPicker
 import de.heckenmann.visualagent.ui.conversation.models.conversationModelOptions
 import de.heckenmann.visualagent.ui.conversation.models.rememberConversationModelState
@@ -80,6 +81,35 @@ class ConversationModelPickerTest {
         compose.waitUntil { runCatching { compose.onNodeWithText("Operation failed").assertExists() }.isSuccess }
         compose.onNodeWithText("active · Main provider").assertExists()
         coVerify(exactly = 1) { settings.selectConversationModel("main", "unknown") }
+    }
+
+    @Test fun `model capability labels appear in the selected model and model list`() {
+        val capableProfile =
+            profile.copy(
+                models =
+                    listOf(
+                        ProviderModel("active", capabilities = setOf("chat", "vision", "tools")),
+                    ),
+            )
+        every { providers.listProviders() } returns listOf(capableProfile)
+        every { settings.snapshot() } returns SettingsSnapshot(providerId = "main", modelId = "active")
+        compose.setContent { MaterialTheme { ConversationModelPicker(rememberConversationModelState(providers, settings)) {} } }
+        compose.waitUntil {
+            runCatching { compose.onNodeWithText("active [chat, tools, vision] · Main provider").assertExists() }.isSuccess
+        }
+        compose.onNodeWithText("active [chat, tools, vision] · Main provider").assertExists()
+        compose.onNodeWithContentDescription("Select conversation model").performClick()
+        compose.onNodeWithText("active [chat, tools, vision]").assertExists()
+    }
+
+    @Test fun `model capability labels apply targeted overrides`() {
+        val model =
+            ProviderModel(
+                "custom",
+                capabilities = setOf("chat", "vision"),
+                capabilityOverrides = mapOf("vision" to false, "embedding" to true),
+            )
+        assertEquals("custom [chat, embedding]", model.labelWithCapabilities())
     }
 
     @Test fun `picker search empty state and manage providers action are available without sending input`() {

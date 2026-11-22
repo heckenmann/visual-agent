@@ -123,6 +123,8 @@ class SpringProviderPortTest {
                                 format = "gguf",
                                 quantizationLevel = "Q4_K_M",
                                 contextLimit = 4096,
+                                capabilities = setOf("chat", "vision"),
+                                capabilityOverrides = mapOf("vision" to false),
                             ),
                     ),
                 )
@@ -134,6 +136,8 @@ class SpringProviderPortTest {
             assertEquals("8B", details.parameterSize)
             assertEquals("Q4_K_M", details.quantizationLevel)
             assertEquals(4096, details.contextLimit)
+            assertEquals(setOf("chat", "vision"), details.capabilities)
+            assertEquals(mapOf("vision" to false), details.capabilityOverrides)
             verify { provider.getModelConfigsReactive(applicationProfile) }
             verify { provider.getModelDetailsReactive("ollama", "llama3") }
             verify { catalog.updateDiscoveredModelConfigs("ollama", applicationProfile.models) }

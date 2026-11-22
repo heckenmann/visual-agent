@@ -170,7 +170,7 @@ class ConfiguredLLMProvider(
                         adapterFor(
                             profile.adapter,
                         ).getModelDetailsReactive(profile, modelName)
-                }
+                }.map { it.withCatalogCapabilities(profile, modelName) }
             }
 
     private fun discoverModelConfigsReactive(profile: ProviderProfile): Mono<List<ProviderModelConfig>> =
