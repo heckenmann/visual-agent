@@ -11,14 +11,44 @@ import de.heckenmann.visualagent.agent.TestVisualAgentTool
 import de.heckenmann.visualagent.agent.ToolDefinition
 import de.heckenmann.visualagent.agent.ToolId
 import de.heckenmann.visualagent.agent.ToolResult
+import de.heckenmann.visualagent.agent.ollama.OllamaPromptFactory
 import de.heckenmann.visualagent.agent.toTestFunctionName
 import org.junit.jupiter.api.Test
 import org.springframework.ai.chat.messages.AssistantMessage
+import org.springframework.ai.chat.messages.UserMessage
 import org.springframework.ai.model.tool.ToolCallingChatOptions
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class OpenAiPromptFactoryTest {
+    @Test
+    fun `chat prompts include current image media and omit historical attachments`() {
+        val png = "data:image/png;base64,iVBORw=="
+        val request =
+            ChatRequestContext(
+                messages = listOf(Message("user", "previous", images = listOf(png)), Message("user", "current", images = listOf(png))),
+            )
+        val registry = TestToolRegistry()
+        val prompts =
+            listOf(
+                OpenAiPromptFactory(registry).buildPrompt(request, "vision"),
+                OllamaPromptFactory(registry).buildPrompt(request, "vision"),
+            )
+        prompts.forEach { prompt ->
+            val users = prompt.instructions.filterIsInstance<UserMessage>()
+            assertEquals(0, users.first().media.size)
+            assertEquals(
+                "image/png",
+                users
+                    .last()
+                    .media
+                    .single()
+                    .mimeType
+                    .toString(),
+            )
+        }
+    }
+
     @Test
     fun `prompt exposes only provider function names in callbacks and strict guard`() {
         val registry = TestToolRegistry(listOf(FakeTool("agent:list"), FakeTool("terminal")))
