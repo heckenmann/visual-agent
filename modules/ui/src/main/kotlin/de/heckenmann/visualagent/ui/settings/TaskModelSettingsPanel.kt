@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -85,7 +86,7 @@ internal fun TaskModelSettingsPanel(
         }
     }
 
-    LaunchedEffect(port) { if (!state.loaded) reload() }
+    LaunchedEffect(port) { if (!dirty) reload() }
     DisposableEffect(port) {
         val listener =
             port.addChangeListener {
@@ -103,6 +104,7 @@ internal fun TaskModelSettingsPanel(
             Column(Modifier.fillMaxSize().verticalScroll(scroll).padding(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 PanelInfoBox(
                     "These choices apply globally. Visual Agent automatically assigns an available capable model when none is selected. " +
+                        "Find compatible models in Settings → Providers. " +
                         "An explicit sub-agent assignment takes precedence. Speech processing is not yet implemented.",
                 )
                 taskModelCapabilities.forEach { capability ->
@@ -183,6 +185,10 @@ private fun TaskModelAssignmentField(
             addAll(options)
         }
     PanelSection(title = capability.settingLabel()) {
+        if (options.isEmpty() && assignment == null) {
+            Text("No compatible model")
+            return@PanelSection
+        }
         PanelDropdownField(
             label = "Model",
             selectedValue = selectedValue,
