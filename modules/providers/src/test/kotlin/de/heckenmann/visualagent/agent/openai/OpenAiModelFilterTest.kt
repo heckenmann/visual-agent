@@ -25,11 +25,11 @@ class OpenAiModelFilterTest {
 
     @Test
     fun `filter on official endpoint only keeps chat models`() {
-        val models = listOf("gpt-4o", "custom-model", "o1-preview", "chatgpt-4o-latest")
+        val models = listOf("gpt-4o", "custom-model", "o1-preview", "chatgpt-4o-latest", "chat-latest", "chatgpt-image-latest")
 
         val filtered = OpenAiModelFilter.filter(models, URI("https://api.openai.com/v1"))
 
-        assertEquals(listOf("chatgpt-4o-latest", "gpt-4o", "o1-preview"), filtered)
+        assertEquals(listOf("chat-latest", "chatgpt-4o-latest", "gpt-4o", "o1-preview"), filtered)
     }
 
     @Test

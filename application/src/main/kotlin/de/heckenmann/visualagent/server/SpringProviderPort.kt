@@ -9,6 +9,7 @@ import de.heckenmann.visualagent.agent.provider.DirectProviderAuthorization
 import de.heckenmann.visualagent.agent.provider.ModelCapability
 import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
 import de.heckenmann.visualagent.agent.provider.ProviderModelConfig
+import de.heckenmann.visualagent.agent.provider.mergeWithExisting
 import de.heckenmann.visualagent.agent.provider.supportsCapability
 import de.heckenmann.visualagent.protocol.ModelDetails
 import de.heckenmann.visualagent.protocol.ModelStatus
@@ -219,26 +220,7 @@ private fun ProviderProfile.toApplication(): ApplicationProviderProfile =
     )
 
 private fun ProviderProfile.withDiscoveredModels(modelConfigs: List<ProviderModelConfig>): ProviderProfile =
-    copy(
-        models =
-            modelConfigs.distinctBy(ProviderModelConfig::id).map { config ->
-                val discovered = config.toProtocol()
-                val existing = models.firstOrNull { it.id == config.id }
-                existing?.copy(
-                    name = discovered.name,
-                    contextLimit = discovered.contextLimit ?: existing.contextLimit,
-                    outputLimit = discovered.outputLimit ?: existing.outputLimit,
-                    capabilities =
-                        when {
-                            existing.capabilitiesOverridden -> existing.capabilities
-                            discovered.capabilitiesComplete -> discovered.capabilities
-                            existing.capabilitiesComplete -> existing.capabilities
-                            else -> existing.capabilities + discovered.capabilities
-                        },
-                    capabilitiesComplete = existing.capabilitiesComplete || discovered.capabilitiesComplete,
-                ) ?: discovered
-            },
-    )
+    copy(models = modelConfigs.mergeWithExisting(models.associate { it.id to it.toApplication() }).map(ProviderModelConfig::toProtocol))
 
 private fun ProviderProfile.selectableModels(): List<ProviderModel> =
     models.filter { model ->

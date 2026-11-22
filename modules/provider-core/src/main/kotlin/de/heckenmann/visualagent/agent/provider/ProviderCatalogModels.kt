@@ -1,6 +1,7 @@
 package de.heckenmann.visualagent.agent.provider
 
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 
 /**
  * Supported runtime adapter used by a configurable provider profile.
@@ -44,6 +45,7 @@ enum class ModelStatus {
  * @property capabilitiesComplete Whether capabilities is a complete provider declaration rather than positive observations
  * @property capabilitiesOverridden Whether the user explicitly edited capabilities and discovery must preserve them
  * @property capabilityOverrides Targeted manual declarations; absent keys use provider evidence
+ * @property refreshedCapabilities Capabilities authoritatively checked by this discovery response
  */
 @Serializable
 data class ProviderModelConfig(
@@ -58,6 +60,7 @@ data class ProviderModelConfig(
     val capabilitiesComplete: Boolean = false,
     val capabilitiesOverridden: Boolean = false,
     val capabilityOverrides: Map<String, Boolean> = emptyMap(),
+    @Transient val refreshedCapabilities: Set<String> = emptySet(),
 )
 
 /**
