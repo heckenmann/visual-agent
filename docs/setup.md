@@ -15,6 +15,42 @@
 ./gradlew :desktop:run
 ```
 
+### Compose Hot Reload MCP
+
+Use Compose Hot Reload MCP to inspect the running desktop UI, read its semantic
+tree, and exercise controls through their accessibility actions. Run the
+following from the repository root in a graphical desktop session. This Bash
+example gives the app a temporary database and lets Gradle provision the
+JetBrains Runtime used by Hot Reload.
+
+```bash
+smoke_dir=$(mktemp -d)
+VISUAL_AGENT_DB_PATH="$smoke_dir/visual-agent.db" \
+  ./gradlew -Pcompose.reload.jbr.autoProvisioningEnabled=true :desktop:hotRun
+```
+
+After the app stops, remove the temporary directory created for the run.
+
+Configure the MCP client to start the Gradle server over standard input and
+output. For Codex, add this entry to the project's `.codex/config.toml` and
+replace the example path with the absolute path to the checkout.
+
+```toml
+[mcp_servers.compose-hot-reload]
+command = "/path/to/visual-agent/gradlew"
+args = ["--no-daemon", "--quiet", "--console=plain", ":desktop:hotMcpServer"]
+cwd = "/path/to/visual-agent"
+```
+
+The client starts the server, which connects to the Hot Reload app from the
+same checkout. Use `status` to confirm the connection, `list_windows` to find the
+window, and `get_semantic_tree` to find controls and their node IDs. Use `click`
+or `type_text` to exercise the flow, then read the tree again to confirm the
+result. Use `take_screenshot` for layout checks and `get_ui_error` for rendering
+failures. This workflow supplements the automated quality checks.
+
+See the [JetBrains Compose Hot Reload MCP documentation](https://github.com/JetBrains/compose-hot-reload/blob/master/README.md#mcp-server-for-ai-agents).
+
 ## Supported Operating Systems and Release Packages
 
 [v0.1.1](https://github.com/heckenmann/visual-agent/releases/tag/v0.1.1) is available
