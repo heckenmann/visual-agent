@@ -85,7 +85,8 @@ internal fun ChatRequestContext.withTaskModelAssignment(catalog: ProviderCatalog
         (metadata["modelCapability"] as? String)?.let { name ->
             runCatching { ModelCapability.valueOf(name) }.getOrNull()
         } ?: ModelCapability.VISION.takeIf { messages.lastOrNull { it.role == "user" }?.images?.isNotEmpty() == true } ?: return this
-    val selection = catalog.taskModelAssignment(capability) ?: return this
+    if (capability != ModelCapability.VISION) return this
+    val selection = catalog.visionTaskModelAssignment(provider) ?: return this
     val resolved = catalog.resolve(selection.first, selection.second)
     require(resolved.model.supportsCapability(capability)) {
         "Model '${selection.first}/${selection.second}' does not support $capability"

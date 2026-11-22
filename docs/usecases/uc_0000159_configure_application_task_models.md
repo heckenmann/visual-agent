@@ -17,7 +17,7 @@ Desktop user.
 
 1. The user opens **Settings → Task Models**.
 2. The application lists task-specific model defaults for Vision, Speech recognition, Speech output, and Embeddings.
-3. If no task model is configured, Visual Agent automatically assigns the first selectable model that declares the matching capability. The user may choose a different provider-qualified model.
+3. If no task model is configured, Visual Agent automatically assigns the first selectable model that declares the matching capability. Automatic Vision selection stays within the active provider. The user may explicitly choose a Vision model from another provider.
 4. The user saves the task defaults independently of provider profile edits.
 5. Vision, audio input, audio output, and embedding selections are stored independently as global task defaults.
 6. A per-sub-agent model explicitly assigned for the same capability takes precedence. If no capable model is available, existing request and conversation selections continue to apply until discovery finds one.

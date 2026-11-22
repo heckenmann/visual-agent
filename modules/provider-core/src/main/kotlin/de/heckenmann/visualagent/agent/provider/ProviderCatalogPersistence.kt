@@ -20,6 +20,7 @@ internal data class CatalogState(
 internal data class CatalogModelSelection(
     val providerId: String,
     val modelId: String,
+    val confirmed: Boolean = false,
 )
 
 /** Recomputes mutations against fresh database state after a compare-and-set conflict. */

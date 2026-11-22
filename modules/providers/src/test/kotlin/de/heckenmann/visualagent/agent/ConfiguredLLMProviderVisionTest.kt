@@ -31,6 +31,8 @@ class ConfiguredLLMProviderVisionTest {
                     models = listOf(ProviderModelConfig("llava", capabilities = setOf("vision"))),
                 )
             catalog.saveProvider(profile)
+            assertEquals(null, catalog.visionTaskModelAssignment())
+            catalog.replaceTaskModelAssignments(mapOf("VISION" to (profile.id to "llava")), catalog.taskModelAssignments())
             val ollama = mockk<OllamaClient>()
             every { ollama.visionReactive(any(), "describe", "llava", profile) } returns
                 Mono.just(ChatResponse("llava", Message("assistant", "routed"), done = true))
@@ -73,6 +75,7 @@ class ConfiguredLLMProviderVisionTest {
                 provider = "ollama",
                 model = "text",
             )
+        catalog.replaceTaskModelAssignments(mapOf("VISION" to ("vision-provider" to "vision")), catalog.taskModelAssignments())
         assertEquals(request, request.withTaskModelAssignment(catalog))
     }
 

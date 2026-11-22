@@ -52,7 +52,7 @@ The agent persists the enabled feature set and feature-specific model references
 - Capability assignments survive persistence and protocol roundtrips.
 - Model dropdowns exclude models without the corresponding declared capability.
 - Text-only and image-bearing requests select their respective configured models.
-- A configured application-wide vision default is used only after explicit user selection; an explicit per-agent assignment takes precedence.
+- Automatic vision selection stays within the request provider. Using a global vision model from another provider requires an explicit selection. A per-agent assignment takes precedence.
 - Application-wide task defaults are handled separately from per-agent capability assignments; see [UC-0000159](uc_0000159_configure_application_task_models.md).
 - Provider credentials remain in the provider adapter; capability strings never expose API keys.
 - The animated provider capability editor preserves non-overlapping text and independently selectable capability controls at narrow widths and enlarged font scales.

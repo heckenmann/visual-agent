@@ -65,6 +65,14 @@ class ProviderCatalogService(
     fun taskModelAssignment(capability: ModelCapability): Pair<String, String>? =
         load().taskModelAssignments[capability.name]?.let { it.providerId to it.modelId }
 
+    /** Keeps an automatic vision assignment within the provider selected for the request. */
+    fun visionTaskModelAssignment(providerId: String? = null): Pair<String, String>? {
+        val state = load()
+        val selection = state.taskModelAssignments[ModelCapability.VISION.name] ?: return null
+        val requestProvider = providerId?.takeIf(String::isNotBlank) ?: state.activeProviderId
+        return (selection.providerId to selection.modelId).takeIf { selection.confirmed || selection.providerId == requestProvider }
+    }
+
     /** Returns all configured application-wide task model assignments. */
     fun taskModelAssignments(): Map<String, Pair<String, String>> =
         load().taskModelAssignments.mapValues { (_, selection) -> selection.providerId to selection.modelId }
@@ -77,9 +85,17 @@ class ProviderCatalogService(
         val proposed = assignments.mapValues { (_, selection) -> CatalogModelSelection(selection.first, selection.second) }
         mutate { current ->
             val baseline = expectedAssignments.mapValues { (_, selection) -> CatalogModelSelection(selection.first, selection.second) }
-            check(current.taskModelAssignments == baseline) { "Task model assignments changed elsewhere. Reload before saving." }
-            validateTaskModelAssignments(proposed.filter { (key, value) -> current.taskModelAssignments[key] != value }, current.providers)
-            current.copy(taskModelAssignments = proposed)
+            check(current.taskModelAssignments.mapValues { (_, value) -> value.copy(confirmed = false) } == baseline) {
+                "Task model assignments changed elsewhere. Reload before saving."
+            }
+            val changes = proposed.filter { (key, value) -> baseline[key] != value }
+            validateTaskModelAssignments(changes, current.providers)
+            current.copy(
+                taskModelAssignments =
+                    proposed.mapValues { (key, value) ->
+                        if (key in changes) value.copy(confirmed = true) else current.taskModelAssignments.getValue(key)
+                    },
+            )
         }
     }
 

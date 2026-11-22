@@ -55,7 +55,7 @@ class ConfiguredLLMProvider(
     ): Mono<ChatResponse> =
         Mono
             .fromCallable {
-                val selected = providerCatalog.taskModelAssignment(ModelCapability.VISION)
+                val selected = providerCatalog.visionTaskModelAssignment()
                 if (selected != null) {
                     val resolved = providerCatalog.resolve(selected.first, selected.second)
                     require(resolved.model.supportsCapability(ModelCapability.VISION)) {
@@ -104,7 +104,7 @@ class ConfiguredLLMProvider(
     ): Mono<ChatResponse> =
         Mono
             .fromCallable {
-                val taskSelection = if (useTaskDefault) providerCatalog.taskModelAssignment(ModelCapability.VISION) else null
+                val taskSelection = if (useTaskDefault) providerCatalog.visionTaskModelAssignment(selection.provider) else null
                 val resolved = providerCatalog.resolve(taskSelection?.first ?: selection.provider, taskSelection?.second ?: selection.model)
                 require(resolved.model.supportsCapability(ModelCapability.VISION)) {
                     "Model '${resolved.provider.id}/${resolved.model.id}' does not support VISION. " +

@@ -3,6 +3,10 @@ package de.heckenmann.visualagent.agent.provider
 /** Assigns the first selectable model with each supported application task capability when unset. */
 internal fun CatalogState.withAutomaticTaskModelAssignments(): CatalogState {
     val assignments = taskModelAssignments.toMutableMap()
+    val vision = assignments[ModelCapability.VISION.name]
+    if (vision != null && !vision.confirmed && vision.providerId != activeProviderId) {
+        assignments.remove(ModelCapability.VISION.name)
+    }
     val capabilities = listOf(ModelCapability.VISION, ModelCapability.AUDIO_INPUT, ModelCapability.AUDIO_OUTPUT, ModelCapability.EMBEDDING)
     capabilities.forEach { capability ->
         if (capability.name !in assignments) {
@@ -10,6 +14,7 @@ internal fun CatalogState.withAutomaticTaskModelAssignments(): CatalogState {
                 providers
                     .asSequence()
                     .filter(ProviderProfile::enabled)
+                    .filter { capability != ModelCapability.VISION || it.id == activeProviderId }
                     .filter { it.adapter.supportsTaskModel(capability) }
                     .sortedWith(compareBy<ProviderProfile> { if (it.id == activeProviderId) 0 else 1 }.thenBy(ProviderProfile::id))
                     .firstOrNull { candidate ->
