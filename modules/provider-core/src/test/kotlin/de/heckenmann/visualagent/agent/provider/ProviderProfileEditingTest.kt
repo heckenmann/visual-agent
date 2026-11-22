@@ -37,6 +37,34 @@ class ProviderProfileEditingTest {
         assertEquals(profiles, catalog.listProviders())
     }
 
+    @Test fun `an unavailable assignment does not prevent provider edits and can be cleared`() {
+        val catalog = catalog()
+        val provider = catalog.getProvider("ollama")!!
+        catalog.saveProvider(provider.copy(models = listOf(ProviderModelConfig("vision", capabilities = setOf("vision")))))
+        assertEquals("ollama" to "vision", catalog.taskModelAssignment(ModelCapability.VISION))
+        catalog.updateDiscoveredModels("ollama", emptyList())
+        val baseline = catalog.listProviders()
+        catalog.replaceProfiles(baseline.map { it.copy(name = "Updated ${it.name}") }, baseline)
+        val assignments = catalog.taskModelAssignments()
+        catalog.replaceTaskModelAssignments(assignments - "VISION", assignments)
+        assertEquals(null, catalog.taskModelAssignment(ModelCapability.VISION))
+    }
+
+    @Test fun `image generation gets an independent automatic model and preserves a manual selection`() {
+        val catalog = catalog()
+        val provider = catalog.getProvider("ollama")!!
+        val first = ProviderModelConfig("image-a", capabilities = setOf("image_generation"))
+        val second = ProviderModelConfig("image-b", capabilities = setOf("image_generation"))
+        catalog.saveProvider(provider.copy(models = listOf(first, second)))
+
+        assertEquals("ollama" to "image-a", catalog.taskModelAssignment(ModelCapability.IMAGE_GENERATION))
+        val baseline = catalog.taskModelAssignments()
+        catalog.replaceTaskModelAssignments(baseline + ("IMAGE_GENERATION" to ("ollama" to "image-b")), baseline)
+        catalog.saveProvider(provider.copy(models = listOf(first, second), defaultModel = first.id))
+
+        assertEquals("ollama" to "image-b", catalog.taskModelAssignment(ModelCapability.IMAGE_GENERATION))
+    }
+
     private fun catalog(): ProviderCatalogService =
         ProviderCatalogService(
             object : ProviderPreferenceStore {

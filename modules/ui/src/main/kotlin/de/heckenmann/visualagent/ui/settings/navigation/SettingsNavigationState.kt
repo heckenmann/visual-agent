@@ -10,6 +10,7 @@ enum class SettingsDestination(
 ) {
     APPEARANCE("Appearance"),
     PROVIDERS("Providers"),
+    TASK_MODELS("Task Models"),
     AGENT("Agent"),
     TERMINAL_ACCESS("Terminal Access"),
     UPDATES("Updates"),

@@ -64,9 +64,11 @@ class AgentCapabilityValidatorTest {
     }
 
     @Test
-    fun `inherited chat model remains valid without catalog resolution`() {
+    fun `inherited models remain valid without catalog resolution`() {
         val catalog = mockk<ProviderCatalogService>()
-        AgentCapabilityValidator(catalog).validate(AgentConfig())
+        AgentCapabilityValidator(catalog).validate(
+            AgentConfig(enabledCapabilities = setOf(ModelCapability.CHAT, ModelCapability.VISION)),
+        )
         verify(exactly = 0) { catalog.resolve(any(), any(), any(), any()) }
     }
 }

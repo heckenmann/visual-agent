@@ -150,6 +150,12 @@ class OpenAiClient(
         modelId: String,
     ): Mono<List<Double>> = embeddingsReactive(text)
 
+    internal fun embeddingsReactive(
+        text: String,
+        modelId: String,
+        profile: ProviderProfile,
+    ): Mono<List<Double>> = requestOpenAiEmbedding(text, modelId) { openAiClient(profile) }
+
     override fun isConnected(): Boolean = appConfig.openAiApiKey.isNotBlank()
 
     override fun checkConnectionReactive(): Mono<Boolean> =
@@ -189,11 +195,11 @@ class OpenAiClient(
             .fromCallable {
                 requireUsableApiKey(profile.baseUrl, ProviderEnvironmentCredentials.openAiApiKey(profile))
                 OpenAiModelCatalog { openAiClient(profile) }.loadAll().map { id ->
-                    val capabilities = OpenAiModelCapabilities.infer(id)
+                    val capabilities = inferredCapabilities(id)
                     ProviderModelConfig(
                         id = id,
-                        capabilities = capabilities.map { it.name.lowercase() }.toSet(),
-                        capabilitiesComplete = false,
+                        capabilities = capabilities,
+                        capabilitiesComplete = capabilities == setOf("image_generation"),
                     )
                 }
             }.subscribeOn(Schedulers.boundedElastic())
@@ -206,7 +212,7 @@ class OpenAiClient(
             ShowResponse(
                 model = modelName,
                 modifiedAt = "",
-                details = ModelDetails(family = profile.name),
+                details = ModelDetails(family = profile.name, capabilities = inferredCapabilities(modelName)),
             ),
         )
 
@@ -215,9 +221,12 @@ class OpenAiClient(
             ShowResponse(
                 model = modelName,
                 modifiedAt = "",
-                details = ModelDetails(family = "openai-compatible"),
+                details = ModelDetails(family = "openai-compatible", capabilities = inferredCapabilities(modelName)),
             )
         }
+
+    private fun inferredCapabilities(modelId: String): Set<String> =
+        OpenAiModelCapabilities.infer(modelId).map { it.name.lowercase() }.toSet()
 
     private fun chatModel(
         profile: ProviderProfile? = null,

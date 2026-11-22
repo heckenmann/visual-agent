@@ -151,6 +151,7 @@ See the module READMEs for ownership and migration details: [`:application`](app
 
 ## Documentation
 
+- [Setup Guide](docs/setup.md) — local development, Compose Hot Reload MCP, and quality checks
 - [Architecture](docs/architecture.md) — runtime layers, provider routing, tool system, persistence, in-flight indicator, current constraints
 - [Gradle Module Architecture](docs/gradle-module-architecture.md) — module graph, dependency rules, migration sequence, and verification commands
 - [API Reference](docs/api.md) — `LLMProvider`, Spring AI integration, tool-calling contracts, activity surface

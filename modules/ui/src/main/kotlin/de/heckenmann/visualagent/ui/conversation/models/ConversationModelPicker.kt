@@ -42,6 +42,7 @@ import de.heckenmann.visualagent.protocol.ProviderModel
 import de.heckenmann.visualagent.protocol.ProviderProfile
 import de.heckenmann.visualagent.protocol.capabilitySupport
 import de.heckenmann.visualagent.ui.components.ActionIconButton
+import de.heckenmann.visualagent.ui.components.labelWithCapabilities
 
 /** One row selectable in the composer; provider identity prevents duplicate model names colliding. */
 internal data class ConversationModelOption(
@@ -95,7 +96,7 @@ internal fun ConversationModelPicker(
                     if (state.busy) {
                         "Updating model…"
                     } else {
-                        "${model?.name ?: state.selected.modelId.ifBlank {
+                        "${model?.labelWithCapabilities() ?: state.selected.modelId.ifBlank {
                             "Select model"
                         }} · ${profile?.name.orEmpty()}"
                     },
@@ -133,7 +134,7 @@ internal fun ConversationModelPicker(
                         DropdownMenuItem(
                             text = {
                                 Column {
-                                    Text(option.model.name, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    Text(option.model.labelWithCapabilities(), maxLines = 1, overflow = TextOverflow.Ellipsis)
                                     Text(
                                         if (supported) option.provider.name else "${option.provider.name} · Chat unsupported",
                                         style = MaterialTheme.typography.labelSmall,

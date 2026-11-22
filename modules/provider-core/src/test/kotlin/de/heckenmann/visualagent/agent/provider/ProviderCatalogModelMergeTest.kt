@@ -36,6 +36,18 @@ class ProviderCatalogModelMergeTest {
     }
 
     @Test
+    fun `image-only discovery replaces automatic chat while keeping manual overrides`() {
+        val old = ProviderModelConfig("chatgpt-image-latest", capabilities = setOf("chat"), capabilityOverrides = mapOf("tools" to true))
+        val discovered = old.copy(capabilities = setOf("image_generation"), capabilitiesComplete = true, capabilityOverrides = emptyMap())
+
+        val refreshed = listOf(discovered).mergeWithExisting(mapOf(old.id to old)).single()
+
+        assertEquals(false, refreshed.supportsCapability(ModelCapability.CHAT))
+        assertEquals(true, refreshed.supportsCapability(ModelCapability.IMAGE_GENERATION))
+        assertEquals(old.capabilityOverrides, refreshed.capabilityOverrides)
+    }
+
+    @Test
     fun `updates discovered limits while preserving existing limits when discovery omits them`() {
         val existing =
             mapOf(

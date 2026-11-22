@@ -123,6 +123,8 @@ class SpringProviderPortTest {
                                 format = "gguf",
                                 quantizationLevel = "Q4_K_M",
                                 contextLimit = 4096,
+                                capabilities = setOf("chat", "vision"),
+                                capabilityOverrides = mapOf("vision" to false),
                             ),
                     ),
                 )
@@ -134,6 +136,8 @@ class SpringProviderPortTest {
             assertEquals("8B", details.parameterSize)
             assertEquals("Q4_K_M", details.quantizationLevel)
             assertEquals(4096, details.contextLimit)
+            assertEquals(setOf("chat", "vision"), details.capabilities)
+            assertEquals(mapOf("vision" to false), details.capabilityOverrides)
             verify { provider.getModelConfigsReactive(applicationProfile) }
             verify { provider.getModelDetailsReactive("ollama", "llama3") }
             verify { catalog.updateDiscoveredModelConfigs("ollama", applicationProfile.models) }
@@ -258,6 +262,19 @@ class SpringProviderPortTest {
             assertTrue(result.contains("responded successfully"))
             assertEquals("ollama", selection.captured.provider)
             assertEquals("llava", selection.captured.model)
+        }
+
+    @Test
+    fun `embedding probe validates the selected provider model response`() =
+        runTest {
+            every { catalog.selectableModels("openai") } returns
+                listOf(ProviderModelConfig("embed", capabilities = setOf("embedding"), capabilitiesComplete = true))
+            val selection = ModelSelection(provider = "openai", model = "embed")
+            every { provider.embeddingsReactive(any(), selection) } returns Mono.just(listOf(0.1)) andThen
+                Mono.just(emptyList())
+
+            assertTrue(port.probeModelCapability("openai", "embed", "EMBEDDING").contains("responded successfully"))
+            assertTrue(runCatching { port.probeModelCapability("openai", "embed", "EMBEDDING") }.isFailure)
         }
 
     @Test

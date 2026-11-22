@@ -16,6 +16,10 @@ object VisionSupport {
      */
     fun media(image: ByteArray): Media = Media(mimeType(image), ByteArrayResource(image))
 
+    /** Decodes inline message attachments, accepting both data URLs and raw Base64. */
+    fun messageMedia(images: List<String>?): List<Media> =
+        images.orEmpty().map { media(Base64.getDecoder().decode(it.substringAfter(','))) }
+
     /** Returns a data URL suitable for provider protocols that accept inline images. */
     fun dataUrl(image: ByteArray): String = "data:${mimeType(image)};base64,${Base64.getEncoder().encodeToString(image)}"
 

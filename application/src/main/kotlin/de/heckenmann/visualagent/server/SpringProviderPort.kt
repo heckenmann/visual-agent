@@ -9,6 +9,7 @@ import de.heckenmann.visualagent.agent.provider.DirectProviderAuthorization
 import de.heckenmann.visualagent.agent.provider.ModelCapability
 import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
 import de.heckenmann.visualagent.agent.provider.ProviderModelConfig
+import de.heckenmann.visualagent.agent.provider.mergeWithExisting
 import de.heckenmann.visualagent.agent.provider.supportsCapability
 import de.heckenmann.visualagent.protocol.ModelDetails
 import de.heckenmann.visualagent.protocol.ModelStatus
@@ -20,6 +21,7 @@ import de.heckenmann.visualagent.protocol.ProviderPort
 import de.heckenmann.visualagent.protocol.ProviderProfile
 import de.heckenmann.visualagent.protocol.ProviderSignInResult
 import de.heckenmann.visualagent.protocol.ProviderSignInSession
+import de.heckenmann.visualagent.protocol.TaskModelAssignment
 import de.heckenmann.visualagent.protocol.UserFacingError
 import kotlinx.coroutines.reactor.awaitSingle
 import kotlinx.coroutines.reactor.awaitSingleOrNull
@@ -75,6 +77,13 @@ class SpringProviderPort(
         )
     }
 
+    override fun taskModelAssignments(): List<TaskModelAssignment> = protocolBoundary { providerCatalog.taskModelAssignmentsToProtocol() }
+
+    override fun replaceTaskModelAssignments(
+        assignments: List<TaskModelAssignment>,
+        expectedAssignments: List<TaskModelAssignment>,
+    ) = protocolBoundary { providerCatalog.replaceTaskModelAssignmentsFromProtocol(assignments, expectedAssignments) }
+
     override fun deleteProvider(providerId: String): Boolean = protocolBoundary { providerCatalog.deleteProvider(providerId) }
 
     override suspend fun refreshModels(providerId: String): List<ProviderModel> =
@@ -113,22 +122,28 @@ class SpringProviderPort(
             require(model.supportsCapability(requested)) {
                 "Model '$providerId/$modelId' does not declare $requested capability"
             }
-            val response =
+            val responds =
                 when (requested) {
                     ModelCapability.CHAT ->
-                        llmProvider.chatReactive(
-                            ChatRequestContext(
-                                messages = listOf(Message("user", "Reply with one short word: OK.")),
-                                provider = providerId,
-                                model = modelId,
-                            ),
-                        )
+                        llmProvider
+                            .chatReactive(
+                                ChatRequestContext(
+                                    messages = listOf(Message("user", "Reply with one short word: OK.")),
+                                    provider = providerId,
+                                    model = modelId,
+                                ),
+                            ).map { it.message.content.isNotBlank() }
                     ModelCapability.VISION ->
-                        llmProvider.visionReactive(
-                            Base64.getDecoder().decode(PROBE_PNG_BASE64),
-                            "Briefly describe the color of this image.",
-                            ModelSelection(provider = providerId, model = modelId),
-                        )
+                        llmProvider
+                            .visionReactive(
+                                Base64.getDecoder().decode(PROBE_PNG_BASE64),
+                                "Briefly describe the color of this image.",
+                                ModelSelection(provider = providerId, model = modelId),
+                            ).map { it.message.content.isNotBlank() }
+                    ModelCapability.EMBEDDING ->
+                        llmProvider
+                            .embeddingsReactive("Visual Agent model probe", ModelSelection(provider = providerId, model = modelId))
+                            .map { it.isNotEmpty() && it.all(Double::isFinite) }
                     else ->
                         throw ProtocolOperationException(
                             UserFacingError(
@@ -140,7 +155,7 @@ class SpringProviderPort(
                             ),
                         )
                 }.timeout(Duration.ofSeconds(15)).awaitSingle()
-            require(response.message.content.isNotBlank()) { "Model '$providerId/$modelId' returned an empty response" }
+            require(responds) { "Model '$providerId/$modelId' returned an empty or invalid response" }
             "$requested model '$providerId/$modelId' responded successfully"
         }
 
@@ -211,26 +226,7 @@ private fun ProviderProfile.toApplication(): ApplicationProviderProfile =
     )
 
 private fun ProviderProfile.withDiscoveredModels(modelConfigs: List<ProviderModelConfig>): ProviderProfile =
-    copy(
-        models =
-            modelConfigs.distinctBy(ProviderModelConfig::id).map { config ->
-                val discovered = config.toProtocol()
-                val existing = models.firstOrNull { it.id == config.id }
-                existing?.copy(
-                    name = discovered.name,
-                    contextLimit = discovered.contextLimit ?: existing.contextLimit,
-                    outputLimit = discovered.outputLimit ?: existing.outputLimit,
-                    capabilities =
-                        when {
-                            existing.capabilitiesOverridden -> existing.capabilities
-                            discovered.capabilitiesComplete -> discovered.capabilities
-                            existing.capabilitiesComplete -> existing.capabilities
-                            else -> existing.capabilities + discovered.capabilities
-                        },
-                    capabilitiesComplete = existing.capabilitiesComplete || discovered.capabilitiesComplete,
-                ) ?: discovered
-            },
-    )
+    copy(models = modelConfigs.mergeWithExisting(models.associate { it.id to it.toApplication() }).map(ProviderModelConfig::toProtocol))
 
 private fun ProviderProfile.selectableModels(): List<ProviderModel> =
     models.filter { model ->
@@ -299,4 +295,8 @@ private fun ShowResponse.toProtocol(): ModelDetails =
         format = details?.format,
         quantizationLevel = details?.quantizationLevel,
         contextLimit = details?.contextLimit,
+        capabilities = details?.capabilities.orEmpty(),
+        capabilitiesComplete = details?.capabilitiesComplete ?: false,
+        capabilitiesOverridden = details?.capabilitiesOverridden ?: false,
+        capabilityOverrides = details?.capabilityOverrides.orEmpty(),
     )

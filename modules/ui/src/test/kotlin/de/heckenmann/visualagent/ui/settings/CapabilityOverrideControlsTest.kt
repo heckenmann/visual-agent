@@ -53,7 +53,7 @@ class CapabilityOverrideControlsTest {
             "The test host must place catalog controls vertically instead of overlaying their click targets",
         )
         compose.onNodeWithText("Model catalog").performClick()
-        compose.onNodeWithText("legacy-partial").performClick()
+        compose.onNodeWithText("legacy-partial [vision]").performClick()
         assertEquals(legacy.id, draft.value.modelId)
         compose
             .onNodeWithText(

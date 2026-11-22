@@ -27,7 +27,8 @@ internal object OpenAiModelFilter {
     private fun isOfficialChatModel(modelId: String): Boolean {
         val normalized = modelId.lowercase()
         val baseModel = normalized.substringAfter("ft:", normalized)
-        return baseModel.startsWith("gpt-") ||
+        return baseModel == "chat-latest" ||
+            baseModel.startsWith("gpt-") ||
             baseModel.startsWith("chatgpt-") ||
             Regex("""o[1-9](?:-|$)""").containsMatchIn(baseModel)
     }

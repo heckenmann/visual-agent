@@ -18,6 +18,68 @@ import kotlin.test.assertFailsWith
 /** Verifies provider routing and capability checks for image analysis. */
 class ConfiguredLLMProviderVisionTest {
     @Test
+    fun `global vision uses the assigned Ollama profile only while enabled and selectable`() =
+        runTest {
+            val catalog = catalog()
+            val profile =
+                ProviderProfile(
+                    id = "secondary-ollama",
+                    name = "Secondary Ollama",
+                    adapter = ProviderAdapter.OLLAMA,
+                    baseUrl = "http://secondary.example:11434",
+                    defaultModel = "llava",
+                    models = listOf(ProviderModelConfig("llava", capabilities = setOf("vision"))),
+                )
+            catalog.saveProvider(profile)
+            assertEquals(null, catalog.visionTaskModelAssignment())
+            catalog.replaceTaskModelAssignments(mapOf("VISION" to (profile.id to "llava")), catalog.taskModelAssignments())
+            val ollama = mockk<OllamaClient>()
+            every { ollama.visionReactive(any(), "describe", "llava", profile) } returns
+                Mono.just(ChatResponse("llava", Message("assistant", "routed"), done = true))
+            val router = ConfiguredLLMProvider(ollama, mockk(relaxed = true), catalog)
+            assertEquals(
+                "routed",
+                router
+                    .visionReactive(byteArrayOf(1), "describe")
+                    .awaitSingle()
+                    .message.content,
+            )
+            catalog.saveProvider(profile.copy(modelBlacklist = setOf("llava")))
+            assertFailsWith<IllegalStateException> { router.visionReactive(byteArrayOf(1), "describe").awaitSingle() }
+            catalog.saveProvider(profile.copy(enabled = false))
+            assertFailsWith<IllegalStateException> { router.visionReactive(byteArrayOf(1), "describe").awaitSingle() }
+            io.mockk.verify(exactly = 1) { ollama.visionReactive(any(), "describe", "llava", profile) }
+        }
+
+    @Test
+    fun `text follow up does not route to the previous image model`() {
+        val catalog = catalog()
+        catalog.saveProvider(
+            ProviderProfile(
+                id = "vision-provider",
+                name = "Vision",
+                adapter = ProviderAdapter.OLLAMA,
+                baseUrl = "http://vision",
+                defaultModel = "vision",
+                models = listOf(ProviderModelConfig("vision", capabilities = setOf("vision"))),
+            ),
+        )
+        val request =
+            ChatRequestContext(
+                messages =
+                    listOf(
+                        Message("user", "image", images = listOf("encoded")),
+                        Message("assistant", "answer"),
+                        Message("user", "follow up"),
+                    ),
+                provider = "ollama",
+                model = "text",
+            )
+        catalog.replaceTaskModelAssignments(mapOf("VISION" to ("vision-provider" to "vision")), catalog.taskModelAssignments())
+        assertEquals(request, request.withTaskModelAssignment(catalog))
+    }
+
+    @Test
     fun `codex vision delegates with the resolved provider profile`() =
         runTest {
             val catalog = catalog()

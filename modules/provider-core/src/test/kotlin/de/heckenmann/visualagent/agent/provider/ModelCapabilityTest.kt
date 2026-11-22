@@ -9,6 +9,9 @@ class ModelCapabilityTest {
     @Test
     fun `openai inference distinguishes chat vision speech images and embeddings`() {
         assertTrue(ModelCapability.VISION in OpenAiModelCapabilities.infer("gpt-4o"))
+        assertTrue(ModelCapability.VISION in OpenAiModelCapabilities.infer("chat-latest"))
+        assertEquals(setOf(ModelCapability.CHAT, ModelCapability.VISION), OpenAiModelCapabilities.infer("chatgpt-4o-latest"))
+        assertEquals(setOf(ModelCapability.IMAGE_GENERATION), OpenAiModelCapabilities.infer("chatgpt-image-latest"))
         assertTrue(ModelCapability.EMBEDDING in OpenAiModelCapabilities.infer("text-embedding-3-small"))
         assertTrue(ModelCapability.AUDIO_INPUT in OpenAiModelCapabilities.infer("whisper-1"))
         assertTrue(ModelCapability.AUDIO_OUTPUT in OpenAiModelCapabilities.infer("tts-1"))

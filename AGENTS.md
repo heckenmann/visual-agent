@@ -131,6 +131,19 @@ CodeGraph is an optional local MCP service for structural code intelligence. It 
 
 See the [CodeGraph README](https://github.com/colbymchenry/codegraph/blob/main/README.md) for current commands and tool details.
 
+## Compose Hot Reload MCP Workflow
+
+For runtime inspection and smoke checks of the Compose desktop UI, use the
+[Compose Hot Reload MCP setup](docs/setup.md#compose-hot-reload-mcp). Launch the
+app with `:desktop:hotRun` and an isolated database. The MCP client runs
+`:desktop:hotMcpServer` from the same checkout.
+
+Confirm the connection with `status`, select the target window with
+`list_windows`, and use `get_semantic_tree` to locate controls before interacting
+with them. Read the tree again to verify the resulting state and use
+`take_screenshot` when checking layout. Report the UI flows actually exercised
+and run the applicable Gradle quality checks separately.
+
 ## Project Layout (essentials)
 
 ```text

@@ -55,6 +55,14 @@ class ConfiguredLLMProvider(
     ): Mono<ChatResponse> =
         Mono
             .fromCallable {
+                val selected = providerCatalog.visionTaskModelAssignment()
+                if (selected != null) {
+                    val resolved = providerCatalog.resolve(selected.first, selected.second)
+                    require(resolved.model.supportsCapability(ModelCapability.VISION)) {
+                        "Model '${selected.first}/${selected.second}' does not support VISION"
+                    }
+                    return@fromCallable resolved.provider to resolved.model.id
+                }
                 val providerId = providerCatalog.activeProviderId()
                 val profile =
                     providerCatalog.getProvider(providerId)
@@ -64,10 +72,13 @@ class ConfiguredLLMProvider(
                 profile to modelId
             }.subscribeOn(Schedulers.boundedElastic())
             .flatMap { (profile, modelId) ->
-                if (profile.adapter in setOf(ProviderAdapter.CODEX_CLI, ProviderAdapter.CODEX_DIRECT)) {
-                    adapterFor(profile.adapter).visionReactive(image, prompt, modelId, profile)
-                } else {
-                    providerFor(profile).visionReactive(image, prompt, modelId)
+                when (profile.adapter) {
+                    ProviderAdapter.CODEX_CLI, ProviderAdapter.CODEX_DIRECT ->
+                        adapterFor(
+                            profile.adapter,
+                        ).visionReactive(image, prompt, modelId, profile)
+                    ProviderAdapter.OPENAI_COMPATIBLE -> openAiClient.visionReactive(image, prompt, modelId, profile)
+                    ProviderAdapter.OLLAMA -> ollamaClient.visionReactive(image, prompt, modelId, profile)
                 }
             }
 
@@ -76,10 +87,25 @@ class ConfiguredLLMProvider(
         image: ByteArray,
         prompt: String,
         selection: ModelSelection,
+    ): Mono<ChatResponse> = routeVision(image, prompt, selection, useTaskDefault = false)
+
+    override fun visionReactive(
+        image: ByteArray,
+        prompt: String,
+        selection: ModelSelection,
+        useTaskDefault: Boolean,
+    ): Mono<ChatResponse> = routeVision(image, prompt, selection, useTaskDefault)
+
+    private fun routeVision(
+        image: ByteArray,
+        prompt: String,
+        selection: ModelSelection,
+        useTaskDefault: Boolean,
     ): Mono<ChatResponse> =
         Mono
             .fromCallable {
-                val resolved = providerCatalog.resolve(selection.provider, selection.model)
+                val taskSelection = if (useTaskDefault) providerCatalog.visionTaskModelAssignment(selection.provider) else null
+                val resolved = providerCatalog.resolve(taskSelection?.first ?: selection.provider, taskSelection?.second ?: selection.model)
                 require(resolved.model.supportsCapability(ModelCapability.VISION)) {
                     "Model '${resolved.provider.id}/${resolved.model.id}' does not support VISION. " +
                         "Pick a vision-capable model in the sub-agent settings."
@@ -99,7 +125,18 @@ class ConfiguredLLMProvider(
             }
 
     override fun embeddingsReactive(text: String): Mono<List<Double>> =
-        activeProviderSelectionReactive().flatMap { (provider, modelId) -> provider.embeddingsReactive(text, modelId) }
+        Mono
+            .fromCallable { providerCatalog.taskModelAssignment(ModelCapability.EMBEDDING) }
+            .subscribeOn(Schedulers.boundedElastic())
+            .flatMap { (provider, model) -> embeddingsReactive(text, ModelSelection(provider = provider, model = model)) }
+            .switchIfEmpty(
+                activeProviderSelectionReactive().flatMap { (provider, model) -> provider.embeddingsReactive(text, model) },
+            )
+
+    override fun embeddingsReactive(
+        text: String,
+        selection: ModelSelection,
+    ): Mono<List<Double>> = routeProviderEmbeddings(text, selection, providerCatalog, ollamaClient, openAiClient)
 
     override fun isConnected(): Boolean {
         val profile = providerCatalog.getProvider(providerCatalog.activeProviderId()) ?: return false
@@ -122,35 +159,13 @@ class ConfiguredLLMProvider(
     override fun getModelsReactive(): Mono<List<String>> = getModelsReactive(providerCatalog.activeProviderId())
 
     override fun getModelsReactive(providerId: String): Mono<List<String>> =
-        Mono
-            .fromCallable { providerCatalog.getProvider(providerId) ?: error("Provider not found: $providerId") }
-            .subscribeOn(Schedulers.boundedElastic())
-            .flatMap { profile ->
-                discoverModelConfigsReactive(profile).flatMap { discovered ->
-                    if (profile.adapter == ProviderAdapter.CODEX_CLI ||
-                        profile.adapter == ProviderAdapter.CODEX_DIRECT ||
-                        profile.adapter == ProviderAdapter.OPENAI_COMPATIBLE
-                    ) {
-                        providerCatalog.updateDiscoveredModelConfigs(providerId, discovered)
-                    } else {
-                        providerCatalog.updateDiscoveredModels(providerId, discovered.map { it.id })
-                    }
-                    if (profile.adapter == ProviderAdapter.OLLAMA) {
-                        providerCatalog.updateModelCapabilities(
-                            providerId,
-                            discovered
-                                .filter(ProviderModelConfig::capabilitiesComplete)
-                                .associate { it.id to it.capabilities },
-                        )
-                    }
-                    Mono.just(providerCatalog.selectableModels(providerId).map { it.id })
-                }
-            }
+        loadProviderModelIdsReactive(providerCatalog, providerId, ollamaClient, openAiClient, profiledAdapters, fetchCapabilities)
 
     override fun getModelsReactive(profile: ProviderProfile): Mono<List<String>> =
-        discoverModelConfigsReactive(profile).map { configs -> configs.map(ProviderModelConfig::id) }
+        discoverProviderModelIdsReactive(profile, ollamaClient, openAiClient, profiledAdapters, fetchCapabilities)
 
-    override fun getModelConfigsReactive(profile: ProviderProfile): Mono<List<ProviderModelConfig>> = discoverModelConfigsReactive(profile)
+    override fun getModelConfigsReactive(profile: ProviderProfile): Mono<List<ProviderModelConfig>> =
+        discoverProviderModelConfigsReactive(profile, ollamaClient, openAiClient, profiledAdapters, fetchCapabilities)
 
     override fun getModelDetailsReactive(modelName: String): Mono<ShowResponse> =
         getModelDetailsReactive(providerCatalog.activeProviderId(), modelName)
@@ -170,29 +185,8 @@ class ConfiguredLLMProvider(
                         adapterFor(
                             profile.adapter,
                         ).getModelDetailsReactive(profile, modelName)
-                }
+                }.map { it.withCatalogCapabilities(profile, modelName) }
             }
-
-    private fun discoverModelConfigsReactive(profile: ProviderProfile): Mono<List<ProviderModelConfig>> =
-        when (profile.adapter) {
-            ProviderAdapter.OLLAMA ->
-                ollamaClient.getModelsReactive(profile).flatMap { names ->
-                    fetchCapabilities(profile).map { capabilities ->
-                        names.map { name ->
-                            val reported = capabilities[name]
-                            ProviderModelConfig(
-                                id = name,
-                                capabilities = reported.orEmpty(),
-                                capabilitiesComplete = reported != null,
-                            )
-                        }
-                    }
-                }
-            ProviderAdapter.OPENAI_COMPATIBLE ->
-                runCatching { openAiClient.getModelConfigsReactive(profile) }
-                    .getOrElse { openAiClient.getModelsReactive(profile).map { models -> models.map(::ProviderModelConfig) } }
-            ProviderAdapter.CODEX_CLI, ProviderAdapter.CODEX_DIRECT -> adapterFor(profile.adapter).loadModelsReactive(profile)
-        }
 
     private fun checkConnectionReactive(profile: ProviderProfile): Mono<Boolean> =
         when (profile.adapter) {
@@ -226,7 +220,7 @@ class ConfiguredLLMProvider(
 
     private fun resolveRequest(request: ChatRequestContext): Mono<ChatRequestContext> =
         Mono
-            .fromCallable { request.withConfiguredContextLimit().resolve() }
+            .fromCallable { request.withConfiguredContextLimit().withTaskModelAssignment(providerCatalog).resolve() }
             .subscribeOn(Schedulers.boundedElastic())
             .flatMap(::refreshModelContextLimit)
 

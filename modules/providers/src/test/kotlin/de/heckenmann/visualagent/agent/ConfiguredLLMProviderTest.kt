@@ -226,7 +226,7 @@ class ConfiguredLLMProviderTest {
                 val openAi = mockk<OpenAiClient>(relaxed = true)
                 val catalog = catalog()
                 catalog.setActiveSelection("openai", "gpt-vision")
-                every { openAi.visionReactive(any(), any(), "gpt-vision") } returns
+                every { openAi.visionReactive(any(), any(), "gpt-vision", any()) } returns
                     Mono.just(ChatResponse("gpt", Message("assistant", "image ok"), done = true))
                 every { openAi.embeddingsReactive("text", "gpt-vision") } returns Mono.just(listOf(0.1, 0.2))
                 val router = ConfiguredLLMProvider(ollama, openAi, catalog)
@@ -240,7 +240,7 @@ class ConfiguredLLMProviderTest {
                 )
                 assertEquals(listOf(0.1, 0.2), router.embeddingsReactive("text").awaitSingle())
 
-                verify(exactly = 1) { openAi.visionReactive(any(), any(), "gpt-vision") }
+                verify(exactly = 1) { openAi.visionReactive(any(), any(), "gpt-vision", any()) }
                 verify(exactly = 1) { openAi.embeddingsReactive("text", "gpt-vision") }
             } finally {
                 appConfig.llmProvider = originalProvider

@@ -1,6 +1,8 @@
 package de.heckenmann.visualagent.agent.codexdirect
 
 import de.heckenmann.visualagent.agent.provider.DirectProviderAuthMode
+import de.heckenmann.visualagent.agent.provider.ProviderModelConfig
+import de.heckenmann.visualagent.agent.provider.mergeWithExisting
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -8,6 +10,27 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNull
 
 class DirectModelCatalogTest {
+    @Test
+    fun `ChatGPT subscription catalog preserves advertised image input`() {
+        val body =
+            """
+            {"models":[
+              {"slug":"image-input","visibility":"list","input_modalities":["text","image"]},
+              {"slug":"text-input","visibility":"list","input_modalities":["text"]},
+              {"slug":"unknown","visibility":"list"}
+            ]}
+            """.trimIndent()
+
+        val models = parseDirectModels(body, DirectProviderAuthMode.CHATGPT_OAUTH)
+
+        val previous = models.associate { it.id to ProviderModelConfig(it.id, capabilities = setOf("image_input", "tools")) }
+        val refreshed = models.mergeWithExisting(previous)
+
+        assertEquals(setOf("vision", "tools"), refreshed[0].capabilities)
+        assertEquals(setOf("tools"), refreshed[1].capabilities)
+        assertEquals(setOf("image_input", "tools"), refreshed[2].capabilities)
+    }
+
     @Test
     fun `OAuth preserves account ordering and display names while excluding unlisted entries`() {
         val body =

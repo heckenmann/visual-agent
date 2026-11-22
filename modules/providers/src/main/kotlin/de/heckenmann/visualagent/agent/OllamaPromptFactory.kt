@@ -6,6 +6,7 @@ import de.heckenmann.visualagent.agent.Message
 import de.heckenmann.visualagent.agent.RequestContextBudgeter
 import de.heckenmann.visualagent.agent.ToolDefinition
 import de.heckenmann.visualagent.agent.ToolId
+import de.heckenmann.visualagent.agent.VisionSupport
 import de.heckenmann.visualagent.agent.nativeResponseSchema
 import de.heckenmann.visualagent.agent.provider.ProviderToolCallbacks
 import de.heckenmann.visualagent.agent.supportsToolCalling
@@ -151,8 +152,9 @@ class OllamaPromptFactory(
             )
         }
 
-    private fun toSpringMessages(messages: List<Message>): List<SpringMessage> =
-        messages.map { msg ->
+    private fun toSpringMessages(messages: List<Message>): List<SpringMessage> {
+        val currentUser = messages.indexOfLast { it.role == "user" }
+        return messages.mapIndexed { index, msg ->
             val metadata =
                 msg.contextPolicy?.let { mapOf(ContextPolicyMetadata.KEY to it.name) }.orEmpty()
             when (msg.role) {
@@ -172,10 +174,12 @@ class OllamaPromptFactory(
                     UserMessage
                         .builder()
                         .text(msg.content)
+                        .media(VisionSupport.messageMedia(msg.images.takeIf { index == currentUser }))
                         .metadata(metadata)
                         .build()
             }
         }
+    }
 
     private fun org.springframework.ai.tool.ToolCallback.toProviderDefinition(): ToolDefinition =
         ToolDefinition(

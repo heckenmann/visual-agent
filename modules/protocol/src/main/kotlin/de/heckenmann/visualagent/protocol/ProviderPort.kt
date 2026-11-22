@@ -38,6 +38,15 @@ interface ProviderPort {
         expectedProfiles: List<ProviderProfile>,
     ): Unit = throw UnsupportedOperationException("Provider catalog editing is unavailable")
 
+    /** Lists application-wide model choices for task capabilities. */
+    fun taskModelAssignments(): List<TaskModelAssignment> = emptyList()
+
+    /** Saves application-wide task model choices against the previously loaded baseline. */
+    fun replaceTaskModelAssignments(
+        assignments: List<TaskModelAssignment>,
+        expectedAssignments: List<TaskModelAssignment>,
+    ): Unit = throw UnsupportedOperationException("Task model assignment editing is unavailable")
+
     /** Deletes a provider profile when the catalog allows it. */
     fun deleteProvider(providerId: String): Boolean
 
@@ -82,6 +91,13 @@ interface ProviderPort {
     suspend fun signOutDirectProvider(profile: ProviderProfile): Boolean =
         throw UnsupportedOperationException("Direct provider authorization is unavailable")
 }
+
+/** Provider-qualified application-wide model choice for one task capability. */
+data class TaskModelAssignment(
+    val capability: String,
+    val providerId: String,
+    val modelId: String,
+)
 
 /** Browser instructions; authorization URLs may contain identity hints and must never be logged. */
 data class ProviderSignInSession(
@@ -152,7 +168,14 @@ data class ProviderModel(
     val capabilityOverrides: Map<String, Boolean> = emptyMap(),
 )
 
-/** User-safe model detail response. */
+/**
+ * User-safe model detail response.
+ *
+ * @property capabilities Provider-reported model capabilities
+ * @property capabilitiesComplete Whether provider metadata declares the complete capability set
+ * @property capabilitiesOverridden Whether a legacy whole-set override is active
+ * @property capabilityOverrides Per-capability user overrides
+ */
 data class ModelDetails(
     val model: String,
     val modifiedAt: String,
@@ -161,4 +184,8 @@ data class ModelDetails(
     val format: String? = null,
     val quantizationLevel: String? = null,
     val contextLimit: Int? = null,
+    val capabilities: Set<String> = emptySet(),
+    val capabilitiesComplete: Boolean = false,
+    val capabilitiesOverridden: Boolean = false,
+    val capabilityOverrides: Map<String, Boolean> = emptyMap(),
 )

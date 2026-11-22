@@ -97,6 +97,14 @@ interface LLMProvider {
         selection: ModelSelection,
     ): Mono<ChatResponse> = selection.model?.let { visionReactive(image, prompt, it) } ?: visionReactive(image, prompt)
 
+    /** Uses an application-wide VISION default before the supplied fallback selection when requested. */
+    fun visionReactive(
+        image: ByteArray,
+        prompt: String,
+        selection: ModelSelection,
+        useTaskDefault: Boolean,
+    ): Mono<ChatResponse> = visionReactive(image, prompt, selection)
+
     /**
      * Generate embeddings for text.
      *
@@ -120,6 +128,12 @@ interface LLMProvider {
         text: String,
         modelId: String,
     ): Mono<List<Double>> = embeddingsReactive(text)
+
+    /** Generates embeddings through an explicitly selected provider and model. */
+    fun embeddingsReactive(
+        text: String,
+        selection: ModelSelection,
+    ): Mono<List<Double>> = Mono.error(UnsupportedOperationException("Provider-specific embeddings are unavailable"))
 
     /**
      * Check if the provider is currently connected and available.

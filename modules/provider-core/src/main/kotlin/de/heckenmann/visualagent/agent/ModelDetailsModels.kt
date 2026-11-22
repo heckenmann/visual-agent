@@ -1,5 +1,6 @@
 package de.heckenmann.visualagent.agent
 
+import de.heckenmann.visualagent.agent.provider.ProviderProfile
 import kotlinx.serialization.Serializable
 
 /**
@@ -36,6 +37,10 @@ data class ShowResponse(
  * @property parameterSize Human-readable parameter count
  * @property quantizationLevel Quantization description
  * @property contextLimit Provider-reported context window in tokens
+ * @property capabilities Provider-reported model capabilities
+ * @property capabilitiesComplete Whether provider metadata declares the complete capability set
+ * @property capabilitiesOverridden Whether the user set a legacy whole-set override
+ * @property capabilityOverrides Per-capability user overrides
  */
 @Serializable
 data class ModelDetails(
@@ -46,4 +51,25 @@ data class ModelDetails(
     val parameterSize: String? = null,
     val quantizationLevel: String? = null,
     val contextLimit: Int? = null,
+    val capabilities: Set<String> = emptySet(),
+    val capabilitiesComplete: Boolean = false,
+    val capabilitiesOverridden: Boolean = false,
+    val capabilityOverrides: Map<String, Boolean> = emptyMap(),
 )
+
+/** Adds discovered and manually overridden capability metadata from the provider catalog. */
+fun ShowResponse.withCatalogCapabilities(
+    profile: ProviderProfile,
+    modelId: String,
+): ShowResponse {
+    val model = profile.models.firstOrNull { it.id == modelId } ?: return this
+    return copy(
+        details =
+            (details ?: ModelDetails()).copy(
+                capabilities = model.capabilities,
+                capabilitiesComplete = model.capabilitiesComplete,
+                capabilitiesOverridden = model.capabilitiesOverridden,
+                capabilityOverrides = model.capabilityOverrides,
+            ),
+    )
+}

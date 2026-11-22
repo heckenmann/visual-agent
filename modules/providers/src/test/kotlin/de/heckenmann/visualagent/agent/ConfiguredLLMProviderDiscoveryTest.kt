@@ -56,10 +56,22 @@ class ConfiguredLLMProviderDiscoveryTest {
                     Mono.just(ShowResponse("gpt-profile", "", details = ModelDetails(family = "openai")))
                 every { openAi.streamReactive(any<ChatRequestContext>()) } returns
                     Flux.just(ChatResponse("gpt-profile", Message("assistant", "chunk"), true))
+                catalog.updateDiscoveredModelConfigs(
+                    "openai",
+                    listOf(
+                        de.heckenmann.visualagent.agent.provider.ProviderModelConfig(
+                            id = "gpt-profile",
+                            capabilities = setOf("chat", "vision"),
+                            capabilityOverrides = mapOf("vision" to false),
+                        ),
+                    ),
+                )
                 val router = ConfiguredLLMProvider(ollama, openAi, catalog)
 
                 assertEquals(listOf("gpt-profile"), router.getModelsReactive("openai").awaitSingle())
-                assertEquals("gpt-profile", router.getModelDetailsReactive("openai", "gpt-profile").awaitSingle().model)
+                val details = router.getModelDetailsReactive("openai", "gpt-profile").awaitSingle().details
+                assertEquals(setOf("chat", "vision"), details?.capabilities)
+                assertEquals(mapOf("vision" to false), details?.capabilityOverrides)
                 val chunks =
                     router
                         .streamReactive(
