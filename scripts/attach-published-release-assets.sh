@@ -82,6 +82,7 @@ for artifact in \
   ' <<< "$artifacts")"
   target="$assets_dir"
   [[ "$artifact" != release-verification-tools ]] || target="$tools_dir"
+  mkdir -p "$target"
   gh api "repos/$GH_REPO/actions/artifacts/$id/zip" > "$scratch/artifact.zip"
   unzip -oq "$scratch/artifact.zip" -d "$target"
 done
