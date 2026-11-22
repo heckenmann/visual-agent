@@ -47,6 +47,7 @@ internal class TaskModelSettingsState {
     var persistedAssignments by mutableStateOf<List<TaskModelAssignment>>(emptyList())
     var loaded by mutableStateOf(false)
     var busy by mutableStateOf(false)
+    var refreshPending by mutableStateOf(false)
     var status by mutableStateOf("Loading task models...")
     var generation = 0
 }
@@ -62,6 +63,7 @@ internal fun TaskModelSettingsPanel(
 
     /** Reloads the persisted task assignments without blocking the UI. */
     fun reload() {
+        state.refreshPending = false
         val generation = ++state.generation
         state.busy = true
         scope.launch {
@@ -87,11 +89,14 @@ internal fun TaskModelSettingsPanel(
     }
 
     LaunchedEffect(port) { if (!dirty) reload() }
+    LaunchedEffect(port, state.refreshPending, state.busy, dirty) {
+        if (state.refreshPending && !state.busy && !dirty) reload()
+    }
     DisposableEffect(port) {
         val listener =
             port.addChangeListener {
                 scope.launch {
-                    if (state.assignments == state.persistedAssignments && !state.busy) reload()
+                    state.refreshPending = true
                 }
             }
         onDispose { listener.close() }
