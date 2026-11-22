@@ -7,7 +7,7 @@ internal fun CatalogState.withAutomaticTaskModelAssignments(): CatalogState {
     if (vision != null && !vision.confirmed && vision.providerId != activeProviderId) {
         assignments.remove(ModelCapability.VISION.name)
     }
-    val capabilities = listOf(ModelCapability.VISION, ModelCapability.AUDIO_INPUT, ModelCapability.AUDIO_OUTPUT, ModelCapability.EMBEDDING)
+    val capabilities = ModelCapability.entries - setOf(ModelCapability.CHAT, ModelCapability.TOOLS)
     capabilities.forEach { capability ->
         if (capability.name !in assignments) {
             val profile =
@@ -46,4 +46,4 @@ internal fun CatalogState.withAutomaticTaskModelAssignments(): CatalogState {
 }
 
 internal fun ProviderAdapter.supportsTaskModel(capability: ModelCapability): Boolean =
-    capability != ModelCapability.EMBEDDING || this == ProviderAdapter.OLLAMA
+    capability != ModelCapability.EMBEDDING || this == ProviderAdapter.OLLAMA || this == ProviderAdapter.OPENAI_COMPATIBLE

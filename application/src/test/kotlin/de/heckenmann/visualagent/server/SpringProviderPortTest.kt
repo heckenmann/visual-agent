@@ -265,6 +265,19 @@ class SpringProviderPortTest {
         }
 
     @Test
+    fun `embedding probe validates the selected provider model response`() =
+        runTest {
+            every { catalog.selectableModels("openai") } returns
+                listOf(ProviderModelConfig("embed", capabilities = setOf("embedding"), capabilitiesComplete = true))
+            val selection = ModelSelection(provider = "openai", model = "embed")
+            every { provider.embeddingsReactive(any(), selection) } returns Mono.just(listOf(0.1)) andThen
+                Mono.just(emptyList())
+
+            assertTrue(port.probeModelCapability("openai", "embed", "EMBEDDING").contains("responded successfully"))
+            assertTrue(runCatching { port.probeModelCapability("openai", "embed", "EMBEDDING") }.isFailure)
+        }
+
+    @Test
     fun `unsupported audio probes fail clearly instead of declaring metadata checks successful`() =
         runTest {
             every { catalog.selectableModels("ollama") } returns

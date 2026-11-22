@@ -38,7 +38,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-private val taskModelCapabilities = listOf("VISION", "AUDIO_INPUT", "AUDIO_OUTPUT", "EMBEDDING")
+private val taskModelCapabilities = listOf("VISION", "AUDIO_INPUT", "AUDIO_OUTPUT", "IMAGE_GENERATION", "EMBEDDING")
 
 /** Holds persisted and editable application-wide task model choices. */
 internal class TaskModelSettingsState {
@@ -110,7 +110,7 @@ internal fun TaskModelSettingsPanel(
                 PanelInfoBox(
                     "These choices apply globally. Visual Agent automatically assigns an available capable model when none is selected. " +
                         "Find compatible models in Settings → Providers. " +
-                        "An explicit sub-agent assignment takes precedence. Speech processing is not yet implemented.",
+                        "An explicit sub-agent assignment takes precedence. Speech and image generation choices are stored for future execution support.",
                 )
                 taskModelCapabilities.forEach { capability ->
                     TaskModelAssignmentField(
@@ -170,7 +170,7 @@ private fun TaskModelAssignmentField(
     val options =
         profiles
             .filter(ProviderProfile::enabled)
-            .filter { capability != "EMBEDDING" || it.adapter == ProviderAdapter.OLLAMA }
+            .filter { capability != "EMBEDDING" || it.adapter == ProviderAdapter.OLLAMA || it.adapter == ProviderAdapter.OPENAI_COMPATIBLE }
             .flatMap { profile ->
                 profile
                     .selectableModels()
@@ -217,6 +217,7 @@ private fun String.settingLabel(): String =
         "VISION" -> "Vision"
         "AUDIO_INPUT" -> "Speech recognition"
         "AUDIO_OUTPUT" -> "Speech output"
+        "IMAGE_GENERATION" -> "Image generation"
         "EMBEDDING" -> "Embeddings"
         else -> this
     }

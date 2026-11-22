@@ -150,6 +150,12 @@ class OpenAiClient(
         modelId: String,
     ): Mono<List<Double>> = embeddingsReactive(text)
 
+    internal fun embeddingsReactive(
+        text: String,
+        modelId: String,
+        profile: ProviderProfile,
+    ): Mono<List<Double>> = requestOpenAiEmbedding(text, modelId) { openAiClient(profile) }
+
     override fun isConnected(): Boolean = appConfig.openAiApiKey.isNotBlank()
 
     override fun checkConnectionReactive(): Mono<Boolean> =

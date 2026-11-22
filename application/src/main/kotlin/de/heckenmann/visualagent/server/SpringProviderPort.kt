@@ -122,22 +122,28 @@ class SpringProviderPort(
             require(model.supportsCapability(requested)) {
                 "Model '$providerId/$modelId' does not declare $requested capability"
             }
-            val response =
+            val responds =
                 when (requested) {
                     ModelCapability.CHAT ->
-                        llmProvider.chatReactive(
-                            ChatRequestContext(
-                                messages = listOf(Message("user", "Reply with one short word: OK.")),
-                                provider = providerId,
-                                model = modelId,
-                            ),
-                        )
+                        llmProvider
+                            .chatReactive(
+                                ChatRequestContext(
+                                    messages = listOf(Message("user", "Reply with one short word: OK.")),
+                                    provider = providerId,
+                                    model = modelId,
+                                ),
+                            ).map { it.message.content.isNotBlank() }
                     ModelCapability.VISION ->
-                        llmProvider.visionReactive(
-                            Base64.getDecoder().decode(PROBE_PNG_BASE64),
-                            "Briefly describe the color of this image.",
-                            ModelSelection(provider = providerId, model = modelId),
-                        )
+                        llmProvider
+                            .visionReactive(
+                                Base64.getDecoder().decode(PROBE_PNG_BASE64),
+                                "Briefly describe the color of this image.",
+                                ModelSelection(provider = providerId, model = modelId),
+                            ).map { it.message.content.isNotBlank() }
+                    ModelCapability.EMBEDDING ->
+                        llmProvider
+                            .embeddingsReactive("Visual Agent model probe", ModelSelection(provider = providerId, model = modelId))
+                            .map { it.isNotEmpty() && it.all(Double::isFinite) }
                     else ->
                         throw ProtocolOperationException(
                             UserFacingError(
@@ -149,7 +155,7 @@ class SpringProviderPort(
                             ),
                         )
                 }.timeout(Duration.ofSeconds(15)).awaitSingle()
-            require(response.message.content.isNotBlank()) { "Model '$providerId/$modelId' returned an empty response" }
+            require(responds) { "Model '$providerId/$modelId' returned an empty or invalid response" }
             "$requested model '$providerId/$modelId' responded successfully"
         }
 

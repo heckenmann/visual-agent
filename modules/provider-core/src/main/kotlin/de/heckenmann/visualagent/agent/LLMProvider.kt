@@ -129,6 +129,12 @@ interface LLMProvider {
         modelId: String,
     ): Mono<List<Double>> = embeddingsReactive(text)
 
+    /** Generates embeddings through an explicitly selected provider and model. */
+    fun embeddingsReactive(
+        text: String,
+        selection: ModelSelection,
+    ): Mono<List<Double>> = Mono.error(UnsupportedOperationException("Provider-specific embeddings are unavailable"))
+
     /**
      * Check if the provider is currently connected and available.
      *
