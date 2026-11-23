@@ -35,7 +35,7 @@ class TodosTerminalReviewTest {
                 )
             val id = added.content.removePrefix("Added todo ")
             db.saveTodo(db.listTodos().single().copy(status = TodoStatus.COMPLETED))
-            val reviewContext = mapOf<String, Any>("requestId" to "todo-trigger-$id")
+            val reviewContext = mapOf(AUTOMATIC_TERMINAL_REVIEW_CONTEXT_KEY to true)
             val update =
                 tool.execute(
                     json("action" to "update", "id" to id, "description" to "Run script again", "status" to "PENDING"),
