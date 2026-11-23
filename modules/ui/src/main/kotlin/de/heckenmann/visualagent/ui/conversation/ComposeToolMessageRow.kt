@@ -27,6 +27,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import de.heckenmann.visualagent.model.ToolLiveState
@@ -75,6 +76,7 @@ internal fun ToolMessageRow(
     val liveState = LocalToolLiveSnapshots.current[toolLiveKey(message.metadata)] ?: metadata.liveState
     val cancelLiveTool = de.heckenmann.visualagent.ui.conversation.live.LocalToolCancellation.current
     var expanded by remember { mutableStateOf(false) }
+    val hasDetails = !metadata.inputJson.isNullOrBlank() || !metadata.resultContent.isNullOrBlank() || !metadata.resultError.isNullOrBlank()
     val error = metadata.status in TOOL_FAILURE_STATUSES
     val tint =
         if (error) {
@@ -92,12 +94,13 @@ internal fun ToolMessageRow(
             modifier =
                 Modifier
                     .fillMaxWidth()
+                    .testTag("conversation-tool-card")
                     .background(MaterialTheme.colorScheme.surfaceContainerLowest, shape = MaterialTheme.shapes.small)
                     .padding(horizontal = 8.dp, vertical = 6.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             Row(
-                modifier = Modifier.fillMaxWidth().clickable { expanded = !expanded },
+                modifier = if (hasDetails) Modifier.fillMaxWidth().clickable { expanded = !expanded } else Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -138,12 +141,14 @@ internal fun ToolMessageRow(
                         onClick = onDelete,
                     )
                 }
-                Icon(
-                    imageVector = if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
-                    contentDescription = if (expanded) "Collapse tool details" else "Expand tool details",
-                    modifier = Modifier.size(18.dp).alpha(0.7f),
-                    tint = tint,
-                )
+                if (hasDetails) {
+                    Icon(
+                        imageVector = if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                        contentDescription = if (expanded) "Collapse tool details" else "Expand tool details",
+                        modifier = Modifier.size(18.dp).alpha(0.7f),
+                        tint = tint,
+                    )
+                }
             }
             liveState?.let { state ->
                 ToolLivePanel(
@@ -161,7 +166,7 @@ internal fun ToolMessageRow(
                 )
             }
             AnimatedVisibility(
-                visible = expanded,
+                visible = expanded && hasDetails,
                 enter = fadeIn(animationSpec = tween(180)),
                 exit = fadeOut(animationSpec = tween(180)),
             ) {

@@ -4,10 +4,16 @@ package de.heckenmann.visualagent.ui.conversation
 
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import de.heckenmann.visualagent.ui.agents.*
 import de.heckenmann.visualagent.ui.application.*
 import de.heckenmann.visualagent.ui.canvas.*
@@ -161,7 +167,9 @@ class ConversationTimelineRowsTest {
             }
         }
 
-        composeTestRule.waitForIdle()
+        composeTestRule.waitUntil {
+            composeTestRule.onAllNodesWithText("Inspect both files", useUnmergedTree = true).fetchSemanticsNodes().size == 1
+        }
         val contentBounds = composeTestRule.onNodeWithText("Inspect both files", useUnmergedTree = true).getUnclippedBoundsInRoot()
         val readBounds = composeTestRule.onNodeWithText("file:read").getUnclippedBoundsInRoot()
         val grepBounds = composeTestRule.onNodeWithText("file:grep").getUnclippedBoundsInRoot()
@@ -232,6 +240,46 @@ class ConversationTimelineRowsTest {
         composeTestRule.onNodeWithText("search").assertExists()
         composeTestRule.onNodeWithText("running…").assertExists()
         composeTestRule.onNodeWithText("(No text response. See tool results above.)").assertDoesNotExist()
+        val avatar = composeTestRule.onNodeWithTag("conversation-author-avatar").getUnclippedBoundsInRoot()
+        val toolCard = composeTestRule.onNodeWithTag("conversation-tool-card").getUnclippedBoundsInRoot()
+        assertEquals(avatar.top, toolCard.top, "The first tool card must start at the top of the assistant avatar")
+    }
+
+    @Test
+    fun `deleting the last tool call hides its blank assistant turn`() {
+        val parent = Message("assistant", "", id = "turn-empty", assistantToolTurn = true)
+        val child = toolMessage("call-1", "search", "turn-empty", 0)
+        var history by mutableStateOf(listOf(parent, child))
+
+        composeTestRule.setContent {
+            MaterialTheme {
+                LazyColumn {
+                    conversationTimeline(
+                        items =
+                            buildConversationTimeline(
+                                history = history,
+                                pendingUserMessage = null,
+                                streamingContent = "",
+                                requestActive = false,
+                                showOlderHistoryLoading = false,
+                                includeInlineComposer = false,
+                            ),
+                        sending = false,
+                        deletingMessageIds = emptySet(),
+                        onDeleteMessage = { id -> history = history.filterNot { it.id == id } },
+                        onStatusChange = {},
+                        onEditMessage = {},
+                        sendContent = {},
+                    )
+                }
+            }
+        }
+
+        composeTestRule.onNodeWithTag("conversation-author-avatar").assertExists()
+        composeTestRule.onNodeWithContentDescription("Delete tool call").performClick()
+        composeTestRule.onNodeWithTag("conversation-tool-card").assertDoesNotExist()
+        composeTestRule.onNodeWithTag("conversation-author-avatar").assertDoesNotExist()
+        composeTestRule.onNodeWithText("No conversation yet").assertExists()
     }
 
     private fun toolMessage(
