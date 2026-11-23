@@ -83,7 +83,7 @@ internal class R2dbcConversationHistoryQueries(
                        parent_assistant_turn_id, turn_order, assistant_tool_turn, conversation_request_id, provider_replay_json
                 FROM conversation_history
                 WHERE session_id = :sessionId
-                ORDER BY timeline_sequence DESC, created_at DESC, id DESC
+                ORDER BY session_id ASC, timeline_sequence DESC, created_at DESC, id DESC
                 LIMIT :limit
                 """.trimIndent(),
             ).bind("sessionId", sessionId)
@@ -183,7 +183,7 @@ internal class R2dbcConversationHistoryQueries(
                        parent_assistant_turn_id, turn_order, assistant_tool_turn, conversation_request_id, provider_replay_json
                 FROM conversation_history
                 WHERE session_id = :sessionId
-                ORDER BY timeline_sequence DESC, created_at DESC, id DESC
+                ORDER BY session_id ASC, timeline_sequence DESC, created_at DESC, id DESC
                 LIMIT :limit OFFSET :offset
                 """.trimIndent(),
             ).bind("sessionId", sessionId)
@@ -232,7 +232,7 @@ internal class R2dbcConversationHistoryQueries(
                 WITH selected_rows AS (
                     SELECT id FROM conversation_history
                     WHERE session_id = :sessionId
-                    ORDER BY timeline_sequence DESC, created_at DESC, id DESC
+                    ORDER BY session_id ASC, timeline_sequence DESC, created_at DESC, id DESC
                     LIMIT :limit OFFSET :offset
                 ), turn_roots AS (
                     SELECT id AS turn_id FROM conversation_history
