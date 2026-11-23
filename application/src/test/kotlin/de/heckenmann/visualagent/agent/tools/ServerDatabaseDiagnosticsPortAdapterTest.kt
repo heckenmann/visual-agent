@@ -18,7 +18,7 @@ class ServerDatabaseDiagnosticsPortAdapterTest {
 
             assertTrue(result.reachable)
             assertTrue(result.schemaHistoryAvailable)
-            assertEquals("7", result.currentSchemaVersion)
+            assertEquals("8", result.currentSchemaVersion)
             assertEquals(0, result.failedMigrationCount)
         }
     }
