@@ -3,7 +3,6 @@ package de.heckenmann.visualagent.ui.conversation
 import de.heckenmann.visualagent.protocol.ConversationMessage
 import org.junit.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 
 class ConversationEmptyResponseTest {
     @Test
@@ -20,7 +19,10 @@ class ConversationEmptyResponseTest {
     fun `image-only assistant answers are not hidden`() {
         val message = ConversationMessage("assistant", "", images = listOf("workspace-id:picture"), id = "image")
         assertEquals(message, (timeline(listOf(message)).single() as ConversationTimelineItem.MessageEntry).message)
-        assertTrue(timeline(listOf(ConversationMessage("assistant", " ", id = "empty"))).isEmpty())
+        assertEquals(
+            listOf(ConversationTimelineItem.Empty),
+            timeline(listOf(ConversationMessage("assistant", " ", id = "empty"))),
+        )
     }
 
     private fun timeline(history: List<ConversationMessage>) =

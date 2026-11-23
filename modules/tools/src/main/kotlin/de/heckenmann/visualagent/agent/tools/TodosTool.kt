@@ -11,6 +11,9 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 
+/** Server-owned tool context flag for read-only automatic todo reviews. */
+const val AUTOMATIC_TERMINAL_REVIEW_CONTEXT_KEY = "automaticTerminalReview"
+
 /**
  * Tool that lets the model inspect and mutate persisted todo records.
  */
@@ -256,8 +259,7 @@ class TodosTool(
         return success("todos", "Result for todo $id:\n$summary")
     }
 
-    private fun isAutomaticTerminalReview(context: Map<String, Any>): Boolean =
-        context["requestId"]?.toString()?.startsWith("todo-trigger-") == true
+    private fun isAutomaticTerminalReview(context: Map<String, Any>): Boolean = context[AUTOMATIC_TERMINAL_REVIEW_CONTEXT_KEY] == true
 
     private fun agentExists(agentId: String): Boolean = todos.agentExists(agentId)
 

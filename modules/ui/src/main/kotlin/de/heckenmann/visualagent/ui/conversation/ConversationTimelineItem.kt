@@ -118,7 +118,7 @@ internal fun buildConversationTimeline(
                     message.role == "assistant" &&
                         message.content.isBlank() &&
                         message.images.isNullOrEmpty() &&
-                        !message.assistantToolTurn -> null
+                        (!message.assistantToolTurn || toolMessagesByParent[parentId].isNullOrEmpty()) -> null
                     message.id != null && message.id in attachedToolIds -> null
                     message.role == "assistant" && message.assistantToolTurn && parentId != null -> {
                         val parent = ConversationTimelineItem.Persisted(message, index)
@@ -218,10 +218,9 @@ internal fun buildConversationTimeline(
             }
         }
         flushUserRun()
-        if (showOlderHistoryLoading) add(ConversationTimelineItem.OlderHistoryLoading)
-        if (history.isEmpty() &&
-            todos.isEmpty() &&
-            deletedTodoSnapshots.isEmpty() &&
+        if (showOlderHistoryLoading) {
+            add(ConversationTimelineItem.OlderHistoryLoading)
+        } else if (none { it != ConversationTimelineItem.InlineComposer } &&
             pendingUserMessage == null &&
             streamingContent.isEmpty() &&
             !requestActive
