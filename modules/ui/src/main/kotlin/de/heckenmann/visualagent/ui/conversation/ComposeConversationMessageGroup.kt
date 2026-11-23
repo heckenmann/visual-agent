@@ -110,6 +110,14 @@ internal fun ConversationMessageGroupRow(
                             group.messages.asReversed()
                         }
                     orderedMessages.forEach { item ->
+                        val message = item.message
+                        if (message.role == "assistant" &&
+                            message.assistantToolTurn &&
+                            message.content.isBlank() &&
+                            message.images.isNullOrEmpty()
+                        ) {
+                            return@forEach
+                        }
                         key(item.stableKey) {
                             AnimatedVisibility(
                                 visibleState =
@@ -120,28 +128,24 @@ internal fun ConversationMessageGroupRow(
                                 enter = conversationMessageEnterTransition(),
                                 exit = conversationMessageDeleteTransition(),
                             ) {
-                                when {
-                                    item.message.role == "tool" ->
-                                        ToolMessageRow(
-                                            message = item.message,
-                                            isDeleting = item.message.id in deletingMessageIds,
-                                            isInFlight = parseToolMetadata(item.message.metadata).status == "running",
-                                            onDelete = { item.message.id?.let(onDeleteMessage) },
-                                            modifier = Modifier.padding(start = 10.dp),
-                                        )
-                                    item.message.role == "assistant" &&
-                                        item.message.assistantToolTurn &&
-                                        item.message.content.isBlank() -> Unit
-                                    else ->
-                                        ConversationMessageGroupContent(
-                                            item = item,
-                                            sending = sending,
-                                            onDeleteMessage = onDeleteMessage,
-                                            onStatusChange = onStatusChange,
-                                            onEditMessage = onEditMessage,
-                                            onRetry = onRetry,
-                                            isStreaming = isStreaming,
-                                        )
+                                if (message.role == "tool") {
+                                    ToolMessageRow(
+                                        message = message,
+                                        isDeleting = message.id in deletingMessageIds,
+                                        isInFlight = parseToolMetadata(message.metadata).status == "running",
+                                        onDelete = { message.id?.let(onDeleteMessage) },
+                                        modifier = Modifier.padding(start = 10.dp),
+                                    )
+                                } else {
+                                    ConversationMessageGroupContent(
+                                        item = item,
+                                        sending = sending,
+                                        onDeleteMessage = onDeleteMessage,
+                                        onStatusChange = onStatusChange,
+                                        onEditMessage = onEditMessage,
+                                        onRetry = onRetry,
+                                        isStreaming = isStreaming,
+                                    )
                                 }
                             }
                         }

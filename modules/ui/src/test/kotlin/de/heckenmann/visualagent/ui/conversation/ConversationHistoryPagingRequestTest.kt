@@ -13,11 +13,13 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.runBlocking
 import org.junit.Rule
 import org.junit.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import de.heckenmann.visualagent.protocol.ConversationHistoryPage as ConversationHistoryPage
 import de.heckenmann.visualagent.protocol.ConversationMessage as Message
@@ -26,6 +28,56 @@ import de.heckenmann.visualagent.protocol.ConversationMessage as Message
 class ConversationHistoryPagingRequestTest {
     @get:Rule
     val composeTestRule = createComposeRule()
+
+    @Test
+    fun `older history loads when the latest page contains only hidden tool turns`() {
+        val recent = listOf(Message("assistant", "", id = "empty-turn", assistantToolTurn = true))
+        val older = listOf(Message("user", "Older visible message", id = "older"))
+        val loadedOffset = CompletableDeferred<Int>()
+
+        composeTestRule.setContent {
+            val state = rememberConversationUiState(recent)
+            val listState = rememberLazyListState()
+            val gateway =
+                remember {
+                    object : ConversationHistoryGateway {
+                        override suspend fun latest(): ConversationHistoryPage = ConversationHistoryPage(recent, offset = 0, hasMore = true)
+
+                        override suspend fun older(offset: Int): ConversationHistoryPage {
+                            loadedOffset.complete(offset)
+                            return ConversationHistoryPage(older, offset = offset, hasMore = false)
+                        }
+                    }
+                }
+            MaterialTheme {
+                LazyColumn(state = listState, reverseLayout = true) {
+                    conversationTimeline(
+                        items =
+                            buildConversationTimeline(
+                                history = state.history,
+                                pendingUserMessage = null,
+                                streamingContent = "",
+                                requestActive = false,
+                                showOlderHistoryLoading = state.isLoadingOlder,
+                                includeInlineComposer = false,
+                            ),
+                        sending = false,
+                        deletingMessageIds = emptySet(),
+                        onDeleteMessage = {},
+                        onStatusChange = {},
+                        onEditMessage = {},
+                        sendContent = {},
+                    )
+                }
+                ConversationHistoryPagingEffect(state, listState, gateway)
+            }
+        }
+
+        composeTestRule.waitUntil { loadedOffset.isCompleted }
+        assertEquals(recent.size, runBlocking { loadedOffset.await() })
+        composeTestRule.onNodeWithText("Older visible message").assertExists()
+        composeTestRule.onNodeWithText("No conversation yet").assertDoesNotExist()
+    }
 
     @Test
     fun `older history request survives the loader changing the oldest viewport state`() {
