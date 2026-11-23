@@ -3,6 +3,7 @@ package de.heckenmann.visualagent.agent
 import de.heckenmann.visualagent.agent.conversation.AgentManagerConversationOps
 import de.heckenmann.visualagent.agent.conversation.ConversationCompletionEventBus
 import de.heckenmann.visualagent.agent.text.AgentResponseCoordinator
+import de.heckenmann.visualagent.agent.tools.AUTOMATIC_TERMINAL_REVIEW_CONTEXT_KEY
 import de.heckenmann.visualagent.agent.tools.ToolCallEvent
 import de.heckenmann.visualagent.agent.tools.ToolCallPhase
 import de.heckenmann.visualagent.agent.tools.ToolEventBus
@@ -87,7 +88,7 @@ internal class AgentTodoTrigger(
     ) {
         if (lifecycle.closing) return
         val terminalTodo = todo.copy()
-        val requestId = conversationOps.beginConversationRequest("todo-trigger-${java.util.UUID.randomUUID()}")
+        val requestId = conversationOps.beginConversationRequest()
         scope.launch {
             try {
                 terminalReviewMutex.withLock {
@@ -142,13 +143,10 @@ internal class AgentTodoTrigger(
                     )
                     try {
                         val history = conversationOps.loadMainAgentContextFromDb()
-                        val request =
-                            conversationOps.buildMainRequest(
-                                appendTodoChangeReviewInput(history, terminalTodo),
-                                requestId,
-                            )
+                        val request = conversationOps.buildMainRequest(appendTodoChangeReviewInput(history, terminalTodo), requestId)
+                        val reviewRequest = request.copy(metadata = request.metadata + (AUTOMATIC_TERMINAL_REVIEW_CONTEXT_KEY to true))
                         currentCoroutineContext().ensureActive()
-                        val response = llmProvider.chatReactive(request).awaitSingle()
+                        val response = llmProvider.chatReactive(reviewRequest).awaitSingle()
                         val content = responseCoordinator.normalizeAssistantPresentationContent(response.message.content)
                         if (lifecycle.closing) return@withLock
                         val persistedAssistant =
