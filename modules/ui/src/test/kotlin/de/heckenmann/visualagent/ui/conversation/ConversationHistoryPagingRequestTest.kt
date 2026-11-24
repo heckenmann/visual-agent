@@ -13,6 +13,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.CompletableDeferred
@@ -75,6 +76,9 @@ class ConversationHistoryPagingRequestTest {
 
         composeTestRule.waitUntil { loadedOffset.isCompleted }
         assertEquals(recent.size, runBlocking { loadedOffset.await() })
+        composeTestRule.waitUntil {
+            composeTestRule.onAllNodesWithText("Older visible message").fetchSemanticsNodes().size == 1
+        }
         composeTestRule.onNodeWithText("Older visible message").assertExists()
         composeTestRule.onNodeWithText("No conversation yet").assertDoesNotExist()
     }
