@@ -15,7 +15,7 @@ class HistoricalJvmRegistryTest {
     fun `historical licenses Jakarta ICU UPL and ANTLR retain exact identity`() {
         val fixture = RegistryFixture()
         val components = fixture.components
-        assertEquals(105, components.size)
+        assertEquals(107, components.size)
         for ((coordinate, license) in mapOf(
             "com.h2database:h2:2.5.252" to "MPL-2.0",
             "ch.qos.logback:logback-core:1.6.6" to "EPL-2.0",
