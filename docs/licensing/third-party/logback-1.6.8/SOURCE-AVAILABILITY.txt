@@ -1,0 +1,17 @@
+Logback 1.6.8 source availability
+
+This distribution includes Logback Classic and Logback Core 1.6.8. The upstream
+project offers Logback under either EPL-2.0 or LGPL-2.1; this distribution
+selects EPL-2.0. The exact-version source archives are available from Maven
+Central:
+
+Logback Classic:
+https://repo.maven.apache.org/maven2/ch/qos/logback/logback-classic/1.6.8/logback-classic-1.6.8-sources.jar
+SHA-256: 9ee86c547394ce6b8c9250f3cac52e5fb75cf69c238036030277cc7a2c5bd360
+
+Logback Core:
+https://repo.maven.apache.org/maven2/ch/qos/logback/logback-core/1.6.8/logback-core-1.6.8-sources.jar
+SHA-256: 5aa4ddb2f9c5e6f286864c68d8ed2aee367d52c5215824adae5c406b0c1fc275
+
+The source archive bytes were resolved and verified for these exact artifact
+versions. The original EPL-2.0 text is included alongside this notice.
