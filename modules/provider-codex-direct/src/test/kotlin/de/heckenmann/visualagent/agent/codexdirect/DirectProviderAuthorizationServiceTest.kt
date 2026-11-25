@@ -19,6 +19,9 @@ import reactor.core.scheduler.Schedulers
 import reactor.test.StepVerifier
 import java.nio.file.Files
 import java.nio.file.Path
+import java.time.Duration
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
@@ -58,6 +61,95 @@ class DirectProviderAuthorizationServiceTest {
                 },
             ).expectNext(record)
             .verifyComplete()
+    }
+
+    @Test
+    fun `staged browser sign-in stays in memory until the onboarding profile is saved`() {
+        val protocol = mockk<DirectOAuthProtocol>()
+        val record = record()
+        every { protocol.exchange(any(), any(), any()) } returns Mono.just(record)
+        val catalog = authorizationCatalog()
+        val credentials = store()
+        val service = service(protocol, credentials, catalog)
+        val result =
+            service.begin(profile(), staged = true).flatMap { session ->
+                Mono
+                    .zip(
+                        service.await(session.id),
+                        WebClient
+                            .create()
+                            .get()
+                            .uri(callback(session))
+                            .retrieve()
+                            .bodyToMono(String::class.java),
+                    ).map { it.t1 }
+            }
+
+        StepVerifier
+            .create(
+                result.flatMap { safe ->
+                    val reference = safe.credentialReference
+                    val draft = profile().copy(credentialReference = reference)
+                    store()
+                        .load(reference, draft.id)
+                        .doOnNext { error("Onboarding credentials reached durable storage before profile save") }
+                        .then(credentials.load(reference, draft.id))
+                        .doOnNext { assertEquals(record, it) }
+                        .then(service.saveStaged(draft) { Mono.empty() })
+                        .then(store().load(reference, draft.id))
+                },
+            ).expectNext(record)
+            .verifyComplete()
+
+        verify(exactly = 0) { catalog.complete(any(), any()) }
+    }
+
+    @Test
+    fun `staged save receives the profile captured before browser authorization`() {
+        val protocol = mockk<DirectOAuthProtocol>()
+        every { protocol.exchange(any(), any(), any()) } returns Mono.just(record())
+        val previous = profile().copy(credentialReference = "previous-registration", apiKey = "previous-key")
+        val catalog = authorizationCatalog(previous)
+        val service = service(protocol, catalog = catalog)
+        var previousAtSave: ProviderProfile? = null
+
+        StepVerifier
+            .create(
+                completeStagedSignIn(service).flatMap { result ->
+                    val draft = profile().copy(credentialReference = result.credentialReference)
+                    service.saveStaged(draft) { captured ->
+                        previousAtSave = captured
+                        Mono.empty()
+                    }
+                },
+            ).verifyComplete()
+
+        assertEquals(previous, previousAtSave)
+        verify(exactly = 0) { catalog.complete(any(), any()) }
+    }
+
+    @Test
+    fun `staged save completes catalog attachment after its caller cancels`() {
+        val protocol = mockk<DirectOAuthProtocol>()
+        every { protocol.exchange(any(), any(), any()) } returns Mono.just(record())
+        val service = service(protocol)
+        val attached = CountDownLatch(1)
+        var reference: String? = null
+
+        StepVerifier
+            .create(completeStagedSignIn(service))
+            .assertNext { result ->
+                reference = result.credentialReference
+                val caller =
+                    service
+                        .saveStaged(profile().copy(credentialReference = result.credentialReference)) {
+                            Mono.delay(Duration.ofMillis(100)).then(Mono.fromRunnable { attached.countDown() })
+                        }.subscribe()
+                caller.dispose()
+            }.verifyComplete()
+
+        assertTrue(attached.await(5, TimeUnit.SECONDS))
+        assertEquals(record(), store().load(checkNotNull(reference), "profile").block())
     }
 
     @Test
@@ -301,11 +393,25 @@ class DirectProviderAuthorizationServiceTest {
         catalog,
     ).also(running::add)
 
-    private fun authorizationCatalog() =
+    private fun authorizationCatalog(previous: ProviderProfile? = null) =
         mockk<ProviderAuthorizationCatalog> {
-            every { prepare(any()) } answers { Mono.just(ProviderAuthorizationTarget(firstArg(), null)) }
+            every { prepare(any()) } answers { Mono.just(ProviderAuthorizationTarget(firstArg(), previous)) }
             every { complete(any(), any()) } returns Mono.empty()
             every { clear(any()) } returns Mono.empty()
+        }
+
+    private fun completeStagedSignIn(service: DirectProviderAuthorizationService) =
+        service.begin(profile(), staged = true).flatMap { session ->
+            Mono
+                .zip(
+                    service.await(session.id),
+                    WebClient
+                        .create()
+                        .get()
+                        .uri(callback(session))
+                        .retrieve()
+                        .bodyToMono(String::class.java),
+                ).map { it.t1 }
         }
 
     private fun location() = DirectCredentialDirectory(directory.resolve("oauth"))

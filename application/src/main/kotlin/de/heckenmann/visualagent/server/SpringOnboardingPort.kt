@@ -4,6 +4,7 @@ import de.heckenmann.visualagent.agent.ChatRequestContext
 import de.heckenmann.visualagent.agent.LLMProvider
 import de.heckenmann.visualagent.agent.Message
 import de.heckenmann.visualagent.agent.ModelParameters
+import de.heckenmann.visualagent.agent.provider.DirectProviderAuthorization
 import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
 import de.heckenmann.visualagent.knowledge.PreferenceStore
 import de.heckenmann.visualagent.protocol.CredentialUpdate
@@ -23,7 +24,6 @@ import kotlinx.coroutines.reactor.awaitSingleOrNull
 import org.springframework.stereotype.Component
 import java.security.MessageDigest
 import de.heckenmann.visualagent.agent.provider.ProviderAdapter as ApplicationProviderAdapter
-import de.heckenmann.visualagent.agent.provider.ProviderConfiguration as ApplicationProviderConfiguration
 import de.heckenmann.visualagent.agent.provider.ProviderModelConfig as ApplicationProviderModel
 import de.heckenmann.visualagent.agent.provider.ProviderProfile as ApplicationProviderProfile
 
@@ -34,6 +34,7 @@ class SpringOnboardingPort(
     private val providerCatalog: ProviderCatalogService,
     private val llmProvider: LLMProvider,
     private val onboardingAgentService: OnboardingAgentService,
+    private val authorization: DirectProviderAuthorization? = null,
 ) : OnboardingPort {
     override fun state(): OnboardingState =
         OnboardingState(
@@ -101,6 +102,7 @@ class SpringOnboardingPort(
         model: ProviderModel,
         validationFingerprint: String,
     ) {
+        val existing = providerCatalog.getProvider(draft.id)
         val validation = validate(draft, model.id)
         require(validation.success && validation.validationFingerprint == validationFingerprint) {
             "The provider draft changed or is no longer ready and must be validated again."
@@ -108,7 +110,6 @@ class SpringOnboardingPort(
         val discoveredModel =
             discoverModels(draft).singleOrNull { it.id == model.id }
                 ?: error("The selected model is no longer available.")
-        val existing = providerCatalog.getProvider(draft.id)
         val selectedModel = discoveredModel.toApplication()
         val profile =
             draft
@@ -117,11 +118,21 @@ class SpringOnboardingPort(
                     defaultModel = discoveredModel.id,
                     models = existing?.models?.mergeSelectedModel(selectedModel) ?: listOf(selectedModel),
                 )
-        val profiles = providerCatalog.listProviders().filterNot { it.id == profile.id } + profile
-        providerCatalog
-            .replaceConfigurationReactive(ApplicationProviderConfiguration(profiles, profile.id, discoveredModel.id))
-            .awaitSingleOrNull()
+        if (profile.usesStagedAuthorization(existing)) {
+            requireNotNull(authorization) { "Staged provider authorization is unavailable" }
+                .saveStaged(profile) { authorizationPrevious ->
+                    providerCatalog.saveAuthorizedOnboardingProfile(profile, authorizationPrevious)
+                }.awaitSingleOrNull()
+            return
+        }
+        providerCatalog.saveOnboardingProfile(profile, existing).awaitSingleOrNull()
     }
+
+    private fun ApplicationProviderProfile.usesStagedAuthorization(existing: ApplicationProviderProfile?): Boolean =
+        adapter == ApplicationProviderAdapter.CODEX_DIRECT &&
+            directAuthMode == de.heckenmann.visualagent.agent.provider.DirectProviderAuthMode.CHATGPT_OAUTH &&
+            credentialReference != null &&
+            credentialReference != existing?.credentialReference
 
     override suspend fun createAgent(description: String): OnboardingAgentCreationResult = onboardingAgentService.createAgent(description)
 

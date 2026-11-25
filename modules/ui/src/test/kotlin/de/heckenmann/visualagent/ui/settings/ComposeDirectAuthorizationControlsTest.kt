@@ -27,6 +27,7 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.verify
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.awaitCancellation
 import org.junit.Test
@@ -126,6 +127,27 @@ class ComposeDirectAuthorizationControlsTest {
         }
 
     @Test
+    fun `onboarding authorizes a draft without reading or saving a catalog profile`() =
+        runComposeUiTest {
+            coEvery { port.beginStagedDirectSignIn(any()) } returns ProviderSignInSession("attempt", "https://synthetic.invalid/authorize")
+            coEvery { port.awaitDirectSignIn("attempt") } returns ProviderSignInResult("reference", "Synthetic account")
+            coEvery { port.cancelDirectSignIn("attempt") } returns Unit
+            var draft by mutableStateOf(profile())
+            renderProfile({ draft }, staged = true) { _, reference ->
+                draft = draft.copy(credentialReference = reference)
+                changed.complete(draft.id to reference)
+            }
+
+            onNodeWithContentDescription("Continue with ChatGPT").performClick()
+            waitUntil { changed.isCompleted }
+            assertEquals("profile" to "reference", changed.await())
+            onNodeWithText("Synthetic account authorized for this draft.").assertExists()
+            coVerify(exactly = 1) { port.beginStagedDirectSignIn(any()) }
+            coVerify(exactly = 0) { port.beginDirectSignIn(any()) }
+            verify(exactly = 0) { port.getProvider(any()) }
+        }
+
+    @Test
     fun `explicit sign in opens only the returned URL and publishes a credential reference`() =
         runComposeUiTest {
             coEvery { port.beginDirectSignIn(any()) } returns ProviderSignInSession("attempt", "https://synthetic.invalid/authorize")
@@ -214,6 +236,7 @@ class ComposeDirectAuthorizationControlsTest {
     private fun ComposeUiTest.renderProfile(
         profile: () -> ProviderProfile,
         storedProfile: () -> ProviderProfile? = profile,
+        staged: Boolean = false,
         onChanged: (String, String?) -> Unit,
     ) {
         every { port.getProvider(any()) } answers { storedProfile() }
@@ -228,7 +251,7 @@ class ComposeDirectAuthorizationControlsTest {
             ) {
                 MaterialTheme {
                     Column {
-                        DirectAuthorizationControls(profile(), port, onChanged)
+                        DirectAuthorizationControls(profile(), port, staged, onReferenceChanged = onChanged)
                     }
                 }
             }

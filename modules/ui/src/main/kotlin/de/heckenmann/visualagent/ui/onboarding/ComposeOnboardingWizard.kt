@@ -28,6 +28,7 @@ import de.heckenmann.visualagent.protocol.TerminalConsentPort
 import de.heckenmann.visualagent.ui.modal.ComposeConfirmationModal
 import de.heckenmann.visualagent.ui.modal.ComposeModalHost
 import de.heckenmann.visualagent.ui.settings.agent.TerminalAccessPage
+import de.heckenmann.visualagent.protocol.DirectProviderAuthMode
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -74,7 +75,12 @@ fun ComposeOnboardingWizard(
     val draft = customDraft ?: selected?.toDraft()
     val credentialConfigured =
         when (val credential = draft?.credential) {
-            CredentialUpdate.Unchanged -> selected?.credentialConfigured == true
+            CredentialUpdate.Unchanged ->
+                if (draft.directAuthMode == DirectProviderAuthMode.CHATGPT_OAUTH) {
+                    draft.credentialReference != null
+                } else {
+                    selected?.credentialConfigured == true
+                }
             CredentialUpdate.Clear -> false
             is CredentialUpdate.Replace -> credential.value.isNotBlank()
             null -> false

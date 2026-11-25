@@ -19,7 +19,7 @@ let the configured main model create a first sub-agent after the desktop client 
 
 1. The desktop reads onboarding state from the connected server.
 2. One welcome page briefly explains the Main Agent, specialized Sub-agents, and durable Todos.
-3. The user selects an enabled provider profile and the server discovers structured model metadata using a staged, non-persistent draft.
+3. If the server already has enabled provider profiles, the user selects one. If the catalog is empty, the wizard offers **Add provider** and keeps the new profile in a staged, non-persistent draft while the server discovers structured model metadata.
 4. The user may refresh model discovery without persisting the draft, filters by model name or ID if needed, then selects a model and reviews the safe provider summary.
 5. The server validates the exact provider/model selection.
 6. After successful validation the server saves and activates the provider selection.
@@ -72,6 +72,10 @@ and persisted sub-agents; the desktop never reads existing credentials.
 - Missing or malformed background assets do not interrupt the wizard; theme
   colors provide the fallback and all foreground/contrast treatments.
 - Provider views expose credential presence but not credential values.
+- A fresh server database has no provider profiles; showing or skipping onboarding does not create any.
+- Adding a profile, discovering models, and validating a draft do not persist it. Finishing a valid draft saves only that profile; discarding it leaves the catalog empty across restart.
+- ChatGPT sign-in for a draft uses a temporary server registration for model discovery and validation. The registration is stored with the provider only when setup saves the profile, and expires after 15 minutes if unused.
+- Existing installations keep their saved legacy provider configuration when it is migrated into the provider catalog.
 - Skip changes only the server-owned onboarding state.
 - Manual cancellation does not change the server-owned onboarding state.
 - Settings > Providers can open the manual onboarding flow for the current server.
@@ -87,3 +91,4 @@ and persisted sub-agents; the desktop never reads existing credentials.
 No new library is used. A klibs.io search was unavailable from the development environment, and a GitHub search found no maintained
 Compose Multiplatform onboarding-wizard library matching this flow. The implementation therefore extends the existing Compose wizard,
 protocol boundary, and Main Agent tool flow without introducing another dependency or security boundary.
+The temporary OAuth registration reuses the protected credential store's existing lifecycle and locking. A general-purpose cache such as Caffeine would only supply expiration and would still need the profile-bound promotion and rollback logic.

@@ -161,10 +161,17 @@ class SpringProviderPort(
 
     override fun addChangeListener(listener: () -> Unit): AutoCloseable = providerCatalog.addChangeListener(listener)
 
-    override suspend fun beginDirectSignIn(profile: ProviderProfile): ProviderSignInSession {
+    override suspend fun beginDirectSignIn(profile: ProviderProfile): ProviderSignInSession = beginSignIn(profile, staged = false)
+
+    override suspend fun beginStagedDirectSignIn(profile: ProviderProfile): ProviderSignInSession = beginSignIn(profile, staged = true)
+
+    private suspend fun beginSignIn(
+        profile: ProviderProfile,
+        staged: Boolean,
+    ): ProviderSignInSession {
         val result =
             requireNotNull(authorization) { "Direct provider authorization is unavailable" }
-                .begin(profile.toApplication())
+                .begin(profile.toApplication(), staged)
                 .awaitSingle()
         return ProviderSignInSession(result.id, result.authorizationUrl)
     }

@@ -198,6 +198,46 @@ class ProviderCatalogService(
             }.flatMap { notifications.publishReactive() }
     }
 
+    /** Attaches a validated onboarding registration while preserving unrelated catalog changes. */
+    fun saveAuthorizedOnboardingProfile(
+        profile: ProviderProfile,
+        previous: ProviderProfile?,
+    ): Mono<Void> {
+        val state = validatedCatalogState(ProviderConfiguration(listOf(profile), profile.id, profile.defaultModel))
+        return persistence
+            .mutateReactive { current ->
+                check(current.providers.firstOrNull { it.id == profile.id } == previous) {
+                    "Provider configuration changed during onboarding. Reload before saving."
+                }
+                state
+                    .copy(
+                        providers = current.providers.filterNot { it.id == profile.id } + state.providers.single(),
+                        taskModelAssignments = current.taskModelAssignments,
+                    ).withAutomaticTaskModelAssignments()
+            }.flatMap { notifications.publishReactive() }
+    }
+
+    /** Saves onboarding edits only if the profile used for validation is still current. */
+    fun saveOnboardingProfile(
+        profile: ProviderProfile,
+        previous: ProviderProfile?,
+    ): Mono<Void> {
+        val selected = validatedCatalogState(ProviderConfiguration(listOf(profile), profile.id, profile.defaultModel))
+        return persistence
+            .mutateReactive { current ->
+                check(current.providers.firstOrNull { it.id == profile.id } == previous) {
+                    "Provider configuration changed during onboarding. Reload before saving."
+                }
+                current
+                    .copy(
+                        activeProviderId = selected.activeProviderId,
+                        activeModelId = selected.activeModelId,
+                        providers = current.providers.filterNot { it.id == profile.id } + selected.providers.single(),
+                    ).withAutomaticTaskModelAssignments()
+                    .withAuthoritativeCredentials(current)
+            }.flatMap { notifications.publishReactive() }
+    }
+
     private fun validatedCatalogState(configuration: ProviderConfiguration): CatalogState {
         val providers = configuration.providers.map { profile -> profile.withSelectedCredentialRoute().withSelectableCodexDefault() }
         require(providers.map(ProviderProfile::id).all { it.isNotBlank() }) { "Provider identifiers must not be blank" }
@@ -497,8 +537,6 @@ class ProviderCatalogService(
     private companion object {
         private const val KEY_CATALOG = "llm.provider.catalog.v1"
         private const val KEY_CODEX_INITIALIZED = "llm.provider.codex.profile.initialized.v1"
-    }
-}
         private val LEGACY_PROVIDER_PREFERENCE_KEYS =
             setOf(
                 "llm.provider",
@@ -509,3 +547,5 @@ class ProviderCatalogService(
                 "openai.base.url",
                 "openai.model",
             )
+    }
+}
