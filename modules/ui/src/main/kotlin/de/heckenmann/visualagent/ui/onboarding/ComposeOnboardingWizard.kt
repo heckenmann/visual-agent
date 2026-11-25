@@ -1,5 +1,6 @@
 package de.heckenmann.visualagent.ui.onboarding
 
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,9 +17,18 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.dp
 import de.heckenmann.visualagent.protocol.CredentialUpdate
+import de.heckenmann.visualagent.protocol.DirectProviderAuthMode
 import de.heckenmann.visualagent.protocol.OnboardingAgent
 import de.heckenmann.visualagent.protocol.OnboardingPort
 import de.heckenmann.visualagent.protocol.OnboardingProviderDraft
@@ -28,7 +38,6 @@ import de.heckenmann.visualagent.protocol.TerminalConsentPort
 import de.heckenmann.visualagent.ui.modal.ComposeConfirmationModal
 import de.heckenmann.visualagent.ui.modal.ComposeModalHost
 import de.heckenmann.visualagent.ui.settings.agent.TerminalAccessPage
-import de.heckenmann.visualagent.protocol.DirectProviderAuthMode
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -150,7 +159,29 @@ fun ComposeOnboardingWizard(
             onFinished()
         }
     }
-    Box(modifier = Modifier.fillMaxSize()) {
+    val busy = loadingModels || savingProvider || creatingAgent
+    val cancel = { if (automatic) confirmSkip = true else onFinished() }
+    val dismissOnEscape =
+        if (automatic) {
+            Modifier
+        } else {
+            val focus = remember { FocusRequester() }
+            LaunchedEffect(focus) {
+                withFrameNanos { }
+                focus.requestFocus()
+            }
+            Modifier
+                .onPreviewKeyEvent { event ->
+                    if (event.type == KeyEventType.KeyDown && event.key == Key.Escape) {
+                        if (!busy) cancel()
+                        true
+                    } else {
+                        false
+                    }
+                }.focusRequester(focus)
+                .focusable()
+        }
+    Box(modifier = Modifier.fillMaxSize().then(dismissOnEscape)) {
         Column(
             modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -222,11 +253,11 @@ fun ComposeOnboardingWizard(
             OnboardingNavigation(
                 step = step,
                 automatic = automatic,
-                busy = loadingModels || savingProvider || creatingAgent,
+                busy = busy,
                 canContinue = step != 1 || draft != null,
                 canSelectModel = step != 2 || selectedModel != null,
                 onBack = { step -= 1 },
-                onCancel = { if (automatic) confirmSkip = true else onFinished() },
+                onCancel = cancel,
                 onContinue = {
                     when (step) {
                         1 -> {
