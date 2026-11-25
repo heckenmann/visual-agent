@@ -10,6 +10,8 @@ class ProviderCatalogTransactionTest {
     fun `delayed publication cannot roll runtime selection back to an older committed value`() {
         val runtime = DefaultProviderRuntimeConfig()
         val catalog = ProviderCatalogService(InMemoryProviderPreferences(), runtime)
+        catalog.saveProvider(ProviderProfile("ollama", "Ollama", ProviderAdapter.OLLAMA, "http://localhost:11434"))
+        catalog.saveProvider(ProviderProfile("openai", "OpenAI", ProviderAdapter.OPENAI_COMPATIBLE, "https://api.openai.com"))
         TransactionSynchronizationManager.initSynchronization()
         try {
             catalog.setActiveProvider("openai")

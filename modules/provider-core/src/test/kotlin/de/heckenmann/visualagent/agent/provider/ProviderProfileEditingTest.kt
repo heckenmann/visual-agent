@@ -6,6 +6,20 @@ import kotlin.test.assertFailsWith
 
 /** Catalog editing is conditional on persisted profiles, never on a UI copy of the active model. */
 class ProviderProfileEditingTest {
+    @Test
+    fun `saving a first profile from Settings initializes the active selection`() {
+        val catalog = catalog(legacy = false)
+        val model = ProviderModelConfig("first-model")
+        val first =
+            ProviderProfile("first", "First provider", ProviderAdapter.CODEX_CLI, "", defaultModel = model.id, models = listOf(model))
+
+        catalog.replaceProfiles(listOf(first), emptyList())
+
+        assertEquals(listOf(first), catalog.listProviders())
+        assertEquals(first.id, catalog.activeProviderId())
+        assertEquals(model.id, catalog.activeModelId())
+    }
+
     @Test fun `saving profile drafts retains a concurrently changed active selection`() {
         val catalog = catalog()
         val profiles = catalog.listProviders()
@@ -65,10 +79,10 @@ class ProviderProfileEditingTest {
         assertEquals("ollama" to "image-b", catalog.taskModelAssignment(ModelCapability.IMAGE_GENERATION))
     }
 
-    private fun catalog(): ProviderCatalogService =
+    private fun catalog(legacy: Boolean = true): ProviderCatalogService =
         ProviderCatalogService(
             object : ProviderPreferenceStore {
-                private val values = mutableMapOf<String, String>()
+                private val values = mutableMapOf<String, String>().apply { if (legacy) put("llm.provider", "ollama") }
 
                 override fun getPreference(key: String): String? = values[key]
 

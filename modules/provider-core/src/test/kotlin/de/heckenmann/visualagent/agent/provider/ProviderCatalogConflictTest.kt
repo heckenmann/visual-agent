@@ -42,6 +42,8 @@ class ProviderCatalogConflictTest {
             }
         val runtime = DefaultProviderRuntimeConfig()
         val catalog = ProviderCatalogService(preferences, runtime)
+        catalog.saveProvider(ProviderProfile("ollama", "Ollama", ProviderAdapter.OLLAMA, "http://localhost:11434"))
+        catalog.saveProvider(ProviderProfile("openai", "OpenAI", ProviderAdapter.OPENAI_COMPATIBLE, "https://api.openai.com"))
         val before = catalog.listProviders()
         var publications = 0
         catalog.addChangeListener { publications++ }.use {

@@ -173,6 +173,12 @@ class ProviderCatalogService(
             check(baseline.associateBy(ProviderProfile::id) == current.providers.associateBy(ProviderProfile::id)) {
                 "Provider configuration changed elsewhere. Reload before saving."
             }
+            if (current.providers.none { it.id == current.activeProviderId && it.enabled }) {
+                val first = proposed.first(ProviderProfile::enabled)
+                return@mutate current
+                    .copy(providers = proposed, activeProviderId = first.id, activeModelId = first.defaultModel)
+                    .withAuthoritativeCredentials(current)
+            }
             require(proposed.any { it.id == current.activeProviderId && it.enabled }) {
                 "Switch the Conversation to another provider before removing or disabling the active provider"
             }
@@ -441,14 +447,18 @@ class ProviderCatalogService(
     }
 
     private fun migrateLegacyConfiguration() {
-        if (preferenceStore.getPreference(KEY_CATALOG) != null) return
+        if (preferenceStore.getPreference(KEY_CATALOG) != null ||
+            LEGACY_PROVIDER_PREFERENCE_KEYS.none { preferenceStore.getPreference(it) != null }
+        ) {
+            return
+        }
         mutate { state -> if (state.providers.isEmpty()) legacyProviderCatalog(appConfig) else state }
     }
 
     private fun ensureBuiltInProfiles() {
         if (preferenceStore.getPreference(KEY_CODEX_INITIALIZED) == "true") return
         mutate { state ->
-            if (state.providers.none { it.id == ProviderEnvironmentCredentials.CODEX_PROFILE_ID }) {
+            if (state.providers.isNotEmpty() && state.providers.none { it.id == ProviderEnvironmentCredentials.CODEX_PROFILE_ID }) {
                 state.copy(providers = state.providers + builtInCodexProfile())
             } else {
                 state
@@ -489,3 +499,13 @@ class ProviderCatalogService(
         private const val KEY_CODEX_INITIALIZED = "llm.provider.codex.profile.initialized.v1"
     }
 }
+        private val LEGACY_PROVIDER_PREFERENCE_KEYS =
+            setOf(
+                "llm.provider",
+                "ollama.local.url",
+                "ollama.model",
+                "ollama.api.key",
+                "openai.api.key",
+                "openai.base.url",
+                "openai.model",
+            )

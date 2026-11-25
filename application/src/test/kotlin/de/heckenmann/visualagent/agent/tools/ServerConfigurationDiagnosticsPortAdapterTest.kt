@@ -84,8 +84,11 @@ class ServerConfigurationDiagnosticsPortAdapterTest {
     fun `warns when the selected model is no longer in the provider catalog`() {
         val preferences = InMemoryProviderPreferences()
         val catalog = ProviderCatalogService(preferences, AppConfigBean())
-        val profile = catalog.listProviders().first()
-        catalog.saveProvider(profile.copy(models = profile.models.filterNot { it.id == catalog.activeModelId() }))
+        val model = ProviderModelConfig("removed")
+        val profile = ProviderProfile("local", "Local", ProviderAdapter.OLLAMA, "http://localhost:11434", models = listOf(model))
+        catalog.saveProvider(profile)
+        catalog.setActiveSelection(profile.id, model.id)
+        catalog.saveProvider(profile.copy(models = emptyList()))
 
         val snapshot = ServerConfigurationDiagnosticsPortAdapter(catalog, AppConfigBean()).snapshot()
 

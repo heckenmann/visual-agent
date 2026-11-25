@@ -125,9 +125,10 @@ class ProviderAuthorizationCatalogTest {
 
     @Test
     fun `deleted provider is not recreated by a delayed authorization`() {
+        catalog.saveProvider(ProviderProfile("fallback", "Fallback", ProviderAdapter.CODEX_CLI, ""))
         catalog.saveProvider(profile)
         val target = requireNotNull(authorization.prepare(profile).block())
-        catalog.deleteProvider(profile.id)
+        assertEquals(true, catalog.deleteProvider(profile.id))
 
         assertFailsWith<IllegalStateException> { authorization.complete(target, "late").block() }
         assertNull(catalog.getProvider(profile.id))

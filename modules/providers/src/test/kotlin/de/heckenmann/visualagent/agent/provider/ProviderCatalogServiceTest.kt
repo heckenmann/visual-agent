@@ -11,11 +11,25 @@ class ProviderCatalogServiceTest {
     @Test
     fun `legacy settings migrate into persisted provider profiles`() {
         val store = MapPreferenceStore()
+        store.setPreference("llm.provider", "ollama")
         val catalog = ProviderCatalogService(store, TestProviderRuntimeConfig())
 
         assertNotNull(catalog.getProvider("ollama"))
         assertNotNull(catalog.getProvider("openai"))
+        assertNotNull(catalog.getProvider("openai-codex"))
         assertNotNull(store.getPreference("llm.provider.catalog.v1"))
+    }
+
+    @Test
+    fun `fresh catalog stays empty across restart until a profile is saved`() {
+        val store = MapPreferenceStore()
+        val catalog = ProviderCatalogService(store, TestProviderRuntimeConfig())
+
+        assertTrue(catalog.listProviders().isEmpty())
+
+        val restored = ProviderCatalogService(store, TestProviderRuntimeConfig())
+
+        assertTrue(restored.listProviders().isEmpty())
     }
 
     @Test
@@ -189,7 +203,7 @@ class ProviderCatalogServiceTest {
 
     @Test
     fun `deleting active provider selects another enabled profile`() {
-        val catalog = ProviderCatalogService(MapPreferenceStore())
+        val catalog = catalogWithTwoProfiles()
         catalog.setActiveProvider("openai")
 
         assertEquals(true, catalog.deleteProvider("openai"))
@@ -198,7 +212,7 @@ class ProviderCatalogServiceTest {
 
     @Test
     fun `disabling active provider selects another enabled profile`() {
-        val catalog = ProviderCatalogService(MapPreferenceStore())
+        val catalog = catalogWithTwoProfiles()
         catalog.setActiveProvider("openai")
         val openAi = requireNotNull(catalog.getProvider("openai"))
 
@@ -282,6 +296,12 @@ class ProviderCatalogServiceTest {
         )
         assertFalse(catalog.deleteProvider("missing"))
     }
+
+    private fun catalogWithTwoProfiles(): ProviderCatalogService =
+        ProviderCatalogService(MapPreferenceStore()).apply {
+            saveProvider(ProviderProfile("ollama", "Ollama", ProviderAdapter.OLLAMA, "http://localhost:11434"))
+            saveProvider(ProviderProfile("openai", "OpenAI", ProviderAdapter.OPENAI_COMPATIBLE, "https://api.openai.com"))
+        }
 
     internal class MapPreferenceStore : ProviderPreferenceStore {
         private val values = mutableMapOf<String, String>()
