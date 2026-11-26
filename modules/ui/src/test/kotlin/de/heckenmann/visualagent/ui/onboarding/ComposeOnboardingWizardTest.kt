@@ -12,6 +12,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasScrollToIndexAction
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToIndex
@@ -33,6 +34,9 @@ import de.heckenmann.visualagent.ui.CompletionIdlingResource
 import de.heckenmann.visualagent.ui.awaitCompletion
 import org.junit.Rule
 import org.junit.Test
+import java.util.concurrent.CopyOnWriteArrayList
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /** Verifies that the onboarding wizard keeps navigation usable through the complete setup flow. */
@@ -94,6 +98,45 @@ class ComposeOnboardingWizardTest {
     }
 
     @Test
+    fun `failed validation preserves the provider draft and model for a successful retry`() {
+        val onboarding = TestOnboardingPort(failFirstValidation = true)
+        composeTestRule.setContent {
+            MaterialTheme {
+                ComposeOnboardingWizard(onboarding, automatic = false, onFinished = {})
+            }
+        }
+        composeTestRule.onNodeWithText("Continue").performClick()
+        composeTestRule.onNodeWithText("Add provider").performClick()
+        composeTestRule.onNodeWithText("Provider name").performTextReplacement("Retry provider")
+        composeTestRule.awaitCompletion(onboarding.modelDiscovery) {
+            composeTestRule.onNodeWithText("Continue").performClick()
+        }
+        composeTestRule.onNodeWithText("Continue").performClick()
+        composeTestRule.onNodeWithText("Save and continue").performClick()
+
+        composeTestRule.waitUntil(timeoutMillis = 5_000) {
+            onboarding.validationRequests.isNotEmpty() &&
+                composeTestRule.onAllNodesWithText("The provider is temporarily unavailable.").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeTestRule.onNodeWithText("The provider is temporarily unavailable.").assertIsDisplayed()
+        val firstAttempt = onboarding.validationRequests.single()
+        assertEquals("Retry provider", firstAttempt.first.name)
+        assertEquals("discovered", firstAttempt.second)
+        assertTrue(onboarding.savedConfigurations.isEmpty())
+        assertFalse(onboarding.completed)
+        composeTestRule.onNodeWithText("Discovered model").assertIsSelected()
+
+        composeTestRule.onNodeWithText("Continue").performClick()
+        composeTestRule.onNodeWithText("Review").assertIsDisplayed()
+        composeTestRule.awaitCompletion(onboarding.providerSaved) {
+            composeTestRule.onNodeWithText("Save and continue").performClick()
+        }
+        composeTestRule.onNodeWithText("Create your first sub-agent").assertIsDisplayed()
+        assertEquals(listOf(firstAttempt, firstAttempt), onboarding.validationRequests.toList())
+        assertEquals(Triple(firstAttempt.first, firstAttempt.second, "fingerprint"), onboarding.savedConfigurations.single())
+    }
+
+    @Test
     fun `model list scrolls independently at larger font scale`() {
         val models =
             List(40) { ProviderModel("model-$it") } +
@@ -131,7 +174,9 @@ class ComposeOnboardingWizardTest {
         composeTestRule.onNodeWithText("The server could not validate", substring = true).assertIsDisplayed()
     }
 
-    private class TestOnboardingPort : OnboardingPort {
+    private class TestOnboardingPort(
+        private val failFirstValidation: Boolean = false,
+    ) : OnboardingPort {
         var finished = false
         var discoveryCalled = false
         var creationCalled = false
@@ -140,6 +185,8 @@ class ComposeOnboardingWizardTest {
         val providerSaved = CompletionIdlingResource("provider save")
         val agentCreation = CompletionIdlingResource("agent creation")
         val completion = CompletionIdlingResource("onboarding completion")
+        val validationRequests = CopyOnWriteArrayList<Pair<OnboardingProviderDraft, String>>()
+        val savedConfigurations = CopyOnWriteArrayList<Triple<OnboardingProviderDraft, String, String>>()
 
         override fun state() = OnboardingState(OnboardingStatus.NOT_STARTED, version = 1)
 
@@ -158,13 +205,21 @@ class ComposeOnboardingWizardTest {
         override suspend fun validate(
             draft: OnboardingProviderDraft,
             modelId: String,
-        ) = OnboardingValidationResult(true, OnboardingValidationCode.SUCCESS, "Ready", "fingerprint")
+        ): OnboardingValidationResult {
+            validationRequests += draft to modelId
+            return if (failFirstValidation && validationRequests.size == 1) {
+                OnboardingValidationResult(false, OnboardingValidationCode.ENDPOINT_UNAVAILABLE, "The provider is temporarily unavailable.")
+            } else {
+                OnboardingValidationResult(true, OnboardingValidationCode.SUCCESS, "Ready", "fingerprint")
+            }
+        }
 
         override suspend fun finish(
             draft: OnboardingProviderDraft,
             model: ProviderModel,
             validationFingerprint: String,
         ) {
+            savedConfigurations += Triple(draft, model.id, validationFingerprint)
             finished = true
             providerSaved.complete()
         }

@@ -124,25 +124,10 @@ internal fun ComposeOnboardingWindow(
     onFinished: () -> Unit,
     onCloseRequest: () -> Unit,
     themeMode: ThemeMode = ThemeMode.SYSTEM,
+    windowHost: @Composable (Boolean, () -> Unit, @Composable () -> Unit) -> Unit = ::NativeOnboardingWindow,
 ) {
-    val applicationIcon = painterResource(Res.drawable.visual_agent)
     var skipRequested by remember { mutableStateOf(false) }
-    StartupWindow(
-        mode = StartupWindowMode.ONBOARDING,
-        observeStartup = automatic,
-        onCloseRequest = {
-            if (automatic) skipRequested = true else onCloseRequest()
-        },
-        title = "$STARTUP_WINDOW_TITLE – Setup",
-        icon = applicationIcon,
-        resizable = false,
-        state =
-            rememberWindowState(
-                width = DEFAULT_SPLASH_WIDTH,
-                height = DEFAULT_SPLASH_HEIGHT,
-                position = WindowPosition.Aligned(Alignment.Center),
-            ),
-    ) {
+    windowHost(automatic, { if (automatic) skipRequested = true else onCloseRequest() }) {
         val darkTheme = startupDarkTheme(themeMode)
         MaterialTheme(
             colorScheme = if (darkTheme) visualAgentDarkColorScheme() else visualAgentLightColorScheme(),
@@ -161,6 +146,29 @@ internal fun ComposeOnboardingWindow(
             }
         }
     }
+}
+
+@OptIn(ExperimentalComposeUiApi::class)
+@Composable
+private fun NativeOnboardingWindow(
+    automatic: Boolean,
+    onCloseRequest: () -> Unit,
+    content: @Composable () -> Unit,
+) {
+    StartupWindow(
+        mode = StartupWindowMode.ONBOARDING,
+        observeStartup = automatic,
+        onCloseRequest = onCloseRequest,
+        title = "$STARTUP_WINDOW_TITLE – Setup",
+        icon = painterResource(Res.drawable.visual_agent),
+        resizable = false,
+        state =
+            rememberWindowState(
+                width = DEFAULT_SPLASH_WIDTH,
+                height = DEFAULT_SPLASH_HEIGHT,
+                position = WindowPosition.Aligned(Alignment.Center),
+            ),
+    ) { content() }
 }
 
 /** Renders the main window with its own state and independent lifecycle. */

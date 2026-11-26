@@ -1,5 +1,6 @@
 package de.heckenmann.visualagent.agent
 
+import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
 import de.heckenmann.visualagent.agent.provider.ProviderPreferenceStore
 import de.heckenmann.visualagent.agent.provider.ProviderRuntimeConfig
 import de.heckenmann.visualagent.agent.provider.ProviderToolCallbacks
@@ -31,6 +32,11 @@ internal class TestPreferenceStore : ProviderPreferenceStore {
     ) {
         values[key] = value
     }
+}
+
+internal fun configuredProviderTestCatalog(config: ProviderRuntimeConfig): ProviderCatalogService {
+    val preferences = TestPreferenceStore().apply { setPreference("llm.provider", config.llmProvider) }
+    return ProviderCatalogService(preferences, config)
 }
 
 internal interface TestVisualAgentTool {

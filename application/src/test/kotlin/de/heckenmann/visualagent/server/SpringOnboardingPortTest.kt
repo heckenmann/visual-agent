@@ -133,7 +133,7 @@ class SpringOnboardingPortTest {
                 )
             every { catalog.getProvider("openai") } returns null
             every { catalog.listProviders() } returns emptyList()
-            every { catalog.replaceConfigurationReactive(any()) } returns Mono.empty()
+            every { catalog.saveOnboardingProfile(any(), any()) } returns Mono.empty()
             every { preferences.setPreference(any(), any()) } returns Unit
             every { provider.getModelConfigsReactive(any<ProviderProfile>()) } returns
                 Mono.just(listOf(ProviderModelConfig("verified-model")))
@@ -144,10 +144,9 @@ class SpringOnboardingPortTest {
             port.finish(draft, ProviderModel("verified-model"), checkNotNull(validation.validationFingerprint))
 
             verify {
-                catalog.replaceConfigurationReactive(
-                    match { configuration ->
-                        configuration.providerId == "openai" && configuration.modelId == "verified-model"
-                    },
+                catalog.saveOnboardingProfile(
+                    match { it.id == "openai" && it.defaultModel == "verified-model" },
+                    null,
                 )
             }
             verify(exactly = 0) { preferences.setPreference("ui.onboarding.v1", OnboardingStatus.COMPLETED.name) }
@@ -168,7 +167,7 @@ class SpringOnboardingPortTest {
             val discovered = ProviderModelConfig("verified-model", name = "Verified", contextLimit = 131072)
             every { catalog.getProvider("openai") } returns null
             every { catalog.listProviders() } returns emptyList()
-            every { catalog.replaceConfigurationReactive(any()) } returns Mono.empty()
+            every { catalog.saveOnboardingProfile(any(), any()) } returns Mono.empty()
             every { preferences.setPreference(any(), any()) } returns Unit
             every { provider.getModelConfigsReactive(any<ProviderProfile>()) } returns Mono.just(listOf(discovered))
             every { provider.chatReactive(any<ChatRequestContext>()) } returns
@@ -182,19 +181,11 @@ class SpringOnboardingPortTest {
             )
 
             verify {
-                catalog.replaceConfigurationReactive(
-                    match { configuration ->
-                        configuration.providers
-                            .single()
-                            .models
-                            .single()
-                            .name == "Verified" &&
-                            configuration.providers
-                                .single()
-                                .models
-                                .single()
-                                .contextLimit == 131072
+                catalog.saveOnboardingProfile(
+                    match {
+                        it.models.single().name == "Verified" && it.models.single().contextLimit == 131072
                     },
+                    null,
                 )
             }
         }
@@ -230,7 +221,7 @@ class SpringOnboardingPortTest {
                 )
             every { catalog.getProvider("openai") } returns configured
             every { catalog.listProviders() } returns listOf(configured)
-            every { catalog.replaceConfigurationReactive(any()) } returns Mono.empty()
+            every { catalog.saveOnboardingProfile(any(), any()) } returns Mono.empty()
             every { preferences.setPreference(any(), any()) } returns Unit
             every { provider.getModelConfigsReactive(any<ProviderProfile>()) } returns
                 Mono.just(listOf(ProviderModelConfig("selected-model")))
@@ -241,19 +232,16 @@ class SpringOnboardingPortTest {
             port.finish(draft, ProviderModel("selected-model"), checkNotNull(validation.validationFingerprint))
 
             verify {
-                catalog.replaceConfigurationReactive(
-                    match { configuration ->
-                        val models =
-                            configuration.providers
-                                .single()
-                                .models
-                                .associateBy { it.id }
+                catalog.saveOnboardingProfile(
+                    match {
+                        val models = it.models.associateBy { model -> model.id }
                         models.keys == setOf("selected-model", "other-model") &&
                             models.getValue("selected-model").options == mapOf("temperature" to "0.2") &&
                             models.getValue("selected-model").variants == mapOf("fast" to mapOf("reasoning" to "low")) &&
                             models.getValue("selected-model").contextLimit == 65536 &&
                             models.getValue("other-model").contextLimit == 32768
                     },
+                    configured,
                 )
             }
         }

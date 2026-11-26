@@ -33,6 +33,7 @@ import kotlinx.coroutines.withContext
 internal fun DirectAuthorizationControls(
     profile: ProviderProfile,
     port: ProviderPort,
+    staged: Boolean = false,
     onReferenceChanged: (String, String?) -> Unit,
 ) {
     if (profile.adapter != ProviderAdapter.CODEX_DIRECT || profile.directAuthMode != DirectProviderAuthMode.CHATGPT_OAUTH) return
@@ -40,19 +41,20 @@ internal fun DirectAuthorizationControls(
     val browser = LocalUriHandler.current
     val publishReference by rememberUpdatedState(onReferenceChanged)
     var reference by remember(profile.id, profile.credentialReference) { mutableStateOf(profile.credentialReference) }
-    var registrationLoaded by remember(profile.id, port) { mutableStateOf(false) }
+    var registrationLoaded by remember(profile.id, port, staged) { mutableStateOf(staged) }
     var catalogRevision by remember(profile.id, port) { mutableStateOf(0) }
     val hasRegistration = reference != null
     var operation by remember(profile.id) { mutableStateOf<Job?>(null) }
     var status by remember(profile.id) { mutableStateOf<String?>(null) }
-    DisposableEffect(profile.id, port) {
-        val listener = port.addChangeListener { scope.launch { catalogRevision++ } }
+    DisposableEffect(profile.id, port, staged) {
+        val listener = if (staged) null else port.addChangeListener { scope.launch { catalogRevision++ } }
         onDispose {
-            listener.close()
+            listener?.close()
             operation?.cancel()
         }
     }
-    LaunchedEffect(profile.id, profile.credentialReference, port, catalogRevision) {
+    LaunchedEffect(profile.id, profile.credentialReference, port, catalogRevision, staged) {
+        if (staged) return@LaunchedEffect
         registrationLoaded = false
         try {
             val saved = withContext(Dispatchers.IO) { port.getProvider(profile.id) }
@@ -82,13 +84,21 @@ internal fun DirectAuthorizationControls(
                         var sessionId: String? = null
                         try {
                             status = "Complete ChatGPT authorization in your browser."
-                            val session = withContext(Dispatchers.IO) { port.beginDirectSignIn(profile) }
+                            val session =
+                                withContext(Dispatchers.IO) {
+                                    if (staged) port.beginStagedDirectSignIn(profile) else port.beginDirectSignIn(profile)
+                                }
                             sessionId = session.id
                             withContext(Dispatchers.IO) { browser.openUri(session.authorizationUrl) }
                             val result = withContext(Dispatchers.IO) { port.awaitDirectSignIn(session.id) }
                             reference = result.credentialReference
                             publishReference(profile.id, result.credentialReference)
-                            status = "${result.accountLabel} authorized. This account selection is saved."
+                            status =
+                                if (staged) {
+                                    "${result.accountLabel} authorized for this draft."
+                                } else {
+                                    "${result.accountLabel} authorized. This account selection is saved."
+                                }
                         } catch (cancelled: CancellationException) {
                             status = "ChatGPT authorization cancelled."
                             throw cancelled

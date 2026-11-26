@@ -6,8 +6,9 @@ import kotlin.test.assertEquals
 /** Verifies Codex-specific provider catalog behavior. */
 class ProviderCatalogServiceCodexTest {
     @Test
-    fun `catalog seeds the codex profile without selecting it`() {
-        val catalog = ProviderCatalogService(MapPreferenceStore())
+    fun `legacy catalog seeds the codex profile without selecting it`() {
+        val preferences = MapPreferenceStore().apply { setPreference("llm.provider", "ollama") }
+        val catalog = ProviderCatalogService(preferences)
         val profile = requireNotNull(catalog.getProvider(ProviderEnvironmentCredentials.CODEX_PROFILE_ID))
 
         assertEquals("Codex CLI", profile.name)

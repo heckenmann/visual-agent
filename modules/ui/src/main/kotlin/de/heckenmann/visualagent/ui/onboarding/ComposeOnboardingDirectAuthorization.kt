@@ -29,6 +29,7 @@ internal fun OnboardingDirectAuthorization(
                 credentialReference = draft.credentialReference,
             ),
             port,
+            staged = true,
         ) { id, reference ->
             if (current.id == id && current.directAuthMode == DirectProviderAuthMode.CHATGPT_OAUTH) {
                 publish(current.copy(credentialReference = reference))

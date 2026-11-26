@@ -11,8 +11,10 @@ import io.netty.handler.codec.http.QueryStringDecoder
 import org.slf4j.LoggerFactory
 import org.springframework.context.SmartLifecycle
 import org.springframework.stereotype.Service
+import reactor.core.Disposable
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
+import reactor.core.scheduler.Schedulers
 import reactor.netty.http.HttpResources
 import reactor.netty.http.server.HttpServer
 import reactor.netty.http.server.HttpServerRequest
@@ -38,10 +40,14 @@ internal class DirectProviderAuthorizationService(
 ) : DirectProviderAuthorization,
     SmartLifecycle {
     private val attempts = ConcurrentHashMap<String, DirectSignInTransaction>()
+    private val stagedTargets = ConcurrentHashMap<String, StagedAuthorizationTarget>()
     private val accepting = AtomicBoolean(true)
     private val logger = LoggerFactory.getLogger(javaClass)
 
-    override fun begin(profile: ProviderProfile): Mono<ProviderAuthorizationSession> =
+    override fun begin(
+        profile: ProviderProfile,
+        staged: Boolean,
+    ): Mono<ProviderAuthorizationSession> =
         Mono.defer {
             check(accepting.get()) { "ChatGPT sign-in is shutting down" }
             require(profile.adapter == ProviderAdapter.CODEX_DIRECT && profile.directAuthMode == DirectProviderAuthMode.CHATGPT_OAUTH) {
@@ -74,6 +80,7 @@ internal class DirectProviderAuthorizationService(
                                     attempt,
                                     server,
                                     prepared.t3,
+                                    staged,
                                 )
                             holder.set(transaction)
                             synchronized(attempts) {
@@ -117,6 +124,17 @@ internal class DirectProviderAuthorizationService(
                 transaction.claimed.set(true)
                 close(transaction)
             }
+            if (transaction.staged) {
+                val staged = StagedAuthorizationTarget(transaction.target)
+                check(stagedTargets.putIfAbsent(transaction.reference, staged) == null)
+                staged.expiry =
+                    Schedulers.parallel().schedule(
+                        { stagedTargets.remove(transaction.reference, staged) },
+                        15,
+                        java.util.concurrent.TimeUnit.MINUTES,
+                    )
+                return@defer Mono.empty()
+            }
             catalog.complete(transaction.target, transaction.reference).onErrorResume { error ->
                 sessions
                     .withSession(transaction.reference) {
@@ -124,6 +142,26 @@ internal class DirectProviderAuthorizationService(
                     }.then(Mono.error(error))
             }
         }
+
+    override fun saveStaged(
+        profile: ProviderProfile,
+        attach: (ProviderProfile?) -> Mono<Void>,
+    ): Mono<Void> {
+        val reference = requireNotNull(profile.credentialReference)
+        val staged = checkNotNull(stagedTargets[reference]) { "The onboarding sign-in expired. Sign in again." }
+        // Once subscribed, finish the save even if the onboarding window closes.
+        return sessions
+            .withSession(reference) {
+                store.promote(reference, profile.id).then(
+                    Mono.defer { attach(staged.target.previous) }.onErrorResume { error ->
+                        store.signOut(reference, profile.id).then(Mono.error(error))
+                    },
+                )
+            }.doFinally {
+                stagedTargets.remove(reference, staged)
+                staged.expiry?.dispose()
+            }.cache()
+    }
 
     override fun cancel(sessionId: String): Mono<Void> =
         Mono.defer {
@@ -185,7 +223,13 @@ internal class DirectProviderAuthorizationService(
                 .flatMap { credentials ->
                     sessions.withSession(transaction.reference) {
                         check(transaction.active.get()) { "The sign-in attempt was cancelled" }
-                        store.save(transaction.reference, credentials, null).map { saved ->
+                        val registration =
+                            if (transaction.staged) {
+                                store.stage(transaction.reference, credentials)
+                            } else {
+                                store.save(transaction.reference, credentials, null)
+                            }
+                        registration.map { saved ->
                             check(saved) { "The credential registration already exists" }
                             ProviderAuthorizationResult(transaction.reference, "ChatGPT ${credentials.clientId.takeLast(8)}")
                         }
@@ -261,5 +305,12 @@ internal class DirectProviderAuthorizationService(
                 logger.warn("Could not invalidate pending ChatGPT sign-in credentials during shutdown")
                 callback.run()
             }, callback::run)
+    }
+
+    private class StagedAuthorizationTarget(
+        val target: de.heckenmann.visualagent.agent.provider.ProviderAuthorizationTarget,
+    ) {
+        @Volatile
+        var expiry: Disposable? = null
     }
 }

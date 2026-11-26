@@ -79,6 +79,10 @@ interface ProviderPort {
     suspend fun beginDirectSignIn(profile: ProviderProfile): ProviderSignInSession =
         throw UnsupportedOperationException("Direct provider authorization is unavailable")
 
+    /** Starts sign-in for an onboarding draft without saving its profile. */
+    suspend fun beginStagedDirectSignIn(profile: ProviderProfile): ProviderSignInSession =
+        throw UnsupportedOperationException("Staged provider authorization is unavailable")
+
     /** Awaits validated account authorization without returning tokens. */
     suspend fun awaitDirectSignIn(sessionId: String): ProviderSignInResult =
         throw UnsupportedOperationException("Direct provider authorization is unavailable")

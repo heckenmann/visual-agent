@@ -19,7 +19,16 @@ data class ProviderAuthorizationResult(
 /** Server-owned authentication lifecycle for the direct Codex provider. */
 interface DirectProviderAuthorization {
     /** Starts a one-use browser authorization attempt for an explicitly selected OAuth profile. */
-    fun begin(profile: ProviderProfile): Mono<ProviderAuthorizationSession>
+    fun begin(
+        profile: ProviderProfile,
+        staged: Boolean = false,
+    ): Mono<ProviderAuthorizationSession>
+
+    /** Saves a staged registration and attaches it through the catalog mutation. */
+    fun saveStaged(
+        profile: ProviderProfile,
+        attach: (ProviderProfile?) -> Mono<Void>,
+    ): Mono<Void>
 
     /** Awaits a validated result; cancelling the subscription cancels the corresponding attempt. */
     fun await(sessionId: String): Mono<ProviderAuthorizationResult>

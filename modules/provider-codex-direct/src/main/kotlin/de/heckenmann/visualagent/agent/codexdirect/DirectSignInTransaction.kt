@@ -15,6 +15,7 @@ internal data class DirectSignInTransaction(
     val attempt: DirectOAuthAttempt,
     val server: DisposableServer,
     val target: ProviderAuthorizationTarget,
+    val staged: Boolean,
     val result: Sinks.One<ProviderAuthorizationResult> = Sinks.one(),
     val accepted: AtomicBoolean = AtomicBoolean(),
     val active: AtomicBoolean = AtomicBoolean(true),

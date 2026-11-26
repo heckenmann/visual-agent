@@ -14,6 +14,7 @@ import java.nio.file.StandardCopyOption.REPLACE_EXISTING
 import java.nio.file.StandardOpenOption.READ
 import java.nio.file.StandardOpenOption.WRITE
 import java.util.UUID
+import java.util.concurrent.TimeUnit
 
 /** Persists profile-bound OAuth credentials atomically outside exported provider settings. */
 @Service
@@ -21,6 +22,33 @@ internal class DirectOAuthCredentialStore(
     private val location: DirectCredentialDirectory,
 ) {
     private val lock = Any()
+    private val drafts = mutableMapOf<String, DirectOAuthCredentials>()
+
+    /** Holds an onboarding registration in memory until the profile is saved. */
+    fun stage(
+        reference: String,
+        record: DirectOAuthCredentials,
+    ): Mono<Boolean> =
+        io {
+            require(drafts.size < 8) { "Too many staged ChatGPT registrations" }
+            check(drafts.putIfAbsent(reference, record) == null)
+            Schedulers.parallel().schedule({ synchronized(lock) { drafts.remove(reference) } }, 15, TimeUnit.MINUTES)
+            true
+        }
+
+    /** Moves the selected draft registration to protected storage before the catalog attaches it. */
+    fun promote(
+        reference: String,
+        profileId: String,
+    ): Mono<Void> =
+        io {
+            val record = checkNotNull(drafts[reference]) { "The onboarding sign-in expired. Sign in again." }
+            require(record.profileId == profileId) { "Credential record belongs to another provider profile" }
+            drafts.remove(reference)
+            record.copy(generation = 0)
+        }.flatMap { record ->
+            save(reference, record, null).doOnNext { saved -> check(saved) { "The credential registration already exists" } }
+        }.then()
 
     /** Loads one protected record only for its owning provider profile. */
     fun load(
@@ -28,6 +56,10 @@ internal class DirectOAuthCredentialStore(
         profileId: String,
     ): Mono<DirectOAuthCredentials> =
         io {
+            drafts[reference]?.let { record ->
+                require(record.profileId == profileId) { "Credential record belongs to another provider profile" }
+                return@io record
+            }
             val path = root().resolve(fileName(reference))
             if (!Files.exists(path, NOFOLLOW_LINKS)) return@io null
             requireProtectedPath(path)
@@ -49,6 +81,13 @@ internal class DirectOAuthCredentialStore(
         expectedGeneration: Long?,
     ): Mono<Boolean> =
         io {
+            drafts[reference]?.let { previous ->
+                require(previous.profileId == record.profileId) { "Credential record belongs to another provider profile" }
+                if (previous.generation != expectedGeneration) return@io false
+                require(record.generation == previous.generation + 1) { "Invalid credential generation" }
+                drafts[reference] = record
+                return@io true
+            }
             val directory = root()
             val lockPath = directory.resolve("credentials.lock")
             if (!Files.exists(lockPath, NOFOLLOW_LINKS)) {
@@ -88,6 +127,20 @@ internal class DirectOAuthCredentialStore(
 
     /** Invalidates local tokens so a refresh based on an older generation cannot restore them. */
     fun signOut(
+        reference: String,
+        profileId: String,
+    ): Mono<Boolean> =
+        io {
+            drafts[reference]?.let { record ->
+                require(record.profileId == profileId) { "Credential record belongs to another provider profile" }
+                drafts.remove(reference)
+                true
+            } ?: false
+        }.flatMap { removed ->
+            if (removed) Mono.just(true) else invalidateStored(reference, profileId)
+        }
+
+    private fun invalidateStored(
         reference: String,
         profileId: String,
     ): Mono<Boolean> =

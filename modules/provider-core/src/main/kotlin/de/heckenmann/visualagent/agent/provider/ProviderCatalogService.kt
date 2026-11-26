@@ -173,6 +173,12 @@ class ProviderCatalogService(
             check(baseline.associateBy(ProviderProfile::id) == current.providers.associateBy(ProviderProfile::id)) {
                 "Provider configuration changed elsewhere. Reload before saving."
             }
+            if (current.providers.none { it.id == current.activeProviderId && it.enabled }) {
+                val first = proposed.first(ProviderProfile::enabled)
+                return@mutate current
+                    .copy(providers = proposed, activeProviderId = first.id, activeModelId = first.defaultModel)
+                    .withAuthoritativeCredentials(current)
+            }
             require(proposed.any { it.id == current.activeProviderId && it.enabled }) {
                 "Switch the Conversation to another provider before removing or disabling the active provider"
             }
@@ -188,6 +194,46 @@ class ProviderCatalogService(
                 state
                     .copy(taskModelAssignments = current.taskModelAssignments)
                     .withAutomaticTaskModelAssignments()
+                    .withAuthoritativeCredentials(current)
+            }.flatMap { notifications.publishReactive() }
+    }
+
+    /** Attaches a validated onboarding registration while preserving unrelated catalog changes. */
+    fun saveAuthorizedOnboardingProfile(
+        profile: ProviderProfile,
+        previous: ProviderProfile?,
+    ): Mono<Void> {
+        val state = validatedCatalogState(ProviderConfiguration(listOf(profile), profile.id, profile.defaultModel))
+        return persistence
+            .mutateReactive { current ->
+                check(current.providers.firstOrNull { it.id == profile.id } == previous) {
+                    "Provider configuration changed during onboarding. Reload before saving."
+                }
+                state
+                    .copy(
+                        providers = current.providers.filterNot { it.id == profile.id } + state.providers.single(),
+                        taskModelAssignments = current.taskModelAssignments,
+                    ).withAutomaticTaskModelAssignments()
+            }.flatMap { notifications.publishReactive() }
+    }
+
+    /** Saves onboarding edits only if the profile used for validation is still current. */
+    fun saveOnboardingProfile(
+        profile: ProviderProfile,
+        previous: ProviderProfile?,
+    ): Mono<Void> {
+        val selected = validatedCatalogState(ProviderConfiguration(listOf(profile), profile.id, profile.defaultModel))
+        return persistence
+            .mutateReactive { current ->
+                check(current.providers.firstOrNull { it.id == profile.id } == previous) {
+                    "Provider configuration changed during onboarding. Reload before saving."
+                }
+                current
+                    .copy(
+                        activeProviderId = selected.activeProviderId,
+                        activeModelId = selected.activeModelId,
+                        providers = current.providers.filterNot { it.id == profile.id } + selected.providers.single(),
+                    ).withAutomaticTaskModelAssignments()
                     .withAuthoritativeCredentials(current)
             }.flatMap { notifications.publishReactive() }
     }
@@ -441,14 +487,18 @@ class ProviderCatalogService(
     }
 
     private fun migrateLegacyConfiguration() {
-        if (preferenceStore.getPreference(KEY_CATALOG) != null) return
+        if (preferenceStore.getPreference(KEY_CATALOG) != null ||
+            LEGACY_PROVIDER_PREFERENCE_KEYS.none { preferenceStore.getPreference(it) != null }
+        ) {
+            return
+        }
         mutate { state -> if (state.providers.isEmpty()) legacyProviderCatalog(appConfig) else state }
     }
 
     private fun ensureBuiltInProfiles() {
         if (preferenceStore.getPreference(KEY_CODEX_INITIALIZED) == "true") return
         mutate { state ->
-            if (state.providers.none { it.id == ProviderEnvironmentCredentials.CODEX_PROFILE_ID }) {
+            if (state.providers.isNotEmpty() && state.providers.none { it.id == ProviderEnvironmentCredentials.CODEX_PROFILE_ID }) {
                 state.copy(providers = state.providers + builtInCodexProfile())
             } else {
                 state
@@ -487,5 +537,15 @@ class ProviderCatalogService(
     private companion object {
         private const val KEY_CATALOG = "llm.provider.catalog.v1"
         private const val KEY_CODEX_INITIALIZED = "llm.provider.codex.profile.initialized.v1"
+        private val LEGACY_PROVIDER_PREFERENCE_KEYS =
+            setOf(
+                "llm.provider",
+                "ollama.local.url",
+                "ollama.model",
+                "ollama.api.key",
+                "openai.api.key",
+                "openai.base.url",
+                "openai.model",
+            )
     }
 }

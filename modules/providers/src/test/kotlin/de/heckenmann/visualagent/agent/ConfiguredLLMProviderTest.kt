@@ -5,7 +5,6 @@ import de.heckenmann.visualagent.agent.provider.ProfiledProviderAdapter
 import de.heckenmann.visualagent.agent.provider.ProviderAdapter
 import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
 import de.heckenmann.visualagent.agent.provider.ProviderModelConfig
-import de.heckenmann.visualagent.agent.provider.ProviderPreferenceStore
 import de.heckenmann.visualagent.agent.provider.ProviderProfile
 import io.mockk.every
 import io.mockk.mockk
@@ -294,20 +293,5 @@ class ConfiguredLLMProviderTest {
             verify(exactly = 0) { ollama.chatReactive(any<ChatRequestContext>()) }
         }
 
-    private fun catalog(): ProviderCatalogService =
-        ProviderCatalogService(
-            object : ProviderPreferenceStore {
-                private val values = mutableMapOf<String, String>()
-
-                override fun getPreference(key: String): String? = values[key]
-
-                override fun setPreference(
-                    key: String,
-                    value: String,
-                ) {
-                    values[key] = value
-                }
-            },
-            appConfig,
-        )
+    private fun catalog(): ProviderCatalogService = configuredProviderTestCatalog(appConfig)
 }
