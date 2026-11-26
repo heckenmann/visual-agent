@@ -69,6 +69,7 @@ class OllamaPromptFactory(
         val toolContext =
             request.metadata +
                 mapOf("model" to selectedModel) +
+                ("enabledTools" to request.enabledTools.mapTo(linkedSetOf()) { it.value }) +
                 (request.cancellationToken?.let { mapOf("cancellationToken" to it) } ?: emptyMap())
         // Stable schema order permits prefix-cache reuse without widening the allowlist; see docs/context-transport.md.
         val callbacks =
@@ -146,8 +147,12 @@ class OllamaPromptFactory(
                         - Do not invent variants, prefixes, or suffixes.
                         - ${toolRegistry.toolRuntimeGuidance()}
                         - Use `async:true` when a tool can finish in the background.
-                        - To list the tools available to you, call tool_help with {"action":"list"}.
-                        """.trimIndent(),
+                        """.trimIndent() +
+                            if (TOOL_HELP_FUNCTION in exactFunctionNames) {
+                                "\n- To list the tools available to you, call tool_help with {\"action\":\"list\"}."
+                            } else {
+                                ""
+                            },
                 ),
             )
         }

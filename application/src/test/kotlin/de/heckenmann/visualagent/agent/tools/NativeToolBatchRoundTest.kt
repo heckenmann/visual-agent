@@ -1,5 +1,6 @@
 package de.heckenmann.visualagent.agent.tools
 
+import de.heckenmann.visualagent.agent.FakeTool
 import de.heckenmann.visualagent.agent.ProviderToolCall
 import de.heckenmann.visualagent.agent.tools.api.ToolBatchSafety
 import de.heckenmann.visualagent.agent.tools.api.ToolDefinition
@@ -12,10 +13,38 @@ import java.time.Duration
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /** Proves identical tool names/arguments retain immutable distinct provider identities. */
 class NativeToolBatchRoundTest {
+    @Test
+    fun `tool help can delegate only request grants and direct calls still require an advertised schema`() {
+        lateinit var registry: ToolRegistry
+        val help = ToolHelpTool { registry }
+        registry = ToolRegistry(listOf(help, FakeTool("agent:list"), FakeTool("agent:create")), ToolEventBus())
+        val native = NativeToolBatchRound(registry, ToolBatchExecutor(registry))
+        val context = mapOf("enabledTools" to setOf("tool:help", "agent:list"))
+
+        fun invoke(
+            function: String,
+            arguments: String,
+        ): Boolean {
+            val result =
+                native
+                    .execute(listOf(ProviderToolCall("id", "function", function, arguments)), 0, null, setOf("tool_help"), context)
+                    .block(Duration.ofSeconds(5))!!
+                    .single()
+            return kotlinx.serialization.json.Json
+                .decodeFromString<de.heckenmann.visualagent.agent.tools.api.ToolResultEnvelope>(result)
+                .success
+        }
+
+        assertTrue(invoke("tool_help", """{"action":"call","name":"agent_list","arguments":{}}"""))
+        assertFalse(invoke("tool_help", """{"action":"call","name":"agent_create","arguments":{}}"""))
+        assertFalse(invoke("agent_list", "{}"))
+    }
+
     @Test
     fun `malformed batch JSON returns canonical errors before any tool starts`() {
         var started = false
