@@ -149,21 +149,18 @@ internal class DirectProviderAuthorizationService(
     ): Mono<Void> {
         val reference = requireNotNull(profile.credentialReference)
         val staged = checkNotNull(stagedTargets[reference]) { "The onboarding sign-in expired. Sign in again." }
-        val operation =
-            sessions
-                .withSession(reference) {
-                    store.promote(reference, profile.id).then(
-                        Mono.defer { attach(staged.target.previous) }.onErrorResume { error ->
-                            store.signOut(reference, profile.id).then(Mono.error(error))
-                        },
-                    )
-                }.doFinally {
-                    stagedTargets.remove(reference, staged)
-                    staged.expiry?.dispose()
-                }.cache()
-        // The catalog and credential file must commit or roll back even if the onboarding window closes.
-        operation.subscribe({}, { error -> logger.warn("Could not finish staged ChatGPT authorization") })
-        return operation
+        // Once subscribed, finish the save even if the onboarding window closes.
+        return sessions
+            .withSession(reference) {
+                store.promote(reference, profile.id).then(
+                    Mono.defer { attach(staged.target.previous) }.onErrorResume { error ->
+                        store.signOut(reference, profile.id).then(Mono.error(error))
+                    },
+                )
+            }.doFinally {
+                stagedTargets.remove(reference, staged)
+                staged.expiry?.dispose()
+            }.cache()
     }
 
     override fun cancel(sessionId: String): Mono<Void> =
