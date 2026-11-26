@@ -9,6 +9,7 @@ import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
 import de.heckenmann.visualagent.knowledge.PreferenceStore
 import de.heckenmann.visualagent.protocol.CredentialUpdate
 import de.heckenmann.visualagent.protocol.OnboardingAgent
+import de.heckenmann.visualagent.protocol.OnboardingAgentCreationAvailability
 import de.heckenmann.visualagent.protocol.OnboardingAgentCreationResult
 import de.heckenmann.visualagent.protocol.OnboardingPort
 import de.heckenmann.visualagent.protocol.OnboardingProviderDraft
@@ -52,6 +53,8 @@ class SpringOnboardingPort(
     override fun providers(): List<OnboardingProviderProfile> = providerCatalog.listProviders().map { profile -> profile.toSafeView() }
 
     override fun agents(): List<OnboardingAgent> = onboardingAgentService.agents()
+
+    override fun agentCreationAvailability(): OnboardingAgentCreationAvailability = onboardingAgentService.agentCreationAvailability()
 
     override fun dismiss() {
         preferenceStore.setPreference(ONBOARDING_KEY, OnboardingStatus.DISMISSED.name)

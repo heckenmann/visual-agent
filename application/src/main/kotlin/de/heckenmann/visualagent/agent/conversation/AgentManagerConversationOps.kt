@@ -128,12 +128,12 @@ internal class AgentManagerConversationOps(
     suspend fun sendMessage(
         content: String,
         token: CancellationToken? = null,
-    ): String {
-        val requestId =
+        requestId: String =
             java.util.UUID
                 .randomUUID()
-                .toString()
-        owner.conversationStore.beginConversationRequest(AgentManagerConstants.MAIN_SESSION_ID, requestId)
+                .toString(),
+    ): String {
+        beginConversationRequest(requestId)
         persist(Message("user", content, conversationRequestId = requestId))
         token?.throwIfCancelled()
         var providerFailed = false

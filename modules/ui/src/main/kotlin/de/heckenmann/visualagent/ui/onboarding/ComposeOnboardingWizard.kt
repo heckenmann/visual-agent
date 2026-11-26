@@ -27,9 +27,8 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.dp
-import de.heckenmann.visualagent.protocol.CredentialUpdate
-import de.heckenmann.visualagent.protocol.DirectProviderAuthMode
 import de.heckenmann.visualagent.protocol.OnboardingAgent
+import de.heckenmann.visualagent.protocol.OnboardingAgentCreationAvailability
 import de.heckenmann.visualagent.protocol.OnboardingPort
 import de.heckenmann.visualagent.protocol.OnboardingProviderDraft
 import de.heckenmann.visualagent.protocol.OnboardingProviderProfile
@@ -68,6 +67,7 @@ fun ComposeOnboardingWizard(
     var creatingAgent by remember { mutableStateOf(false) }
     var agentResult by remember { mutableStateOf<String?>(null) }
     var agentError by remember { mutableStateOf<String?>(null) }
+    var agentCreationAvailability by remember { mutableStateOf<OnboardingAgentCreationAvailability?>(null) }
     var confirmSkip by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     LaunchedEffect(onboarding) {
@@ -82,76 +82,68 @@ fun ComposeOnboardingWizard(
         }
     }
     val draft = customDraft ?: selected?.toDraft()
-    val credentialConfigured =
-        when (val credential = draft?.credential) {
-            CredentialUpdate.Unchanged ->
-                if (draft.directAuthMode == DirectProviderAuthMode.CHATGPT_OAUTH) {
-                    draft.credentialReference != null
-                } else {
-                    selected?.credentialConfigured == true
-                }
-            CredentialUpdate.Clear -> false
-            is CredentialUpdate.Replace -> credential.value.isNotBlank()
-            null -> false
-        }
+    val credentialConfigured = onboardingCredentialConfigured(draft, selected)
 
     val discoverModels: () -> Unit = {
-        draft?.let { providerDraft ->
-            scope.launch {
-                loadingModels = true
-                validationError = null
-                runCatching {
-                    withContext(Dispatchers.IO) { onboarding.discoverModels(providerDraft) }
-                }.onSuccess { discovered ->
-                    models = discovered
-                    selectedModel = discovered.firstOrNull { it.id == selectedModel?.id } ?: discovered.firstOrNull()
-                    if (discovered.isEmpty()) {
-                        validationError =
-                            "No selectable model was found for this provider. Check the provider and refresh later."
-                    }
-                }.onFailure {
-                    validationError = "Models could not be discovered from this Visual Agent server."
+        discoverOnboardingModels(
+            scope = scope,
+            onboarding = onboarding,
+            draft = draft,
+            onLoading = { loading ->
+                loadingModels = loading
+                if (loading) validationError = null
+            },
+            onDiscovered = { discovered ->
+                models = discovered
+                selectedModel = discovered.firstOrNull { it.id == selectedModel?.id } ?: discovered.firstOrNull()
+                if (discovered.isEmpty()) {
+                    validationError = "No selectable model was found for this provider. Check the provider and refresh later."
                 }
-                loadingModels = false
-            }
-        }
+            },
+            onFailure = { validationError = "Models could not be discovered from this Visual Agent server." },
+        )
     }
     val createAgent: () -> Unit = {
-        scope.launch {
-            creatingAgent = true
-            agentError = null
-            runCatching { withContext(Dispatchers.IO) { onboarding.createAgent(agentDescription) } }
-                .onSuccess { result ->
-                    agents = result.agents
-                    agentResult = result.message
-                }.onFailure {
-                    agentError = "The model could not create the sub-agent. Adjust the description or skip this step."
-                }
-            creatingAgent = false
-        }
+        createOnboardingAgent(
+            scope = scope,
+            onboarding = onboarding,
+            description = agentDescription,
+            onCreating = { creatingAgent = it },
+            onCreated = { result ->
+                agents = result.agents
+                agentResult = result.message
+                agentError =
+                    if (result.agentCreated) {
+                        null
+                    } else {
+                        "The model replied without creating a sub-agent. Revise the request or skip this step."
+                    }
+            },
+            onFailure = {
+                agentError = "The model could not create the sub-agent. Adjust the description or skip this step."
+            },
+        )
     }
     val saveProvider: () -> Unit = {
-        scope.launch {
-            savingProvider = true
-            val result = withContext(Dispatchers.IO) { onboarding.validate(checkNotNull(draft), checkNotNull(selectedModel).id) }
-            if (!result.success) {
-                validationError = result.message
+        saveOnboardingProvider(
+            scope = scope,
+            onboarding = onboarding,
+            draft = draft,
+            model = selectedModel,
+            onSaving = { savingProvider = it },
+            onValidationFailed = {
+                validationError = it
                 step = 2
-            } else {
-                runCatching {
-                    withContext(Dispatchers.IO) {
-                        onboarding.finish(checkNotNull(draft), checkNotNull(selectedModel), checkNotNull(result.validationFingerprint))
-                        onboarding.agents()
-                    }
-                }.onSuccess { currentAgents ->
-                    agents = currentAgents
-                    step = 4
-                }.onFailure {
-                    validationError = "The setup could not be saved. Your previous provider configuration remains active."
-                }
-            }
-            savingProvider = false
-        }
+            },
+            onSaved = { currentAgents, availability ->
+                agents = currentAgents
+                agentCreationAvailability = availability
+                step = 4
+            },
+            onFailure = {
+                validationError = "The setup could not be saved. Your previous provider configuration remains active."
+            },
+        )
     }
     val completeOnboarding: () -> Unit = {
         scope.launch {
@@ -243,8 +235,14 @@ fun ComposeOnboardingWizard(
                                 creatingAgent,
                                 agentResult,
                                 agentError,
+                                availability = agentCreationAvailability,
                                 onDescriptionChange = { agentDescription = it },
                                 onCreate = createAgent,
+                                onSelectModel = {
+                                    agentError = null
+                                    agentResult = null
+                                    step = 2
+                                },
                             )
                         else -> TerminalAccessPage(terminalConsent)
                     }
