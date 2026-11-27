@@ -8,6 +8,7 @@ import de.heckenmann.visualagent.protocol.OnboardingAgentCreationResult
 import de.heckenmann.visualagent.protocol.OnboardingPort
 import de.heckenmann.visualagent.protocol.OnboardingProviderDraft
 import de.heckenmann.visualagent.protocol.OnboardingProviderProfile
+import de.heckenmann.visualagent.protocol.OnboardingValidationResult
 import de.heckenmann.visualagent.protocol.ProviderModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -39,7 +40,7 @@ internal fun saveOnboardingProvider(
     draft: OnboardingProviderDraft?,
     model: ProviderModel?,
     onSaving: (Boolean) -> Unit,
-    onValidationFailed: (String) -> Unit,
+    onValidationFailed: (OnboardingValidationResult) -> Unit,
     onSaved: (List<OnboardingAgent>, OnboardingAgentCreationAvailability) -> Unit,
     onFailure: () -> Unit,
 ) {
@@ -50,7 +51,7 @@ internal fun saveOnboardingProvider(
             val selectedModel = checkNotNull(model)
             val validation = withContext(Dispatchers.IO) { onboarding.validate(providerDraft, selectedModel.id) }
             if (!validation.success) {
-                onValidationFailed(validation.message)
+                onValidationFailed(validation)
             } else {
                 withContext(Dispatchers.IO) {
                     onboarding.finish(providerDraft, selectedModel, checkNotNull(validation.validationFingerprint))
@@ -88,7 +89,7 @@ internal fun discoverOnboardingModels(
     draft: OnboardingProviderDraft?,
     onLoading: (Boolean) -> Unit,
     onDiscovered: (List<ProviderModel>) -> Unit,
-    onFailure: () -> Unit,
+    onFailure: (Exception) -> Unit,
 ) {
     val providerDraft = draft ?: return
     scope.launch {
@@ -97,8 +98,8 @@ internal fun discoverOnboardingModels(
             onDiscovered(withContext(Dispatchers.IO) { onboarding.discoverModels(providerDraft) })
         } catch (cancelled: CancellationException) {
             throw cancelled
-        } catch (_: Exception) {
-            onFailure()
+        } catch (failure: Exception) {
+            onFailure(failure)
         } finally {
             onLoading(false)
         }

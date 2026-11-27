@@ -32,6 +32,16 @@ let the configured main model create a first sub-agent after the desktop client 
 
 ## Alternative Flow
 
+### Provider uses a private CA
+
+1. If discovery or validation fails because the issuer is untrusted, the wizard opens **Review server certificates**. The server fetches public certificates from the configured HTTPS endpoint without using provider credentials.
+2. The review lists the server certificate and the intermediate CAs and root CA that the endpoint presents. Each entry shows its SHA-256 fingerprint. An eligible root CA is recommended and preselected when available. The user compares the fingerprints with a trusted source and may select any combination before confirming **Import selected certificates**.
+3. The connected Visual Agent server verifies that the chain still matches the review and that TLS succeeds for the endpoint hostname with the selected trust. A CA-only selection must validate the chain through a selected CA. It saves the selection in its managed trust store (UC-0000132). A server certificate is trusted only for the reviewed hostname and port. Imported CAs apply to outbound TLS on the server.
+4. **Import CA certificate** also accepts one public X.509 CA from a trusted PEM file or pasted text, including when the server omits the root CA.
+5. The wizard keeps the staged provider and credentials and refreshes model discovery after a successful import in the model step. The user can then retry validation with the updated trust.
+
+### Skip setup
+
 1. The user chooses **Skip setup**.
 2. The server stores `DISMISSED` without changing provider configuration.
 3. The desktop opens the workspace.
@@ -82,6 +92,7 @@ and persisted sub-agents; the desktop never reads existing credentials.
 - Manual cancellation does not change the server-owned onboarding state.
 - Settings > Providers can open the manual onboarding flow for the current server.
 - Provider/model validation occurs in the connected Visual Agent server environment.
+- CA import is available before provider discovery and validation. After a trust error, the user can import the CA and retry in the same wizard, preserving the provider draft. Hostname mismatches continue to fail.
 - Model discovery preserves provider-supplied metadata when available and can be refreshed without saving configuration.
 - Existing sub-agents are shown before the optional creation request.
 - The Researcher example is editable and is sent through the normal Main Agent conversation path.
