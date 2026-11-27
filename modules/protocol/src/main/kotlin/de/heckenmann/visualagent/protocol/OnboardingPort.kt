@@ -60,6 +60,7 @@ data class OnboardingValidationResult(
     val code: OnboardingValidationCode,
     val message: String,
     val validationFingerprint: String? = null,
+    val certificateTrustRequired: Boolean = false,
 )
 
 /** Safe sub-agent summary shown during onboarding. */
@@ -88,6 +89,7 @@ enum class OnboardingValidationCode {
     SUCCESS,
     AUTHENTICATION_FAILED,
     ENDPOINT_UNAVAILABLE,
+    TLS_VERIFICATION_FAILED,
     INVALID_CONFIGURATION,
     PREREQUISITE_UNAVAILABLE,
     MODEL_UNAVAILABLE,

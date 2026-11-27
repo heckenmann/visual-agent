@@ -8,6 +8,7 @@ import de.heckenmann.visualagent.agent.provider.ProviderErrorMessages
 import de.heckenmann.visualagent.agent.provider.ProviderProfile
 import de.heckenmann.visualagent.agent.provider.ProviderRuntimeConfig
 import de.heckenmann.visualagent.agent.provider.ProviderToolCallbacks
+import de.heckenmann.visualagent.agent.provider.ServerTrustManagerProvider
 import de.heckenmann.visualagent.agent.supportsToolCalling
 import mu.KotlinLogging
 import org.springframework.ai.chat.model.ChatModel
@@ -34,17 +35,14 @@ class OllamaClient(
     private val toolRecovery: OllamaToolRecovery,
     private val toolRegistry: ProviderToolCallbacks,
     private val appConfig: ProviderRuntimeConfig,
+    private val serverTrustManagerProvider: ServerTrustManagerProvider? = null,
 ) : LLMProvider {
     private val logger = KotlinLogging.logger {}
     private val auxiliary = OllamaClientAuxiliary(chatModel, ollamaApi, appConfig)
-    private val ops = OllamaClientOps(ollamaApi, appConfig)
+    private val ops = OllamaClientOps(ollamaApi, appConfig, ::profileApi)
 
     internal fun getModelCapabilitiesReactive(profile: ProviderProfile): Mono<Map<String, Set<String>>> =
-        fetchModelCapabilitiesReactive(
-            profile,
-            de.heckenmann.visualagent.agent.ollama
-                .createOllamaApi(profile, appConfig),
-        )
+        Mono.defer { fetchModelCapabilitiesReactive(profile, profileApi(profile)) }.subscribeOn(Schedulers.boundedElastic())
 
     override fun chatReactive(messages: List<Message>): Mono<ChatResponse> = chatReactive(ChatRequestContext(messages = messages))
 
@@ -223,7 +221,7 @@ class OllamaClient(
         text: String,
         modelId: String,
         profile: ProviderProfile,
-    ): Mono<List<Double>> = auxiliary.embeddingsReactive(text, modelId) { createOllamaApi(profile, appConfig) }
+    ): Mono<List<Double>> = auxiliary.embeddingsReactive(text, modelId) { profileApi(profile) }
 
     override fun isConnected(): Boolean = ops.isConnected()
 
@@ -247,13 +245,12 @@ class OllamaClient(
         val profile = request.providerProfile ?: return chatModel
         return OllamaChatModel
             .builder()
-            .ollamaApi(createOllamaApi(profile, appConfig))
+            .ollamaApi(profileApi(profile))
             .options(OllamaChatOptions.builder().model(request.model ?: profile.defaultModel).build())
             .build()
     }
 
-    private fun ollamaApiFor(request: ChatRequestContext): OllamaApi =
-        request.providerProfile
-            ?.let { createOllamaApi(it, appConfig) }
-            ?: ollamaApi
+    private fun ollamaApiFor(request: ChatRequestContext): OllamaApi = request.providerProfile?.let(::profileApi) ?: ollamaApi
+
+    private fun profileApi(profile: ProviderProfile): OllamaApi = createOllamaApi(profile, appConfig, serverTrustManagerProvider)
 }

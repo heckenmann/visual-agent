@@ -1,6 +1,8 @@
 package de.heckenmann.visualagent.security
 
 import de.heckenmann.visualagent.agent.tools.ServerCertificateInfo
+import de.heckenmann.visualagent.protocol.MAX_TRUST_CERTIFICATE_PEM_BYTES
+import de.heckenmann.visualagent.protocol.isSinglePublicCertificatePem
 import java.io.ByteArrayInputStream
 import java.net.IDN
 import java.net.InetAddress
@@ -30,11 +32,14 @@ internal class ServerCertificatePolicy {
 
     /** Parses exactly one ASCII PEM CA certificate and validates its constraints and validity. */
     fun parseCaCertificate(pem: String): X509Certificate {
-        require(pem.length <= MAX_CERTIFICATE_CHARS) { "Certificate input exceeds the 128 KiB limit." }
-        require(pem.contains(PEM_BEGIN) && pem.all { it.code in ASCII_PRINTABLE_RANGE || it in "\r\n\t" }) {
+        require(pem.length <= MAX_TRUST_CERTIFICATE_PEM_BYTES) { "Certificate input exceeds the 128 KiB limit." }
+        require(isSinglePublicCertificatePem(pem)) {
             "Provide one ASCII PEM-encoded X.509 CA certificate."
         }
-        val certificates = certificateFactory.generateCertificates(ByteArrayInputStream(pem.toByteArray(StandardCharsets.US_ASCII)))
+        val certificates =
+            certificateFactory.generateCertificates(
+                ByteArrayInputStream(pem.trim().toByteArray(StandardCharsets.US_ASCII)),
+            )
         require(certificates.size == 1) { "Provide exactly one X.509 CA certificate." }
         val certificate = certificates.single() as? X509Certificate ?: throw IllegalArgumentException("Certificate must use X.509 format.")
         require(certificate.basicConstraints >= 0) { "Only CA certificates can be added to the trust store." }
@@ -125,8 +130,6 @@ internal class ServerCertificatePolicy {
         val ALIAS_PATTERN = Regex("[A-Za-z0-9][A-Za-z0-9._-]{0,63}")
         const val X509_TYPE = "X.509"
         const val SHA_256 = "SHA-256"
-        const val MAX_CERTIFICATE_CHARS = 131_072
-        val ASCII_PRINTABLE_RANGE = 0x20..0x7e
         const val MAX_DNS_NAME_CHARS = 253
         const val MAX_DNS_LABEL_CHARS = 63
         const val IPV4_OCTETS = 4

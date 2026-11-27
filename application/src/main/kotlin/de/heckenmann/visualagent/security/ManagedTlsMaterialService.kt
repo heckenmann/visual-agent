@@ -6,16 +6,15 @@ import de.heckenmann.visualagent.agent.tools.GeneratedServerCertificate
 import de.heckenmann.visualagent.agent.tools.ServerTlsEntry
 import de.heckenmann.visualagent.agent.tools.ServerTlsMaterialPort
 import de.heckenmann.visualagent.agent.tools.ServerTlsStore
+import de.heckenmann.visualagent.protocol.PresentedCertificateKind
 import org.springframework.boot.ssl.SslBundle
 import org.springframework.boot.ssl.SslBundleKey
 import org.springframework.boot.ssl.SslManagerBundle
 import org.springframework.boot.ssl.SslOptions
 import org.springframework.boot.ssl.SslStoreBundle
 import org.springframework.stereotype.Component
-import java.security.KeyStore
 import java.security.cert.X509Certificate
 import java.util.function.Supplier
-import javax.net.ssl.TrustManagerFactory
 import javax.net.ssl.X509TrustManager
 
 /** Owns the managed TLS stores below the server data root and exposes secret-safe operations. */
@@ -41,17 +40,20 @@ class ManagedTlsMaterialService internal constructor(
     /** Identifies the exact platform-plus-managed root policy captured by this snapshot. */
     @Synchronized
     override fun trustSnapshot(): ServerTrustSnapshot {
-        val manager = trustManager()
+        val persisted = files.load(ServerTlsStore.TRUST)
+        val pins = persisted.endpointCertificateEntries()
+        val manager =
+            buildTrustBundle(
+                persisted.caCertificateStore(),
+                pins,
+            ).managers.trustManagers.filterIsInstance<X509TrustManager>().first()
         val roots =
             manager.acceptedIssuers
-                .map { certificate ->
-                    java.security.MessageDigest
-                        .getInstance("SHA-256")
-                        .digest(certificate.encoded)
-                        .toHexString()
-                }.sorted()
+                .map(X509Certificate::sha256Fingerprint)
+                .sorted()
                 .joinToString(":")
-        return ServerTrustSnapshot(manager, "composite-v1:$roots")
+        val endpoints = pins.toSortedMap().entries.joinToString(";") { (alias, certificate) -> "$alias=${certificate.sha256Fingerprint()}" }
+        return ServerTrustSnapshot(manager, "composite-v2:$roots;$endpoints")
     }
 
     /** Supplies managed trust to JDK-only tools without coupling their module to provider APIs. */
@@ -60,20 +62,8 @@ class ManagedTlsMaterialService internal constructor(
     /** Creates the Spring SSL bundle used by outbound TLS clients. */
     @Synchronized
     fun trustBundle(): SslBundle {
-        val platformFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm())
-        platformFactory.init(null as KeyStore?)
-        val managedFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm())
-        managedFactory.init(files.load(ServerTlsStore.TRUST))
-        val platform = platformFactory.trustManagers.filterIsInstance<X509TrustManager>().first()
-        val managed = managedFactory.trustManagers.filterIsInstance<X509TrustManager>().first()
-        val stores = SslStoreBundle.of(null, null, files.load(ServerTlsStore.TRUST))
-        return SslBundle.of(
-            stores,
-            SslBundleKey.NONE,
-            SslOptions.NONE,
-            TLS_PROTOCOL,
-            SslManagerBundle.from(CompositeX509TrustManager(platform, managed)),
-        )
+        val persisted = files.load(ServerTlsStore.TRUST)
+        return buildTrustBundle(persisted.caCertificateStore(), persisted.endpointCertificateEntries())
     }
 
     /** Creates the JDK key manager for an exact managed private-key alias. */
@@ -96,7 +86,7 @@ class ManagedTlsMaterialService internal constructor(
                             .getDefaultAlgorithm(),
                     ).apply { init(selectedKeyStore, password) }
             val trustBundle = trustBundle()
-            val stores = SslStoreBundle.of(selectedKeyStore, String(password), files.load(ServerTlsStore.TRUST))
+            val stores = SslStoreBundle.of(selectedKeyStore, String(password), trustBundle.stores.trustStore)
             return SslBundle.of(
                 stores,
                 SslBundleKey.of(alias, String(password)),
@@ -116,8 +106,51 @@ class ManagedTlsMaterialService internal constructor(
             .load(store)
             .aliases()
             .toList()
+            .filterNot(String::isEndpointCertificateAlias)
             .sorted()
             .mapNotNull { entry(store, it, includePem = false) }
+
+    @Synchronized
+    internal fun endpointCertificates(): List<ServerTlsEntry> =
+        files.load(ServerTlsStore.TRUST).endpointCertificateEntries().toSortedMap().map { (alias, certificate) ->
+            ServerTlsEntry(alias, ENTRY_TRUSTED_CERTIFICATE, listOf(certificatePolicy.certificateInfo(certificate, includePem = false)))
+        }
+
+    @Synchronized
+    internal fun importReviewedCertificates(
+        endpoint: TlsEndpoint,
+        approved: List<Pair<X509Certificate, PresentedCertificateKind>>,
+    ) {
+        val fingerprint = approved.first().first.sha256Fingerprint()
+        mutationAudit.record("import_reviewed_certificates", ServerTlsStore.TRUST, fingerprint, { fingerprint }) {
+            val store = files.load(ServerTlsStore.TRUST)
+            store.addReviewedCertificates(endpoint, approved)
+            files.persist(ServerTlsStore.TRUST, store)
+        }
+    }
+
+    @Synchronized
+    internal fun exportEndpointCertificate(alias: String): String? {
+        require(alias.isEndpointCertificateAlias())
+        return entry(ServerTlsStore.TRUST, alias, includePem = true)?.certificates?.single()?.pem
+    }
+
+    @Synchronized
+    internal fun removeEndpointCertificate(
+        alias: String,
+        expectedFingerprint: String,
+    ): Boolean {
+        require(alias.isEndpointCertificateAlias())
+        val store = files.load(ServerTlsStore.TRUST)
+        val certificate = store.getCertificate(alias) as? X509Certificate ?: return false
+        val fingerprint = certificate.sha256Fingerprint()
+        if (fingerprint != expectedFingerprint) return false
+        return mutationAudit.record("remove_endpoint_certificate", ServerTlsStore.TRUST, fingerprint, { fingerprint }) {
+            store.deleteEntry(alias)
+            files.persist(ServerTlsStore.TRUST, store)
+            true
+        }
+    }
 
     /** Inspects one exact alias and optionally returns its public PEM certificate. */
     @Synchronized
@@ -145,6 +178,16 @@ class ManagedTlsMaterialService internal constructor(
             files.persist(ServerTlsStore.TRUST, keyStore)
             checkNotNull(entry(ServerTlsStore.TRUST, alias, includePem = false))
         }
+
+    /** Removes one exact public certificate alias from the managed trust store. */
+    @Synchronized
+    fun removeTrustedCertificate(
+        alias: String,
+        expectedFingerprint: String,
+    ): Boolean {
+        certificatePolicy.validateAlias(alias)
+        return certificateFingerprint(ServerTlsStore.TRUST, alias) == expectedFingerprint && removeTrustedCertificate(alias)
+    }
 
     /** Removes one exact public certificate alias from the managed trust store. */
     @Synchronized
@@ -247,7 +290,6 @@ class ManagedTlsMaterialService internal constructor(
     private companion object {
         const val ENTRY_PRIVATE_KEY = "private_key"
         const val ENTRY_TRUSTED_CERTIFICATE = "trusted_certificate"
-        const val PKCS12_TYPE = "PKCS12"
         const val TLS_PROTOCOL = "TLS"
     }
 }

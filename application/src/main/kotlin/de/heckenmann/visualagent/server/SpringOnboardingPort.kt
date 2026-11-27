@@ -20,6 +20,7 @@ import de.heckenmann.visualagent.protocol.OnboardingValidationCode
 import de.heckenmann.visualagent.protocol.OnboardingValidationResult
 import de.heckenmann.visualagent.protocol.ProviderAdapter
 import de.heckenmann.visualagent.protocol.ProviderModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.reactor.awaitSingle
 import kotlinx.coroutines.reactor.awaitSingleOrNull
 import org.springframework.stereotype.Component
@@ -61,12 +62,16 @@ class SpringOnboardingPort(
     }
 
     override suspend fun discoverModels(draft: OnboardingProviderDraft): List<ProviderModel> =
-        llmProvider
-            .getModelConfigsReactive(draft.toApplication(providerCatalog.getProvider(draft.id)))
-            .awaitSingle()
-            .distinctBy { it.id }
-            .map { model -> model.toProtocol() }
-            .filter { model -> model.status != de.heckenmann.visualagent.protocol.ModelStatus.DISABLED }
+        try {
+            llmProvider
+                .getModelConfigsReactive(draft.toApplication(providerCatalog.getProvider(draft.id)))
+                .awaitSingle()
+                .distinctBy { it.id }
+                .map { model -> model.toProtocol() }
+                .filter { model -> model.status != de.heckenmann.visualagent.protocol.ModelStatus.DISABLED }
+        } catch (failure: Exception) {
+            throw failure.mapOnboardingDiscoveryFailure()
+        }
 
     override suspend fun validate(
         draft: OnboardingProviderDraft,
@@ -96,8 +101,20 @@ class SpringOnboardingPort(
                     fingerprint(draft, modelId),
                 )
             }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (failure: Exception) {
-            OnboardingValidationResult(false, failure.toValidationCode(), failure.toSafeMessage())
+            val tls = failure.onboardingCertificateError()
+            if (tls != null) {
+                OnboardingValidationResult(
+                    false,
+                    OnboardingValidationCode.TLS_VERIFICATION_FAILED,
+                    "${tls.error.summary}: ${tls.error.detail}",
+                    certificateTrustRequired = tls.certificateTrustRequired,
+                )
+            } else {
+                OnboardingValidationResult(false, failure.toValidationCode(), failure.toSafeMessage())
+            }
         }
 
     override suspend fun finish(

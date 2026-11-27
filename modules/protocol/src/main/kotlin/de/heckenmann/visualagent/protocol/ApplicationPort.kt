@@ -23,6 +23,9 @@ interface ApplicationPort {
     /** Server terminal consent for an authorized administrative connection. */
     val serverTerminalConsent: TerminalConsentPort? get() = null
 
+    /** Managed CA certificates for an authorized administrative connection. */
+    val certificates: CertificateTrustPort? get() = null
+
     /** Recipient-facing open-source license documents bundled with this application build. */
     val openSourceLicenses: OpenSourceLicensePort
 
