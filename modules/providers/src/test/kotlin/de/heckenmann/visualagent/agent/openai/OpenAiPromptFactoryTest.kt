@@ -76,6 +76,7 @@ class OpenAiPromptFactoryTest {
         assertTrue(guard.contains("Tool calling strict mode"))
         assertTrue(guard.contains("agent_list"))
         assertTrue(!guard.contains("agent:list"))
+        assertTrue(!guard.contains("tool_help"))
         assertEquals(
             "openai",
             options.toolContext.orEmpty()["provider"].toString(),
@@ -176,6 +177,7 @@ class OpenAiPromptFactoryTest {
         val options = prompt.options as ToolCallingChatOptions
 
         assertEquals(listOf("tool_help"), options.toolCallbacks.orEmpty().map { it.toolDefinition.name() })
+        assertEquals(setOf("tool:help", "workspace:file"), options.toolContext.orEmpty()["enabledTools"])
         assertTrue(prompt.instructions.any { it.text == "previous answer" })
         assertTrue(prompt.instructions.any { it.text == "latest question" })
         assertTrue(prompt.instructions.any { it.text.orEmpty().contains("tool_help with {\"action\":\"list\"}") })

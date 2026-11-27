@@ -32,8 +32,9 @@ internal class NativeToolBatchRound(
                         ).filter { it.definition.name in names }
                         .associateBy { it.definition.name }
                 val enabled = available.values.map { it.definition.id.value }.toSet()
+                // The advertised functions gate native calls. Delegation uses the request's original grants.
                 val metadata =
-                    context + mapOf("enabledTools" to enabled, "toolCallRound" to round) +
+                    context + mapOf("enabledTools" to (context["enabledTools"] ?: enabled), "toolCallRound" to round) +
                         (parent?.let { mapOf("parentAssistantTurnId" to it) } ?: emptyMap())
                 if (calls.size == 1) {
                     val call = calls.single()

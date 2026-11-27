@@ -13,6 +13,7 @@ enum class SettingsDestination(
     TASK_MODELS("Task Models"),
     AGENT("Agent"),
     TERMINAL_ACCESS("Terminal Access"),
+    CERTIFICATES("Certificates"),
     UPDATES("Updates"),
 }
 

@@ -9,6 +9,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasScrollToIndexAction
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -21,6 +22,7 @@ import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import de.heckenmann.visualagent.protocol.OnboardingAgent
+import de.heckenmann.visualagent.protocol.OnboardingAgentCreationAvailability
 import de.heckenmann.visualagent.protocol.OnboardingAgentCreationResult
 import de.heckenmann.visualagent.protocol.OnboardingPort
 import de.heckenmann.visualagent.protocol.OnboardingProviderDraft
@@ -95,6 +97,36 @@ class ComposeOnboardingWizardTest {
 
         assertTrue(onboarding.finished)
         assertTrue(onboarding.completed)
+    }
+
+    @Test
+    fun `availability lookup failure after saving leaves the optional step skippable`() {
+        val onboarding = TestOnboardingPort(failAgentAvailability = true)
+        composeTestRule.setContent {
+            MaterialTheme {
+                ComposeOnboardingWizard(onboarding, automatic = false, onFinished = {})
+            }
+        }
+        composeTestRule.onNodeWithText("Continue").performClick()
+        composeTestRule.onNodeWithText("Add provider").performClick()
+        composeTestRule.awaitCompletion(onboarding.modelDiscovery) {
+            composeTestRule.onNodeWithText("Continue").performClick()
+        }
+        composeTestRule.onNodeWithText("Continue").performClick()
+        composeTestRule.onNodeWithText("Review").assertIsDisplayed()
+        composeTestRule.awaitCompletion(onboarding.providerSaved) {
+            composeTestRule.onNodeWithText("Save and continue").performClick()
+        }
+
+        val notice = "Your provider and model are saved"
+        composeTestRule.waitUntil(timeoutMillis = 5_000) {
+            composeTestRule.onAllNodesWithText(notice, substring = true).fetchSemanticsNodes().isNotEmpty()
+        }
+        composeTestRule.onNodeWithText(notice, substring = true).assertIsDisplayed()
+        composeTestRule.onNodeWithText("Ask model to create sub-agent").assertIsNotEnabled()
+        composeTestRule.onNodeWithText("Skip agent setup").performClick()
+        composeTestRule.onNodeWithText("Terminal Access").assertIsDisplayed()
+        assertEquals(1, onboarding.savedConfigurations.size)
     }
 
     @Test
@@ -176,6 +208,7 @@ class ComposeOnboardingWizardTest {
 
     private class TestOnboardingPort(
         private val failFirstValidation: Boolean = false,
+        private val failAgentAvailability: Boolean = false,
     ) : OnboardingPort {
         var finished = false
         var discoveryCalled = false
@@ -193,6 +226,11 @@ class ComposeOnboardingWizardTest {
         override fun providers() = emptyList<OnboardingProviderProfile>()
 
         override fun agents() = listOf(OnboardingAgent("existing", "Existing agent", "Existing role"))
+
+        override fun agentCreationAvailability(): OnboardingAgentCreationAvailability {
+            check(!failAgentAvailability) { "Sub-agent settings unavailable" }
+            return OnboardingAgentCreationAvailability(available = true)
+        }
 
         override fun dismiss() = Unit
 
@@ -230,6 +268,7 @@ class ComposeOnboardingWizardTest {
             return OnboardingAgentCreationResult(
                 "Created Researcher\n" + "Researcher setup details.\n".repeat(100),
                 agents() + OnboardingAgent("researcher", "Researcher", "Research topics"),
+                agentCreated = true,
             )
         }
 

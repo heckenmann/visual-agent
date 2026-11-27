@@ -1,6 +1,5 @@
 package de.heckenmann.visualagent.ui.onboarding
 
-import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,22 +16,15 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onPreviewKeyEvent
-import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.dp
-import de.heckenmann.visualagent.protocol.CredentialUpdate
-import de.heckenmann.visualagent.protocol.DirectProviderAuthMode
+import de.heckenmann.visualagent.protocol.CertificateTrustPort
 import de.heckenmann.visualagent.protocol.OnboardingAgent
+import de.heckenmann.visualagent.protocol.OnboardingAgentCreationAvailability
 import de.heckenmann.visualagent.protocol.OnboardingPort
 import de.heckenmann.visualagent.protocol.OnboardingProviderDraft
 import de.heckenmann.visualagent.protocol.OnboardingProviderProfile
+import de.heckenmann.visualagent.protocol.ProtocolOperationException
 import de.heckenmann.visualagent.protocol.ProviderModel
 import de.heckenmann.visualagent.protocol.TerminalConsentPort
 import de.heckenmann.visualagent.ui.modal.ComposeConfirmationModal
@@ -52,6 +44,7 @@ fun ComposeOnboardingWizard(
     onSkipRequestHandled: () -> Unit = {},
     providers: de.heckenmann.visualagent.protocol.ProviderPort? = null,
     terminalConsent: TerminalConsentPort? = null,
+    certificates: CertificateTrustPort? = null,
 ) {
     var profiles by remember { mutableStateOf<List<OnboardingProviderProfile>>(emptyList()) }
     var loadingProfiles by remember { mutableStateOf(true) }
@@ -68,8 +61,10 @@ fun ComposeOnboardingWizard(
     var creatingAgent by remember { mutableStateOf(false) }
     var agentResult by remember { mutableStateOf<String?>(null) }
     var agentError by remember { mutableStateOf<String?>(null) }
+    var agentCreationAvailability by remember { mutableStateOf<OnboardingAgentCreationAvailability?>(null) }
     var confirmSkip by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+    val certificateImport = remember(certificates) { OnboardingCertificateImport(certificates) }
     LaunchedEffect(onboarding) {
         profiles = withContext(Dispatchers.IO) { onboarding.providers() }
         selected = profiles.firstOrNull { it.enabled } ?: profiles.firstOrNull()
@@ -82,76 +77,81 @@ fun ComposeOnboardingWizard(
         }
     }
     val draft = customDraft ?: selected?.toDraft()
-    val credentialConfigured =
-        when (val credential = draft?.credential) {
-            CredentialUpdate.Unchanged ->
-                if (draft.directAuthMode == DirectProviderAuthMode.CHATGPT_OAUTH) {
-                    draft.credentialReference != null
-                } else {
-                    selected?.credentialConfigured == true
-                }
-            CredentialUpdate.Clear -> false
-            is CredentialUpdate.Replace -> credential.value.isNotBlank()
-            null -> false
-        }
+    val credentialConfigured = onboardingCredentialConfigured(draft, selected)
 
     val discoverModels: () -> Unit = {
-        draft?.let { providerDraft ->
-            scope.launch {
-                loadingModels = true
-                validationError = null
-                runCatching {
-                    withContext(Dispatchers.IO) { onboarding.discoverModels(providerDraft) }
-                }.onSuccess { discovered ->
-                    models = discovered
-                    selectedModel = discovered.firstOrNull { it.id == selectedModel?.id } ?: discovered.firstOrNull()
-                    if (discovered.isEmpty()) {
-                        validationError =
-                            "No selectable model was found for this provider. Check the provider and refresh later."
-                    }
-                }.onFailure {
-                    validationError = "Models could not be discovered from this Visual Agent server."
+        discoverOnboardingModels(
+            scope = scope,
+            onboarding = onboarding,
+            draft = draft,
+            onLoading = { loading ->
+                loadingModels = loading
+                if (loading) validationError = null
+            },
+            onDiscovered = { discovered ->
+                certificateImport.clearReview()
+                models = discovered
+                selectedModel = discovered.firstOrNull { it.id == selectedModel?.id } ?: discovered.firstOrNull()
+                if (discovered.isEmpty()) {
+                    validationError = "No selectable model was found for this provider. Check the provider and refresh later."
                 }
-                loadingModels = false
-            }
-        }
+            },
+            onFailure = { error ->
+                val protocolError = error as? ProtocolOperationException
+                validationError = protocolError?.error?.detail
+                    ?: "Models could not be discovered from this Visual Agent server."
+                certificateImport.clearReview()
+                if (protocolError?.certificateTrustRequired == true) certificateImport.offerReview(draft?.baseUrl)
+            },
+        )
+    }
+    val importRevision = certificateImport.importRevision
+    LaunchedEffect(certificateImport, importRevision) {
+        if (importRevision > 0 && step == 2) discoverModels()
     }
     val createAgent: () -> Unit = {
-        scope.launch {
-            creatingAgent = true
-            agentError = null
-            runCatching { withContext(Dispatchers.IO) { onboarding.createAgent(agentDescription) } }
-                .onSuccess { result ->
-                    agents = result.agents
-                    agentResult = result.message
-                }.onFailure {
-                    agentError = "The model could not create the sub-agent. Adjust the description or skip this step."
-                }
-            creatingAgent = false
-        }
+        createOnboardingAgent(
+            scope = scope,
+            onboarding = onboarding,
+            description = agentDescription,
+            onCreating = { creatingAgent = it },
+            onCreated = { result ->
+                agents = result.agents
+                agentResult = result.message
+                agentError =
+                    if (result.agentCreated) {
+                        null
+                    } else {
+                        "The model replied without creating a sub-agent. Revise the request or skip this step."
+                    }
+            },
+            onFailure = {
+                agentError = "The model could not create the sub-agent. Adjust the description or skip this step."
+            },
+        )
     }
     val saveProvider: () -> Unit = {
-        scope.launch {
-            savingProvider = true
-            val result = withContext(Dispatchers.IO) { onboarding.validate(checkNotNull(draft), checkNotNull(selectedModel).id) }
-            if (!result.success) {
-                validationError = result.message
+        saveOnboardingProvider(
+            scope = scope,
+            onboarding = onboarding,
+            draft = draft,
+            model = selectedModel,
+            onSaving = { savingProvider = it },
+            onValidationFailed = {
+                validationError = it.message
                 step = 2
-            } else {
-                runCatching {
-                    withContext(Dispatchers.IO) {
-                        onboarding.finish(checkNotNull(draft), checkNotNull(selectedModel), checkNotNull(result.validationFingerprint))
-                        onboarding.agents()
-                    }
-                }.onSuccess { currentAgents ->
-                    agents = currentAgents
-                    step = 4
-                }.onFailure {
-                    validationError = "The setup could not be saved. Your previous provider configuration remains active."
-                }
-            }
-            savingProvider = false
-        }
+                certificateImport.clearReview()
+                if (it.certificateTrustRequired) certificateImport.offerReview(draft?.baseUrl)
+            },
+            onSaved = { currentAgents, availability ->
+                agents = currentAgents
+                agentCreationAvailability = availability
+                step = 4
+            },
+            onFailure = {
+                validationError = "The setup could not be saved. Your previous provider configuration remains active."
+            },
+        )
     }
     val completeOnboarding: () -> Unit = {
         scope.launch {
@@ -161,26 +161,7 @@ fun ComposeOnboardingWizard(
     }
     val busy = loadingModels || savingProvider || creatingAgent
     val cancel = { if (automatic) confirmSkip = true else onFinished() }
-    val dismissOnEscape =
-        if (automatic) {
-            Modifier
-        } else {
-            val focus = remember { FocusRequester() }
-            LaunchedEffect(focus) {
-                withFrameNanos { }
-                focus.requestFocus()
-            }
-            Modifier
-                .onPreviewKeyEvent { event ->
-                    if (event.type == KeyEventType.KeyDown && event.key == Key.Escape) {
-                        if (!busy) cancel()
-                        true
-                    } else {
-                        false
-                    }
-                }.focusRequester(focus)
-                .focusable()
-        }
+    val dismissOnEscape = onboardingDismissOnEscape(!automatic && certificateImport.modal == null, busy, cancel)
     Box(modifier = Modifier.fillMaxSize().then(dismissOnEscape)) {
         Column(
             modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 16.dp),
@@ -192,6 +173,7 @@ fun ComposeOnboardingWizard(
                     modifier = Modifier.fillMaxSize(),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
+                    if (step in 1..3) OnboardingCertificateControl(certificateImport, busy, draft?.baseUrl)
                     when (step) {
                         0 -> OnboardingWelcome()
                         1 ->
@@ -243,8 +225,14 @@ fun ComposeOnboardingWizard(
                                 creatingAgent,
                                 agentResult,
                                 agentError,
+                                availability = agentCreationAvailability,
                                 onDescriptionChange = { agentDescription = it },
                                 onCreate = createAgent,
+                                onSelectModel = {
+                                    agentError = null
+                                    agentResult = null
+                                    step = 2
+                                },
                             )
                         else -> TerminalAccessPage(terminalConsent)
                     }
@@ -297,5 +285,6 @@ fun ComposeOnboardingWizard(
                 )
             }
         }
+        ComposeModalHost(certificateImport.modal, onDismiss = certificateImport::dismiss)
     }
 }

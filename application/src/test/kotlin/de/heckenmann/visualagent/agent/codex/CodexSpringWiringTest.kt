@@ -8,15 +8,28 @@ import de.heckenmann.visualagent.agent.OllamaClient
 import de.heckenmann.visualagent.agent.RequestContextBudgeter
 import de.heckenmann.visualagent.agent.ToolDefinition
 import de.heckenmann.visualagent.agent.config.AgentToolConfigService
+import de.heckenmann.visualagent.agent.createClient
 import de.heckenmann.visualagent.agent.openai.OpenAiClient
 import de.heckenmann.visualagent.agent.provider.ProfiledProviderAdapter
 import de.heckenmann.visualagent.agent.provider.ProviderAdapter
 import de.heckenmann.visualagent.agent.provider.ProviderToolCallbacks
+import de.heckenmann.visualagent.agent.springResponse
+import de.heckenmann.visualagent.agent.tools.ToolRegistry
 import de.heckenmann.visualagent.config.AppConfigBean
+import io.mockk.every
+import io.mockk.mockk
 import org.junit.jupiter.api.Test
+import org.springframework.ai.chat.messages.AssistantMessage
+import org.springframework.ai.chat.messages.ToolResponseMessage
+import org.springframework.ai.chat.model.ChatModel
+import org.springframework.ai.chat.model.ChatResponse
+import org.springframework.ai.chat.model.Generation
+import org.springframework.ai.chat.prompt.Prompt
+import org.springframework.ai.model.tool.ToolCallingChatOptions
 import org.springframework.ai.tokenizer.JTokkitTokenCountEstimator
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
+import java.time.Duration
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertSame
@@ -44,6 +57,9 @@ internal class CodexSpringWiringTest {
 
     @Autowired
     private lateinit var providerToolCallbacks: ProviderToolCallbacks
+
+    @Autowired
+    private lateinit var toolRegistry: ToolRegistry
 
     @Autowired
     private lateinit var profiledAdapters: List<ProfiledProviderAdapter>
@@ -129,6 +145,70 @@ internal class CodexSpringWiringTest {
         assertEquals(setOf("tool_help"), budgetPlan.toolNames)
         assertTrue(budgetPlan.status.toolSchemasReduced)
     }
+
+    @Test
+    fun `Ollama fallback lists and creates agents at 4096 tokens`() {
+        val model = mockk<ChatModel>()
+        val client = createClient(model, mockk(), toolRegistry, appConfig)
+        val name = "Fallback onboarding researcher"
+        val request =
+            agentManager.conversationOps
+                .buildMainRequest(listOf(Message("user", "Create a sub-agent named $name.")))
+                .copy(contextWindow = ContextWindow(configuredLimit = 4096), model = "test")
+        every { model.call(any<Prompt>()) } answers {
+            val prompt = firstArg<Prompt>()
+            val options = prompt.options as ToolCallingChatOptions
+            assertEquals(listOf("tool_help"), options.toolCallbacks.orEmpty().map { it.toolDefinition.name() })
+            val results = prompt.instructions.filterIsInstance<ToolResponseMessage>()
+            when (results.size) {
+                0 -> helpCall("list", """{"action":"call","name":"agent_list","arguments":{}}""")
+                1 -> {
+                    assertTrue(
+                        results
+                            .single()
+                            .responses
+                            .single()
+                            .responseData()
+                            .contains("Jobs: active="),
+                    )
+                    helpCall(
+                        "create",
+                        """{"action":"call","name":"agent_create","arguments":{"name":"$name","role":"Research topics"}}""",
+                    )
+                }
+                else -> {
+                    assertTrue(
+                        results
+                            .last()
+                            .responses
+                            .single()
+                            .responseData()
+                            .contains("Created agent"),
+                    )
+                    springResponse("test", "Created the researcher.")
+                }
+            }
+        }
+        try {
+            val response = client.chatReactive(request).block(Duration.ofSeconds(15))
+            assertEquals("Created the researcher.", response?.message?.content)
+            assertEquals("Research topics", agentManager.getSubAgents().single { it.name == name }.role)
+        } finally {
+            agentManager.getSubAgents().filter { it.name == name }.forEach { agentManager.deleteAgent(it.id) }
+        }
+    }
+
+    private fun helpCall(
+        id: String,
+        arguments: String,
+    ): ChatResponse =
+        ChatResponse(
+            listOf(
+                Generation(
+                    AssistantMessage.builder().toolCalls(listOf(AssistantMessage.ToolCall(id, "function", "tool_help", arguments))).build(),
+                ),
+            ),
+        )
 
     private fun injectedAppConfig(bean: Any): Any? {
         val field = bean.javaClass.getDeclaredField("appConfig")

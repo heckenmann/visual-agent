@@ -65,6 +65,7 @@ data class ComposePanelServices(
     val settingsNavigation: SettingsNavigationState,
     val onOpenSettings: (SettingsDestination) -> Unit,
     val serverTerminalConsent: de.heckenmann.visualagent.protocol.TerminalConsentPort? = null,
+    val certificates: de.heckenmann.visualagent.protocol.CertificateTrustPort? = null,
 )
 
 /** Presentation state shared by automatic and manually triggered update checks. */

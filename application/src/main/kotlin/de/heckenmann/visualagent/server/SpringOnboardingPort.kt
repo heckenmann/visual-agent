@@ -9,6 +9,7 @@ import de.heckenmann.visualagent.agent.provider.ProviderCatalogService
 import de.heckenmann.visualagent.knowledge.PreferenceStore
 import de.heckenmann.visualagent.protocol.CredentialUpdate
 import de.heckenmann.visualagent.protocol.OnboardingAgent
+import de.heckenmann.visualagent.protocol.OnboardingAgentCreationAvailability
 import de.heckenmann.visualagent.protocol.OnboardingAgentCreationResult
 import de.heckenmann.visualagent.protocol.OnboardingPort
 import de.heckenmann.visualagent.protocol.OnboardingProviderDraft
@@ -19,6 +20,7 @@ import de.heckenmann.visualagent.protocol.OnboardingValidationCode
 import de.heckenmann.visualagent.protocol.OnboardingValidationResult
 import de.heckenmann.visualagent.protocol.ProviderAdapter
 import de.heckenmann.visualagent.protocol.ProviderModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.reactor.awaitSingle
 import kotlinx.coroutines.reactor.awaitSingleOrNull
 import org.springframework.stereotype.Component
@@ -53,17 +55,23 @@ class SpringOnboardingPort(
 
     override fun agents(): List<OnboardingAgent> = onboardingAgentService.agents()
 
+    override fun agentCreationAvailability(): OnboardingAgentCreationAvailability = onboardingAgentService.agentCreationAvailability()
+
     override fun dismiss() {
         preferenceStore.setPreference(ONBOARDING_KEY, OnboardingStatus.DISMISSED.name)
     }
 
     override suspend fun discoverModels(draft: OnboardingProviderDraft): List<ProviderModel> =
-        llmProvider
-            .getModelConfigsReactive(draft.toApplication(providerCatalog.getProvider(draft.id)))
-            .awaitSingle()
-            .distinctBy { it.id }
-            .map { model -> model.toProtocol() }
-            .filter { model -> model.status != de.heckenmann.visualagent.protocol.ModelStatus.DISABLED }
+        try {
+            llmProvider
+                .getModelConfigsReactive(draft.toApplication(providerCatalog.getProvider(draft.id)))
+                .awaitSingle()
+                .distinctBy { it.id }
+                .map { model -> model.toProtocol() }
+                .filter { model -> model.status != de.heckenmann.visualagent.protocol.ModelStatus.DISABLED }
+        } catch (failure: Exception) {
+            throw failure.mapOnboardingDiscoveryFailure()
+        }
 
     override suspend fun validate(
         draft: OnboardingProviderDraft,
@@ -93,8 +101,20 @@ class SpringOnboardingPort(
                     fingerprint(draft, modelId),
                 )
             }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (failure: Exception) {
-            OnboardingValidationResult(false, failure.toValidationCode(), failure.toSafeMessage())
+            val tls = failure.onboardingCertificateError()
+            if (tls != null) {
+                OnboardingValidationResult(
+                    false,
+                    OnboardingValidationCode.TLS_VERIFICATION_FAILED,
+                    "${tls.error.summary}: ${tls.error.detail}",
+                    certificateTrustRequired = tls.certificateTrustRequired,
+                )
+            } else {
+                OnboardingValidationResult(false, failure.toValidationCode(), failure.toSafeMessage())
+            }
         }
 
     override suspend fun finish(

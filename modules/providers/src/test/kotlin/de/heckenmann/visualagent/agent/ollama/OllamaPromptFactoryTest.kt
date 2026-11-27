@@ -87,6 +87,7 @@ class OllamaPromptFactoryTest {
                 .orEmpty()
         assertTrue(guard.contains("workspace_file"))
         assertTrue(!guard.contains("workspace:file"))
+        assertTrue(!guard.contains("tool_help"))
     }
 
     @Test
@@ -133,6 +134,7 @@ class OllamaPromptFactoryTest {
         val options = prompt.options as OllamaChatOptions
 
         assertEquals(listOf("tool_help"), options.toolCallbacks.orEmpty().map { it.toolDefinition.name() })
+        assertEquals(setOf("tool:help", "workspace:file"), options.toolContext.orEmpty()["enabledTools"])
         assertTrue(prompt.instructions.any { it.text == "previous answer" })
         assertTrue(prompt.instructions.any { it.text == "latest question" })
         assertTrue(prompt.instructions.any { it.text.orEmpty().contains("tool_help with {\"action\":\"list\"}") })

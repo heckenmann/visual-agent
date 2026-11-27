@@ -9,4 +9,5 @@ package de.heckenmann.visualagent.protocol
 class ProtocolOperationException(
     val error: UserFacingError,
     cause: Throwable? = null,
+    val certificateTrustRequired: Boolean = false,
 ) : RuntimeException("${error.summary}: ${error.detail}", cause)

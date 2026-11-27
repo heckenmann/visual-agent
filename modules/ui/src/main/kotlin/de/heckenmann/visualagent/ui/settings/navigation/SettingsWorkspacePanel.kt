@@ -19,6 +19,7 @@ import de.heckenmann.visualagent.ui.settings.TaskModelSettingsState
 import de.heckenmann.visualagent.ui.settings.agent.AgentSettingsPage
 import de.heckenmann.visualagent.ui.settings.agent.MainAgentMemoryDraft
 import de.heckenmann.visualagent.ui.settings.agent.TerminalAccessPage
+import de.heckenmann.visualagent.ui.settings.certificates.CertificatesPanel
 import de.heckenmann.visualagent.ui.settings.providers.ProviderManagementPanel
 import de.heckenmann.visualagent.ui.settings.providers.ProviderManagementState
 import de.heckenmann.visualagent.ui.settings.settingsPanel
@@ -65,6 +66,7 @@ internal fun SettingsWorkspacePanel(services: ComposePanelServices) {
                         onSaved = services.onSettingsChanged,
                     )
                 SettingsDestination.TERMINAL_ACCESS -> TerminalAccessPage(services.serverTerminalConsent)
+                SettingsDestination.CERTIFICATES -> CertificatesPanel(services.certificates, services.modalRequester)
                 else ->
                     settingsPanel(
                         settingsPort = services.settings,

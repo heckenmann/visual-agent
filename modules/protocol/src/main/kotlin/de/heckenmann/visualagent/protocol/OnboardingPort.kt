@@ -60,6 +60,7 @@ data class OnboardingValidationResult(
     val code: OnboardingValidationCode,
     val message: String,
     val validationFingerprint: String? = null,
+    val certificateTrustRequired: Boolean = false,
 )
 
 /** Safe sub-agent summary shown during onboarding. */
@@ -73,6 +74,14 @@ data class OnboardingAgent(
 data class OnboardingAgentCreationResult(
     val message: String,
     val agents: List<OnboardingAgent>,
+    val agentCreated: Boolean = false,
+)
+
+/** Describes whether onboarding can ask the configured main model to create a sub-agent. */
+data class OnboardingAgentCreationAvailability(
+    val available: Boolean,
+    val reason: String? = null,
+    val canSelectAnotherModel: Boolean = false,
 )
 
 /** Provider readiness outcomes exposed without raw SDK exceptions or secret values. */
@@ -80,6 +89,7 @@ enum class OnboardingValidationCode {
     SUCCESS,
     AUTHENTICATION_FAILED,
     ENDPOINT_UNAVAILABLE,
+    TLS_VERIFICATION_FAILED,
     INVALID_CONFIGURATION,
     PREREQUISITE_UNAVAILABLE,
     MODEL_UNAVAILABLE,
@@ -96,6 +106,9 @@ interface OnboardingPort {
 
     /** Returns the current persisted sub-agent inventory without provider credentials or execution logs. */
     fun agents(): List<OnboardingAgent>
+
+    /** Reports model and globally configured tool availability for the optional creation step. */
+    fun agentCreationAvailability(): OnboardingAgentCreationAvailability
 
     /** Marks automatic onboarding as dismissed without changing provider configuration. */
     fun dismiss()

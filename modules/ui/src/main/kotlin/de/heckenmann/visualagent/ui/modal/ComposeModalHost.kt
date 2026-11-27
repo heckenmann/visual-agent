@@ -81,8 +81,10 @@ fun ComposeModalHost(
         label = "modalScrimAlpha",
     )
     val dismiss = {
-        if (displayedModal is ComposeContentModal) displayedModal.onDismiss()
-        onDismiss()
+        if (displayedModal !is ComposeContentModal || displayedModal.canDismiss()) {
+            if (displayedModal is ComposeContentModal) displayedModal.onDismiss()
+            onDismiss()
+        }
     }
     val focusRequester = remember { FocusRequester() }
     LaunchedEffect(modal) {
@@ -126,7 +128,11 @@ fun ComposeModalHost(
                         ),
             ) {
                 Box(modifier = Modifier.padding(24.dp)) {
-                    modalFrame(title = displayedModal.title(), onDismiss = dismiss) {
+                    modalFrame(
+                        title = displayedModal.title(),
+                        dismissEnabled = displayedModal !is ComposeContentModal || displayedModal.canDismiss(),
+                        onDismiss = dismiss,
+                    ) {
                         ComposeModalContent(modal = displayedModal, onDismiss = dismiss)
                     }
                 }
@@ -138,6 +144,7 @@ fun ComposeModalHost(
 @Composable
 private fun modalFrame(
     title: String,
+    dismissEnabled: Boolean,
     onDismiss: () -> Unit,
     content: @Composable () -> Unit,
 ) {
@@ -161,7 +168,7 @@ private fun modalFrame(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     modalTitle(title)
-                    modalSecondaryButton(label = "Close", onClick = onDismiss)
+                    modalSecondaryButton(label = "Close", enabled = dismissEnabled, onClick = onDismiss)
                 }
                 HorizontalDivider()
                 CompositionLocalProvider(LocalModalBodyMaxHeight provides (maximumHeight - 64.dp)) {

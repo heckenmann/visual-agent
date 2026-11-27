@@ -86,6 +86,7 @@ fun VisualAgentComposeApp(
                 workspaceFiles = deps.applicationPort.workspaceFiles,
                 directoryAccess = deps.applicationPort.directoryAccess,
                 serverTerminalConsent = deps.applicationPort.serverTerminalConsent,
+                certificates = deps.applicationPort.certificates,
                 canvas = deps.applicationPort.canvas,
                 conversation = conversationPort,
                 conversationSuggestions = deps.applicationPort.conversationSuggestions,

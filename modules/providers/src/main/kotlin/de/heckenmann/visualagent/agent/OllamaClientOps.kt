@@ -1,6 +1,5 @@
 package de.heckenmann.visualagent.agent
 
-import de.heckenmann.visualagent.agent.ollama.createOllamaApi
 import de.heckenmann.visualagent.agent.provider.ProviderProfile
 import de.heckenmann.visualagent.agent.provider.ProviderRuntimeConfig
 import mu.KotlinLogging
@@ -17,6 +16,7 @@ import reactor.core.scheduler.Schedulers
 internal class OllamaClientOps(
     private val ollamaApi: OllamaApi,
     private val appConfig: ProviderRuntimeConfig,
+    private val profileApi: (ProviderProfile) -> OllamaApi,
 ) {
     private val logger = KotlinLogging.logger {}
 
@@ -45,7 +45,7 @@ internal class OllamaClientOps(
         Mono
             .fromCallable {
                 try {
-                    createOllamaApi(profile, appConfig).listModels()
+                    profileApi(profile).listModels()
                     true
                 } catch (e: Exception) {
                     logger.warn(e) { "Ollama profile connection check failed" }
@@ -86,7 +86,7 @@ internal class OllamaClientOps(
         Mono
             .fromCallable {
                 val models =
-                    createOllamaApi(profile, appConfig)
+                    profileApi(profile)
                         .listModels()
                         .models()
                         .mapNotNull { model -> model.name() }
@@ -107,7 +107,7 @@ internal class OllamaClientOps(
     ): Mono<ShowResponse> =
         Mono
             .fromCallable {
-                val response = createOllamaApi(profile, appConfig).showModel(OllamaApi.ShowModelRequest(modelName))
+                val response = profileApi(profile).showModel(OllamaApi.ShowModelRequest(modelName))
                 ShowResponse(
                     model = modelName,
                     modifiedAt = "",

@@ -5,6 +5,7 @@ import de.heckenmann.visualagent.protocol.AgentPort
 import de.heckenmann.visualagent.protocol.ApplicationInformationPort
 import de.heckenmann.visualagent.protocol.ApplicationPort
 import de.heckenmann.visualagent.protocol.CanvasPort
+import de.heckenmann.visualagent.protocol.CertificateTrustPort
 import de.heckenmann.visualagent.protocol.ConversationPort
 import de.heckenmann.visualagent.protocol.ConversationSuggestionPort
 import de.heckenmann.visualagent.protocol.DirectoryGrantAdministrationPort
@@ -43,6 +44,7 @@ class SpringApplicationPort(
     override val lifecycle: LifecyclePort,
     private val agentManager: de.heckenmann.visualagent.agent.AgentManager,
     override val serverTerminalConsent: TerminalConsentPort? = null,
+    override val certificates: CertificateTrustPort? = null,
 ) : ApplicationPort {
     override fun cancelActiveWork() {
         if (lifecycle.closing) {

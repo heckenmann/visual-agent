@@ -24,11 +24,23 @@ let the configured main model create a first sub-agent after the desktop client 
 5. The server validates the exact provider/model selection.
 6. After successful validation the server saves and activates the provider selection.
 7. The wizard displays all existing persisted sub-agents from this server and a prefilled example request for a Researcher.
-8. The user may edit the request and ask the configured Main Agent to create a sub-agent through its normal `agent:list` and `agent:create` flow.
-9. The user finishes onboarding, or skips only the optional sub-agent step; the server then marks onboarding completed.
-10. The desktop opens the workspace.
+8. The wizard checks that the selected model supports tool calling and that `agent:list` and `agent:create` are enabled by the Main Agent tool settings. If the model is incompatible, the user may return to model selection. If required tools are disabled, the wizard explains the setting to change. The user may skip the optional step, including when the server cannot load its availability after saving the provider.
+9. When creation is available, the user may edit the request and ask the configured Main Agent to create a sub-agent through its normal tool execution flow. It uses direct function definitions when they fit the context budget, or the existing `tool_help` fallback when enabled.
+10. The wizard refreshes the persisted sub-agent list after the model request and reports when that request finishes without a successful creation tool call.
+11. The user finishes onboarding, or skips only the optional sub-agent step; the server then marks onboarding completed.
+12. The desktop opens the workspace.
 
 ## Alternative Flow
+
+### Provider uses a private CA
+
+1. If discovery or validation fails because the issuer is untrusted, the wizard opens **Review server certificates**. The server fetches public certificates from the configured HTTPS endpoint without using provider credentials.
+2. The review lists the server certificate and the intermediate CAs and root CA that the endpoint presents. Each entry shows its SHA-256 fingerprint. An eligible root CA is recommended and preselected when available. The user compares the fingerprints with a trusted source and may select any combination before confirming **Import selected certificates**.
+3. The connected Visual Agent server verifies that the chain still matches the review and that TLS succeeds for the endpoint hostname with the selected trust. A CA-only selection must validate the chain through a selected CA. It saves the selection in its managed trust store (UC-0000132). A server certificate is trusted only for the reviewed hostname and port. Imported CAs apply to outbound TLS on the server.
+4. **Import CA certificate** also accepts one public X.509 CA from a trusted PEM file or pasted text, including when the server omits the root CA.
+5. The wizard keeps the staged provider and credentials and refreshes model discovery after a successful import in the model step. The user can then retry validation with the updated trust.
+
+### Skip setup
 
 1. The user chooses **Skip setup**.
 2. The server stores `DISMISSED` without changing provider configuration.
@@ -80,9 +92,12 @@ and persisted sub-agents; the desktop never reads existing credentials.
 - Manual cancellation does not change the server-owned onboarding state.
 - Settings > Providers can open the manual onboarding flow for the current server.
 - Provider/model validation occurs in the connected Visual Agent server environment.
+- CA import is available before provider discovery and validation. After a trust error, the user can import the CA and retry in the same wizard, preserving the provider draft. Hostname mismatches continue to fail.
 - Model discovery preserves provider-supplied metadata when available and can be refreshed without saving configuration.
 - Existing sub-agents are shown before the optional creation request.
 - The Researcher example is editable and is sent through the normal Main Agent conversation path.
+- The optional sub-agent step explains when tool calling or required globally enabled tools are unavailable and remains skippable.
+- A model reply that does not create a sub-agent is reported, and the persisted agent list is refreshed after each request.
 - Sub-agent setup can be skipped without undoing the configured provider and model.
 - No onboarding code creates a sub-agent directly; model-owned creation remains an explicit `agent:create` action.
 

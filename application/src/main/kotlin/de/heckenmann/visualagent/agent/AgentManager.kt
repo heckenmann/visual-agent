@@ -247,6 +247,12 @@ class AgentManager
             token: CancellationToken? = null,
         ): String = conversationOps.sendMessage(content, token)
 
+        /** Sends a main-agent message with a server-assigned identity for observing its tool results. */
+        internal suspend fun sendMessage(
+            content: String,
+            requestId: String,
+        ): String = conversationOps.sendMessage(content, requestId = requestId)
+
         /** Streams a user message while preserving caller-provided conversation entry identities. */
         suspend fun streamMessage(
             content: String,

@@ -17,6 +17,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import de.heckenmann.visualagent.protocol.OnboardingAgent
+import de.heckenmann.visualagent.protocol.OnboardingAgentCreationAvailability
 
 internal const val DEFAULT_RESEARCHER_REQUEST =
     "Create a Researcher sub-agent that can investigate topics, find reliable sources, " +
@@ -30,11 +31,19 @@ internal fun ColumnScope.OnboardingAgentStep(
     creating: Boolean,
     resultMessage: String?,
     error: String?,
+    availability: OnboardingAgentCreationAvailability?,
     onDescriptionChange: (String) -> Unit,
     onCreate: () -> Unit,
+    onSelectModel: () -> Unit,
 ) {
     Text("Create your first sub-agent", style = MaterialTheme.typography.titleLarge)
     Text("Describe a helper for the main model to create. You can also do this later in the conversation.")
+    availability?.takeUnless { it.available }?.let { unavailable ->
+        Text(unavailable.reason.orEmpty(), color = MaterialTheme.colorScheme.error)
+        if (unavailable.canSelectAnotherModel) {
+            Button(onClick = onSelectModel) { Text("Choose another model") }
+        }
+    }
     if (agents.isNotEmpty()) {
         Text("Existing sub-agents", style = MaterialTheme.typography.titleMedium)
         LazyColumn(Modifier.weight(1f, fill = false).fillMaxWidth()) {
@@ -52,7 +61,7 @@ internal fun ColumnScope.OnboardingAgentStep(
         maxLines = 3,
         modifier = Modifier.fillMaxWidth(),
     )
-    Button(onClick = onCreate, enabled = description.isNotBlank() && !creating) {
+    Button(onClick = onCreate, enabled = description.isNotBlank() && !creating && availability?.available != false) {
         if (creating) CircularProgressIndicator(modifier = Modifier.padding(end = 8.dp))
         Text(if (creating) "Creating…" else "Ask model to create sub-agent")
     }
