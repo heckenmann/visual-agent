@@ -165,6 +165,7 @@ internal fun ComposeSplitWorkspace(
                                 .fillMaxSize()
                                 .testTag("workspace-viewport")
                                 .onPointerEvent(PointerEventType.Scroll) { event ->
+                                    if (event.changes.any { it.isConsumed }) return@onPointerEvent
                                     val change = event.changes.firstOrNull()
                                     val scrollDelta = change?.scrollDelta
                                     val horizontalScrollDelta = scrollDelta?.x ?: 0f
