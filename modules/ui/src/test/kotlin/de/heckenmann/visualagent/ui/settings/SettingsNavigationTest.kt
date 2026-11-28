@@ -59,13 +59,15 @@ class SettingsNavigationTest {
         val firstTab = compose.onAllNodesWithText("Appearance")[0]
         firstTab.performSemanticsAction(SemanticsActions.RequestFocus) { it() }
         val lastTab = compose.onAllNodesWithText("Updates")[0]
-        lastTab.performKeyInput {
+        firstTab.performKeyInput {
             repeat(5) {
                 keyDown(Key.Tab)
                 keyUp(Key.Tab)
             }
         }
-        lastTab.assertIsFocused().assertIsDisplayed()
+        compose.waitForIdle()
+        lastTab.assertIsFocused()
+        lastTab.assertIsDisplayed()
         lastTab.performKeyInput {
             keyDown(Key.Enter)
             keyUp(Key.Enter)
