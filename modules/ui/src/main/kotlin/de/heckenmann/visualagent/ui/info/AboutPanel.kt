@@ -14,9 +14,10 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.Description
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.PrimaryTabRow
+import androidx.compose.material3.PrimaryScrollableTabRow
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -42,6 +43,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /** Shows project identity, current runtime information, project resources, and bundled licenses. */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun AboutPanel(
     informationPort: ApplicationInformationPort,
@@ -75,7 +77,7 @@ internal fun AboutPanel(
         }
         Spacer(Modifier.height(12.dp))
         HorizontalDivider()
-        PrimaryTabRow(selectedTabIndex = selectedTab) {
+        PrimaryScrollableTabRow(selectedTabIndex = selectedTab, edgePadding = 0.dp) {
             Tab(
                 selected = selectedTab == OVERVIEW_TAB,
                 onClick = { selectedTab = OVERVIEW_TAB },

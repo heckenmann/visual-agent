@@ -9,14 +9,21 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.UriHandler
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performKeyInput
+import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeLeft
 import androidx.compose.ui.unit.dp
 import de.heckenmann.visualagent.AppIdentity
 import de.heckenmann.visualagent.protocol.ApplicationInformation
@@ -83,6 +90,48 @@ class AboutPanelTest {
 
         compose.onNodeWithContentDescription("View Visual Agent license").performClick()
         compose.onNodeWithText("Filter licenses").assertExists()
+        compose.onNodeWithText("Project MIT license text").assertExists()
+    }
+
+    @Test
+    fun `rightmost tab stays reachable in a narrow panel`() {
+        compose.setContent {
+            MaterialTheme {
+                Box(Modifier.width(160.dp).height(480.dp)) {
+                    AboutPanel(applicationInformationPort(), licensePort())
+                }
+            }
+        }
+        compose.waitForIdle()
+
+        compose.onNodeWithText("Overview").performTouchInput { swipeLeft() }
+        compose.onNodeWithText("Open-source licenses").assertIsDisplayed().performClick()
+        compose.waitForIdle()
+
+        compose.onNodeWithText("Filter licenses").assertExists()
+        compose.onNodeWithText("Project MIT license text").assertExists()
+    }
+
+    @Test
+    fun `rightmost tab can be selected with the keyboard in a narrow panel`() {
+        compose.setContent {
+            MaterialTheme {
+                Box(Modifier.width(160.dp).height(480.dp)) {
+                    AboutPanel(applicationInformationPort(), licensePort())
+                }
+            }
+        }
+        compose.waitForIdle()
+
+        val rightmostTab = compose.onNodeWithText("Open-source licenses")
+        rightmostTab.performSemanticsAction(SemanticsActions.RequestFocus) { it() }
+        rightmostTab.performKeyInput {
+            keyDown(Key.Enter)
+            keyUp(Key.Enter)
+        }
+        compose.waitForIdle()
+
+        rightmostTab.assertIsDisplayed()
         compose.onNodeWithText("Project MIT license text").assertExists()
     }
 

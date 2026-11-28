@@ -4,12 +4,13 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.PrimaryTabRow
+import androidx.compose.material3.PrimaryScrollableTabRow
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -19,6 +20,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.unit.dp
 import de.heckenmann.visualagent.protocol.ProviderPort
 import de.heckenmann.visualagent.protocol.ProviderProfile
 import de.heckenmann.visualagent.protocol.SettingsPort
@@ -45,6 +48,8 @@ internal fun ConversationSettingsPage(
     onManageProviders: () -> Unit,
 ) {
     var selected by remember { mutableStateOf(0) }
+    val tabScrollState = rememberScrollState()
+    var tabRowWidth by remember { mutableStateOf(0) }
     val model = remember { SettingsPageDraft() }
     val conversation = remember { SettingsPageDraft() }
     var profiles by remember(providers) { mutableStateOf(emptyList<ProviderProfile>()) }
@@ -60,12 +65,20 @@ internal fun ConversationSettingsPage(
             catalogError = error.toUiErrorMessage()
         }
     }
+    LaunchedEffect(tabRowWidth, selected) {
+        if (selected > 0) tabScrollState.animateScrollTo(tabScrollState.maxValue)
+    }
     Column(Modifier.fillMaxSize()) {
         catalogError?.let { error ->
             PanelInfoBox(error)
             ActionIconButton(Icons.Filled.Refresh, "Retry loading providers", onClick = { catalogRevision++ })
         }
-        PrimaryTabRow(selectedTabIndex = selected) {
+        PrimaryScrollableTabRow(
+            selectedTabIndex = selected,
+            scrollState = tabScrollState,
+            modifier = Modifier.onSizeChanged { tabRowWidth = it.width },
+            edgePadding = 0.dp,
+        ) {
             listOf("Model", "Conversation").forEachIndexed { index, label ->
                 Tab(selected == index, onClick = { selected = index }, text = { Text(label) })
             }

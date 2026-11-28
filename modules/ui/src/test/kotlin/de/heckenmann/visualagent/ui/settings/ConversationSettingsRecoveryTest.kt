@@ -1,12 +1,23 @@
 package de.heckenmann.visualagent.ui.settings
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextReplacement
+import androidx.compose.ui.unit.dp
 import de.heckenmann.visualagent.protocol.ModelDetails
 import de.heckenmann.visualagent.protocol.ProviderAdapter
 import de.heckenmann.visualagent.protocol.ProviderModel
@@ -30,6 +41,49 @@ class ConversationSettingsRecoveryTest {
     private val settings = mockk<SettingsPort>(relaxed = true)
     private val profile =
         ProviderProfile("local", "Local provider", ProviderAdapter.OLLAMA, "http://localhost", models = listOf(ProviderModel("model")))
+
+    @Test fun `conversation settings tab is reachable in a narrow panel`() {
+        every { providers.listProviders() } returns listOf(profile)
+        coEvery { settings.snapshotAsync() } returns SettingsSnapshot()
+        compose.setContent {
+            MaterialTheme {
+                Box(Modifier.width(160.dp).height(480.dp)) {
+                    ConversationSettingsPage(settings, providers, {}, {})
+                }
+            }
+        }
+
+        compose
+            .onAllNodesWithText("Conversation")[0]
+            .performClick()
+            .assertIsSelected()
+            .assertIsDisplayed()
+        compose.onNodeWithText("Queue flush").assertExists()
+    }
+
+    @Test fun `selected conversation tab remains visible when the panel narrows`() {
+        every { providers.listProviders() } returns listOf(profile)
+        coEvery { settings.snapshotAsync() } returns SettingsSnapshot()
+        val panelWidth = mutableStateOf(320.dp)
+        compose.setContent {
+            MaterialTheme {
+                Box(Modifier.width(panelWidth.value).height(480.dp)) {
+                    ConversationSettingsPage(settings, providers, {}, {})
+                }
+            }
+        }
+
+        val conversationTab = compose.onAllNodesWithText("Conversation")[0]
+        conversationTab.performClick().assertIsSelected()
+        compose
+            .onNodeWithContentDescription("Automatic prompt interpolation")
+            .performSemanticsAction(SemanticsActions.RequestFocus) { it() }
+        compose.runOnIdle { panelWidth.value = 160.dp }
+        compose.waitForIdle()
+
+        conversationTab.assertIsSelected().assertIsDisplayed()
+        compose.onNodeWithText("Queue flush").assertExists()
+    }
 
     @Test fun `a delayed context capacity preserves a newer smaller user budget`() {
         val requested = CompletableDeferred<Unit>()
